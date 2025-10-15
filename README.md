@@ -1,4 +1,9 @@
 # **Projektauftrag: Indooro**
+Erik Bergmair
+Michael Stelzmüller
+Fabian Joos
+Niilo Rieser
+David Berghahn
 
 ### **Projektbezeichnung**
 Indooro
