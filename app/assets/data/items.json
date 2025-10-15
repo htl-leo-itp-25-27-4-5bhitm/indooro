@@ -1,0 +1,112 @@
+[
+  {
+    "id": 1,
+    "name": "SPAR Frische Vollmilch 1L",
+    "category": "Molkereiprodukte",
+    "price": 1.59,
+    "location": {
+      "aisle": 7,
+      "nodeId": "N-07-A",
+      "description": "Anfang des Gangs, linke Seite, im Kühlregal"
+    }
+  },
+  {
+    "id": 2,
+    "name": "Barilla Spaghetti N.5 500g",
+    "category": "Teigwaren & Nudeln",
+    "price": 1.99,
+    "location": {
+      "aisle": 3,
+      "nodeId": "N-03-B",
+      "description": "Mitte des Gangs, rechte Seite"
+    }
+  },
+  {
+    "id": 3,
+    "name": "Kelly's Chips Classic",
+    "category": "Snacks & Süßwaren",
+    "price": 2.49,
+    "location": {
+      "aisle": 5,
+      "nodeId": "N-05-C",
+      "description": "Ende des Gangs, linke Seite"
+    }
+  },
+  {
+    "id": 4,
+    "name": "SPAR Natur*pur Bio-Haferflocken 500g",
+    "category": "Müsli & Frühstück",
+    "price": 1.89,
+    "location": {
+      "aisle": 2,
+      "nodeId": "N-02-A",
+      "description": "Anfang des Gangs, rechte Seite, bei den Cerealien"
+    }
+  },
+  {
+    "id": 5,
+    "name": "Vöslauer Mineralwasser prickelnd 1.5L",
+    "category": "Getränke",
+    "price": 0.89,
+    "location": {
+      "aisle": 8,
+      "nodeId": "N-08-D",
+      "description": "Ende des Gangs, bei den PET-Flaschen"
+    }
+  },
+  {
+    "id": 6,
+    "name": "Iglo Fischstäbchen 15 Stk.",
+    "category": "Tiefkühlprodukte",
+    "price": 4.99,
+    "location": {
+      "aisle": 9,
+      "nodeId": "N-09-T",
+      "description": "Tiefkühltruhe, Mitte"
+    }
+  },
+  {
+    "id": 7,
+    "name": "SPAR Tomaten passiert 500g",
+    "category": "Konserven & Saucen",
+    "price": 0.99,
+    "location": {
+      "aisle": 3,
+      "nodeId": "N-03-C",
+      "description": "Ende des Gangs, linke Seite, bei den Tomatensaucen"
+    }
+  },
+  {
+    "id": 8,
+    "name": "Frosch Citrus Dusche & Bad-Reiniger",
+    "category": "Haushalt & Reinigung",
+    "price": 2.79,
+    "location": {
+      "aisle": 6,
+      "nodeId": "N-06-A",
+      "description": "Anfang des Gangs, rechte Seite"
+    }
+  },
+  {
+    "id": 9,
+    "name": "Gala Äpfel lose",
+    "category": "Obst & Gemüse",
+    "price": 2.99,
+    "location": {
+      "aisle": 1,
+      "nodeId": "N-01-O",
+      "description": "Im Eingangsbereich, Obstabteilung (Preis pro kg)"
+    }
+  },
+  {
+    "id": 10,
+    "name": "SPAR Gouda in Scheiben 250g",
+    "category": "Käse & Wurst",
+    "price": 3.49,
+    "location": {
+      "aisle": 7,
+      "nodeId": "N-07-C",
+      "description": "Ende des Gangs, linke Seite, im Kühlregal"
+    }
+  }
+]
