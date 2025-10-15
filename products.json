@@ -1,0 +1,20 @@
+[
+    {
+        "id": 1,
+        "name": "Mezzo Mix 0.5L Pet Fl.",
+        "price": 1.59,
+        "receipt_plan": "510/3/1/5/2/14"
+    },
+    {
+        "id": 2,
+        "name": "CocaCola 0.5L Pet Fl.",
+        "price": 2.59,
+        "receipt_plan": "510/7/2/4/2/10"
+    },
+    {
+        "id": 3,
+        "name": "Fanta 0.5L Pet Fl.",
+        "price": 2.19,
+        "receipt_plan": "510/4/3/2/2/12"
+    }
+]
