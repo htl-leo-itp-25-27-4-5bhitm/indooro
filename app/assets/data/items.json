@@ -17,7 +17,7 @@
     "price": 1.99,
     "location": {
       "aisle": 3,
-      "nodeId": "N-03-B",
+      "nodeId": "N-03-C",
       "description": "Mitte des Gangs, rechte Seite"
     }
   },
@@ -50,7 +50,7 @@
     "price": 0.89,
     "location": {
       "aisle": 8,
-      "nodeId": "N-08-D",
+      "nodeId": "N-08-A",
       "description": "Ende des Gangs, bei den PET-Flaschen"
     }
   },
@@ -61,7 +61,7 @@
     "price": 4.99,
     "location": {
       "aisle": 9,
-      "nodeId": "N-09-T",
+      "nodeId": "N-09-B",
       "description": "Tiefkühltruhe, Mitte"
     }
   },
@@ -94,7 +94,7 @@
     "price": 2.99,
     "location": {
       "aisle": 1,
-      "nodeId": "N-01-O",
+      "nodeId": "N-01-A",
       "description": "Im Eingangsbereich, Obstabteilung (Preis pro kg)"
     }
   },

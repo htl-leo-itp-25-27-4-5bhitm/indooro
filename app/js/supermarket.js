@@ -26,9 +26,9 @@ function createSupermarketLayout(container) {
     const shelveGroups = [
         [1, 2],     // Regal 1 and 2
         [3, 4],     // Regal 3 and 4
-        [5, 6],     // Unnamed shelves in group 3
-        [7, 8],     // Unnamed shelves in group 4
-        [9, 10],    // Unnamed shelves in group 5
+        [5, 6],     // Regal 5 and 6
+        [7, 8],     // Regal 7 and 8
+        [9, 10],    // Regal 9 and 10
     ];
     
     const supermarket = document.createElement('div');
@@ -43,13 +43,7 @@ function createSupermarketLayout(container) {
             shelf.className = 'shelf';
             shelf.id = `shelf-${shelfNum}`;
             
-            // Add shelf label for the first 4 shelves as shown in image
-            if (shelfNum <= 4) {
-                const label = document.createElement('div');
-                label.className = 'shelf-label';
-                label.textContent = `Regal ${shelfNum}`;
-                shelf.appendChild(label);
-            }
+
             
             // Create grid cells for each shelf (9 columns as shown in image)
             for (let i = 0; i < 9; i++) {
@@ -204,6 +198,7 @@ function showProductDetails(product) {
             <div class="location-details">
                 <p><strong>Standort:</strong></p>
                 <p>Gang ${product.location.aisle}</p>
+                <p>ID ${product.location.nodeId}</p>
                 <p>${product.location.description}</p>
             </div>
         `;
