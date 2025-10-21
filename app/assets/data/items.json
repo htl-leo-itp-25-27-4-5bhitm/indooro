@@ -27,7 +27,7 @@
     "category": "Snacks & Süßwaren",
     "price": 2.49,
     "location": {
-      "aisle": 5,
+      "aisle": 5, 
       "nodeId": "N-05-C",
       "description": "Ende des Gangs, linke Seite"
     }

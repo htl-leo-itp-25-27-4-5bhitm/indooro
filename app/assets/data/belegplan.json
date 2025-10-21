@@ -1,0 +1,202 @@
+[
+  {
+    "id": 1,
+    "name": "SPAR Frische Vollmilch 1L",
+    "category": "Molkereiprodukte",
+    "categoryCode": 520,
+    "price": 1.59,
+    "layoutCode": "520/3/2/1/1/20"
+  },
+  {
+    "id": 2,
+    "name": "SPAR Haltbare Vollmilch 1L",
+    "category": "Molkereiprodukte",
+    "categoryCode": 520,
+    "price": 1.39,
+    "layoutCode": "520/3/2/2/1/25"
+  },
+  {
+    "id": 3,
+    "name": "SPAR Gouda in Scheiben 250g",
+    "category": "Käse & Wurst",
+    "categoryCode": 525,
+    "price": 3.49,
+    "layoutCode": "525/3/2/1/1/20"
+  },
+  {
+    "id": 4,
+    "name": "SPAR Edamer in Scheiben 250g",
+    "category": "Käse & Wurst",
+    "categoryCode": 525,
+    "price": 3.29,
+    "layoutCode": "525/3/2/2/1/20"
+  },
+  {
+    "id": 5,
+    "name": "Vöslauer Mineralwasser prickelnd 1.5L",
+    "category": "Getränke",
+    "categoryCode": 510,
+    "price": 0.89,
+    "layoutCode": "510/3/3/2/1/16"
+  },
+  {
+    "id": 6,
+    "name": "Vöslauer Mineralwasser still 1.5L",
+    "category": "Getränke",
+    "categoryCode": 510,
+    "price": 0.89,
+    "layoutCode": "510/3/3/3/1/16"
+  },
+  {
+    "id": 7,
+    "name": "Coca-Cola 1.5L",
+    "category": "Getränke",
+    "categoryCode": 510,
+    "price": 1.69,
+    "layoutCode": "510/4/3/1/1/18"
+  },
+  {
+    "id": 8,
+    "name": "Fanta Orange 1.5L",
+    "category": "Getränke",
+    "categoryCode": 510,
+    "price": 1.69,
+    "layoutCode": "510/4/3/2/1/18"
+  },
+  {
+    "id": 9,
+    "name": "Barilla Spaghetti N.5 500g",
+    "category": "Teigwaren & Nudeln",
+    "categoryCode": 430,
+    "price": 1.99,
+    "layoutCode": "430/2/3/1/1/25"
+  },
+  {
+    "id": 10,
+    "name": "Barilla Penne Rigate 500g",
+    "category": "Teigwaren & Nudeln",
+    "categoryCode": 430,
+    "price": 1.99,
+    "layoutCode": "430/2/3/2/1/25"
+  },
+  {
+    "id": 11,
+    "name": "SPAR Natur*pur Bio-Haferflocken 500g",
+    "category": "Müsli & Frühstück",
+    "categoryCode": 440,
+    "price": 1.89,
+    "layoutCode": "440/1/3/1/1/30"
+  },
+  {
+    "id": 12,
+    "name": "Kellogg’s Cornflakes 375g",
+    "category": "Müsli & Frühstück",
+    "categoryCode": 440,
+    "price": 2.49,
+    "layoutCode": "440/1/3/2/1/25"
+  },
+  {
+    "id": 13,
+    "name": "SPAR Tomaten passiert 500g",
+    "category": "Konserven & Saucen",
+    "categoryCode": 420,
+    "price": 0.99,
+    "layoutCode": "420/3/2/1/1/24"
+  },
+  {
+    "id": 14,
+    "name": "Mutti Tomatenmark 200g",
+    "category": "Konserven & Saucen",
+    "categoryCode": 420,
+    "price": 1.19,
+    "layoutCode": "420/3/2/2/1/30"
+  },
+  {
+    "id": 15,
+    "name": "Kelly’s Chips Classic",
+    "category": "Snacks & Süßwaren",
+    "categoryCode": 470,
+    "price": 2.49,
+    "layoutCode": "470/4/2/2/1/18"
+  },
+  {
+    "id": 16,
+    "name": "Manner Schnitten 200g",
+    "category": "Snacks & Süßwaren",
+    "categoryCode": 470,
+    "price": 2.79,
+    "layoutCode": "470/4/2/3/1/20"
+  },
+  {
+    "id": 17,
+    "name": "Gala Äpfel lose",
+    "category": "Obst & Gemüse",
+    "categoryCode": 310,
+    "price": 2.99,
+    "layoutCode": "310/1/1/1/1/50"
+  },
+  {
+    "id": 18,
+    "name": "Bananen lose",
+    "category": "Obst & Gemüse",
+    "categoryCode": 310,
+    "price": 1.99,
+    "layoutCode": "310/1/1/2/1/60"
+  },
+  {
+    "id": 19,
+    "name": "Iglo Fischstäbchen 15 Stk.",
+    "category": "Tiefkühlprodukte",
+    "categoryCode": 530,
+    "price": 4.99,
+    "layoutCode": "530/2/2/1/1/12"
+  },
+  {
+    "id": 20,
+    "name": "Iglo Rahmspinat 450g",
+    "category": "Tiefkühlprodukte",
+    "categoryCode": 530,
+    "price": 2.79,
+    "layoutCode": "530/2/2/2/1/15"
+  },
+  {
+    "id": 21,
+    "name": "Frosch Citrus Dusche & Bad-Reiniger",
+    "category": "Haushalt & Reinigung",
+    "categoryCode": 610,
+    "price": 2.79,
+    "layoutCode": "610/2/2/1/1/15"
+  },
+  {
+    "id": 22,
+    "name": "Meister Proper Allzweckreiniger 1L",
+    "category": "Haushalt & Reinigung",
+    "categoryCode": 610,
+    "price": 2.99,
+    "layoutCode": "610/2/2/2/1/20"
+  },
+  {
+    "id": 23,
+    "name": "SPAR Natur*pur Bio-Eier 10 Stk.",
+    "category": "Molkereiprodukte",
+    "categoryCode": 520,
+    "price": 4.19,
+    "layoutCode": "520/3/1/1/1/15"
+  },
+  {
+    "id": 24,
+    "name": "Rama Original 500g",
+    "category": "Molkereiprodukte",
+    "categoryCode": 520,
+    "price": 2.59,
+    "layoutCode": "520/3/1/2/1/20"
+  },
+  {
+    "id": 25,
+    "name": "SPAR Speiseöl Sonnenblume 1L",
+    "category": "Öle & Essig",
+    "categoryCode": 450,
+    "price": 3.29,
+    "layoutCode": "450/2/3/1/1/18"
+  }
+]

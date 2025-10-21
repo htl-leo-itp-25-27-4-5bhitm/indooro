@@ -91,7 +91,7 @@ function createProductDetailsPanel(parentElement) {
 
 function loadProducts() {
     // Fix the path to point to the correct location of items.json
-    fetch('assets/data/items.json')
+    fetch('../assets/data/items.json')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! Status: ${response.status}`);
