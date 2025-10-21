@@ -1,0 +1,208 @@
+async function loadProducts() {
+  const res = await fetch('../assets/data/belegplan.json');
+  if (!res.ok) throw new Error('Netzwerkfehler');
+  const raw = await res.json();
+  return enrichProducts(raw);
+}
+
+function parseLayoutCode(code) {
+  if (typeof code !== 'string') return null;
+  const parts = code.split('/');
+  if (parts.length !== 6) return null;
+  const [cat, meter, fach, reihe, reihenAnzahl, kapazitaet] = parts.map(n => Number.parseInt(n, 10));
+  if ([cat, meter, fach, reihe, reihenAnzahl, kapazitaet].some(n => !Number.isFinite(n))) return null;
+  return { cat, meter, fach, reihe, reihenAnzahl, kapazitaet };
+}
+
+function enrichProducts(products) {
+  const out = [];
+  for (const p of products) {
+    const layout = parseLayoutCode(p.layoutCode);
+    if (!layout) {
+      console.warn('Ignoriere Produkt mit ungültigem layoutCode:', p);
+      continue;
+    }
+    out.push({ ...p, layout });
+  }
+  return out;
+}
+
+function buildModel(products) {
+  const model = {};
+  for (const p of products) {
+    const cat = p.categoryCode;
+    if (!model[cat]) {
+      model[cat] = {
+        categoryCode: cat,
+        categoryName: p.category,
+        products: [],
+        meters: { 1: [], 2: [], 3: [], 4: [], 5: [] }
+      };
+    }
+    model[cat].products.push(p);
+    const m = Math.min(5, Math.max(1, p.layout.meter));
+    model[cat].meters[m].push(p);
+  }
+  return model;
+}
+
+function renderMarket(model) {
+  const container = document.getElementById('supermarket-container');
+  container.innerHTML = '';
+  
+  const categories = Object.values(model).sort((a, b) => a.categoryCode - b.categoryCode);
+  
+  categories.forEach((category, index) => {
+    const row = document.createElement('div');
+    row.className = 'shelf-row';
+    
+    const label = document.createElement('div');
+    label.className = 'shelf-label';
+    label.textContent = category.categoryCode;
+    row.appendChild(label);
+    
+    for (let meter = 1; meter <= 5; meter++) {
+      const shelfMeter = document.createElement('div');
+      shelfMeter.className = 'shelf-meter';
+      shelfMeter.dataset.cat = category.categoryCode;
+      shelfMeter.dataset.meter = meter;
+      shelfMeter.setAttribute('role', 'button');
+      shelfMeter.setAttribute('tabindex', '0');
+      shelfMeter.setAttribute('aria-label', `Kategorie ${category.categoryCode}, Meter ${meter}`);
+      
+      const productsInMeter = category.meters[meter] || [];
+      productsInMeter.forEach(product => {
+        const marker = document.createElement('div');
+        marker.className = 'product-marker';
+        marker.title = `${product.name} – €${product.price.toFixed(2)}`;
+        shelfMeter.appendChild(marker);
+      });
+      
+      row.appendChild(shelfMeter);
+    }
+    
+    container.appendChild(row);
+    
+    if (index < categories.length - 1) {
+      const gang = document.createElement('div');
+      gang.className = 'gang';
+      container.appendChild(gang);
+    }
+  });
+  
+  container.addEventListener('click', (e) => {
+    const meter = e.target.closest('.shelf-meter');
+    if (!meter) return;
+    
+    const cat = Number(meter.dataset.cat);
+    const meterNum = Number(meter.dataset.meter);
+    
+    document.querySelectorAll('.shelf-meter').forEach(el => el.classList.remove('selected'));
+    meter.classList.add('selected');
+    
+    renderShelfDetail(cat, meterNum, model);
+  });
+  
+  container.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const meter = e.target.closest('.shelf-meter');
+    if (!meter) return;
+    
+    e.preventDefault();
+    const cat = Number(meter.dataset.cat);
+    const meterNum = Number(meter.dataset.meter);
+    
+    document.querySelectorAll('.shelf-meter').forEach(el => el.classList.remove('selected'));
+    meter.classList.add('selected');
+    
+    renderShelfDetail(cat, meterNum, model);
+  });
+}
+
+function renderShelfDetail(categoryCode, meter, model) {
+  const panel = document.getElementById('shelf-details-content');
+  panel.innerHTML = '';
+  
+  const header = document.createElement('h2');
+  header.textContent = `${resolveCategoryName(categoryCode, model)} – Meter ${meter}`;
+  panel.appendChild(header);
+  
+  const list = (model[categoryCode]?.meters?.[meter] ?? []).filter(p => p?.layout);
+  
+  if (list.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-message';
+    empty.textContent = 'Keine Produkte in diesem Regalabschnitt.';
+    panel.appendChild(empty);
+    return;
+  }
+  
+  const maxFach = list.reduce((acc, p) => Math.max(acc, p.layout.fach ?? 0), 0) || 1;
+  const maxReihe = list.reduce((acc, p) => Math.max(acc, p.layout.reihe ?? 0), 0) || 1;
+  
+  const grid = document.createElement('div');
+  grid.className = 'shelf-matrix';
+  grid.style.gridTemplateRows = `repeat(${maxFach}, minmax(60px, auto))`;
+  grid.style.gridTemplateColumns = `repeat(${maxReihe}, 1fr)`;
+  
+  const cellMap = new Map();
+  
+  list.sort((a, b) => 
+    (a.layout.fach - b.layout.fach) || 
+    (a.layout.reihe - b.layout.reihe) || 
+    a.name.localeCompare(b.name)
+  );
+  
+  for (const p of list) {
+    const { fach, reihe, reihenAnzahl, kapazitaet } = p.layout;
+    const key = `${fach}-${reihe}`;
+    
+    if (!cellMap.has(key)) {
+      const cell = document.createElement('div');
+      cell.className = 'shelf-slot';
+      cell.style.gridRowStart = String(fach);
+      cell.style.gridColumnStart = String(reihe);
+      
+      const title = document.createElement('div');
+      title.className = 'slot-title';
+      title.textContent = `Fach ${fach}, Reihe ${reihe}`;
+      
+      const ul = document.createElement('ul');
+      ul.className = 'slot-products';
+      
+      cell.appendChild(title);
+      cell.appendChild(ul);
+      cellMap.set(key, ul);
+      grid.appendChild(cell);
+    }
+    
+    const ul = cellMap.get(key);
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <div class="product-name">${p.name}</div>
+      <div class="product-price">€${Number(p.price).toFixed(2)}</div>
+      <div class="product-meta">Reihenanzahl: ${reihenAnzahl} · Kapazität: ${kapazitaet}</div>
+    `;
+    ul.appendChild(li);
+  }
+  
+  panel.appendChild(grid);
+}
+
+function resolveCategoryName(categoryCode, model) {
+  return model[categoryCode]?.categoryName || String(categoryCode);
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const enriched = await loadProducts();
+    const model = buildModel(enriched);
+    renderMarket(model);
+  } catch (e) {
+    const panel = document.getElementById('shelf-details-content');
+    if (panel) {
+      panel.innerHTML = '<div class="error-message">Daten konnten nicht geladen werden.</div>';
+    }
+    console.error(e);
+  }
+});
