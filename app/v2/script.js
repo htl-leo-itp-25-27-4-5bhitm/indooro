@@ -1,3 +1,19 @@
+let categoriesMap = {};
+
+async function loadCategories() {
+  try {
+    const res = await fetch('../assets/data/categories.json');
+    if (!res.ok) throw new Error('Categories nicht gefunden');
+    const categories = await res.json();
+    categoriesMap = {};
+    categories.forEach(cat => {
+      categoriesMap[cat.categoryCode] = cat.categoryName;
+    });
+  } catch (error) {
+    console.warn('Categories konnten nicht geladen werden:', error);
+  }
+}
+
 async function loadProducts() {
   const res = await fetch('../assets/data/belegplan.json');
   if (!res.ok) throw new Error('Netzwerkfehler');
@@ -38,7 +54,7 @@ function buildModel(products) {
     if (!model[cat]) {
       model[cat] = {
         categoryCode: cat,
-        categoryName: cat,
+        categoryName: categoriesMap[cat] || `Kategorie ${cat}`,
         products: [],
         meters: { 1: [], 2: [], 3: [], 4: [], 5: [] }
       };
@@ -127,8 +143,10 @@ function renderShelfDetail(categoryCode, meter, model) {
   const panel = document.getElementById('shelf-details-content');
   panel.innerHTML = '';
   
+  const categoryName = model[categoryCode]?.categoryName || `Kategorie ${categoryCode}`;
+  
   const header = document.createElement('h2');
-  header.textContent = `Kategorie ${categoryCode} – Meter ${meter}`;
+  header.textContent = `${categoryName} – Meter ${meter}`;
   panel.appendChild(header);
   
   const list = (model[categoryCode]?.meters?.[meter] ?? []).filter(p => p?.layout);
@@ -198,6 +216,7 @@ function resolveCategoryName(categoryCode, model) {
 
 document.addEventListener('DOMContentLoaded', async () => {
   try {
+    await loadCategories();
     const enriched = await loadProducts();
     const model = buildModel(enriched);
     renderMarket(model);
