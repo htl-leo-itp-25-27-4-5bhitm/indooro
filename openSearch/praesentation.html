@@ -1,80 +1,181 @@
 <!doctype html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <title>OpenSearch Präsentation</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/theme/league.css">
-  </head>
-  <body>
-    <div class="reveal">
-      <div class="slides">
 
+<head>
+  <meta charset="utf-8">
+  <title>OpenSearch Präsentation</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/theme/league.css">
+  <style>
+    .overview-boxes {
+      display: grid;
+      grid-template-columns: 30% 30% 30%;
+      gap: 15px;
+      margin: 30px auto;
+      color: black;
+    }
+
+    .overview-boxes>div {
+      border: 2px solid #007ACC;
+      /* width: 100%; */
+      border-radius: 12px;
+      padding: 15px 20px;
+      background-color: #f0f8ff;
+      font-size: 1em;
+      font-weight: 600;
+      text-align: center;
+      overflow-wrap: break-word;
+      word-wrap: break-word;
+      /* display: grid;
+      align-items: center; */
+    }
+  </style>
+</head>
+
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <section>
+        <h1>OpenSearch</h1>
+        <p>Indooro</p>
+        <!-- <small>Erstellt mit reveal.js</small> -->
+      </section>
+
+      <section>
+        <h2>Übersicht</h2>
+        <div class="overview-boxes">
+          <div>Was ist OpenSearch?</div>
+          <div>Entstehung</div>
+          <div>Wie funktioniert OpenSearch?</div>
+          <div>Funktionen</div>
+          <div>Anwendungsbeispiele</div>
+          <div>Live-Demo & Dashboards</div>
+        </div>
+      </section>
+
+<section>
+  <section>
+    <h2>Was ist OpenSearch?</h2>
+  </section>
+
+  <section>
+    <p><strong>OpenSearch ist eine Open-Source-Such- und Überwachungssuite für Unternehmen, die unstrukturierte Daten in großem Umfang ordnet.</strong></p>
+  </section>
+
+  <section>
+    <p>Entwickler nutzen OpenSearch häufig als Backend für Suchanwendungen, z. B. für <a href="https://en.wikipedia.org/wiki/Wikipedia:FAQ/Technical#What_software_is_used_to_run_Wikipedia?" target="_blank">Wikipedia</a> oder Online-Shops.</p>
+  </section>
+
+  <section>
+    <p>OpenSearch bietet hervorragende Leistung und lässt sich flexibel an die wachsenden oder schrumpfenden Anforderungen der Anwendung anpassen.</p>
+  </section>
+</section>
+
+<!-- <section>
+  <section>
+    <h2>Was ist OpenSearch?</h2>
+  </section>
+  <section>
+    <p><strong>OpenSearch ist eine Open-Source-Such- und Überwachungssuite für Unternehmen, die unstrukturierte Daten in großem Umfang ordnet.</strong></p>
+    <p>Es überrascht daher nicht, dass Entwickler häufig eine Suchmaschine wie OpenSearch als Backend für Suchanwendungen nutzen – beispielsweise für&nbsp;
+      <a href="https://en.wikipedia.org/wiki/Wikipedia:FAQ/Technical#What_software_is_used_to_run_Wikipedia?" target="_blank">Wikipedia</a> oder Online-Shops. OpenSearch bietet hervorragende Leistung und lässt sich flexibel an die wachsenden oder schrumpfenden Anforderungen der Anwendung anpassen.</p>
+  </section>
+</section> -->
+
+
+      <section>
+        <h2>Entstehung</h2>
+      </section>
+
+      <section>
         <section>
-          <h1>🔍 OpenSearch</h1>
-          <p>Die Open-Source-Such- und Analyseplattform</p>
-          <small>Erstellt mit reveal.js</small>
+          <h2>Wie funktioniert OpenSearch?</h2>
+        </section>
+        <section>
+          <h2>Funktionen</h2>
+        </section>
+        <section>
+          <h3><a href="https://opensearch.org/platform/machine-learning/" target="_blank">Maschinelles Lernen & KI</a>
+          </h3>
+          <p>Nutzen Sie integrierte ML-Funktionen, um Anomalien zu erkennen, Vorhersagen zu treffen und intelligente
+            Anwendungen zu entwickeln.</p>
         </section>
 
         <section>
-          <h2>Was ist OpenSearch?</h2>
-          <ul>
-            <li>Open-Source-Such- und Analyse-Engine</li>
-            <li>Fork von Elasticsearch & Kibana (ab Version 7.10)</li>
-            <li>Apache 2.0 Lizenz – frei & offen</li>
-            <li>Entwickelt von Amazon & der Community</li>
-          </ul>
+          <h3><a href="https://opensearch.org/platform/os-search/" target="_blank">Suchen</a></h3>
+          <p>Entwickeln Sie intelligente und effiziente Suchlösungen: Volltextsuche, Relevanzranking und schnelle
+            Datenabfragen.</p>
         </section>
 
         <section>
-          <h2>Wichtige Features</h2>
-          <ul>
-            <li>🔎 Volltextsuche & Filter</li>
-            <li>📊 OpenSearch Dashboards für Visualisierung</li>
-            <li>🧠 Machine Learning & Anomalieerkennung</li>
-            <li>📦 Skalierbar & Cloud-fähig</li>
-            <li>🧭 SQL & Piped Queries</li>
-          </ul>
+          <h3><a href="https://opensearch.org/platform/observability/" target="_blank">Beobachtbarkeit</a></h3>
+          <p>Überwachen, analysieren und beheben Sie Probleme in Anwendungen & Infrastruktur mit Logs, Metriken und
+            Traces.</p>
         </section>
 
         <section>
-          <h2>Typische Anwendungsfälle</h2>
-          <ul>
-            <li>📈 Log-Analyse & Observability</li>
-            <li>🛒 Produktsuche in E-Commerce</li>
-            <li>🔐 Sicherheitsüberwachung</li>
-            <li>📚 Dokumentensuche & Archivierung</li>
-          </ul>
+          <h3><a href="https://opensearch.org/platform/security-analytics/" target="_blank">Sicherheitsanalyse</a></h3>
+          <p>Erkennen Sie Sicherheitsbedrohungen in Echtzeit und reagieren Sie proaktiv auf Angriffe oder Anomalien.</p>
+        </section>
+
+
+
+        <!-- <section>
+  <h2>Wichtige Features</h2>
+  <ul>
+    <li>🔎 Volltextsuche & Filter</li>
+    <li>📊 OpenSearch Dashboards für Visualisierung</li>
+    <li>🧠 Machine Learning & Anomalieerkennung</li>
+    <li>📦 Skalierbar & Cloud-fähig</li>
+    <li>🧭 SQL & Piped Queries</li>
+  </ul>
+</section> -->
+
+      </section>
+
+
+      <section>
+        <section>
+          <h2>Anwendungsbeispiele</h2>
         </section>
 
         <section>
-          <h2>OpenSearch vs Elasticsearch</h2>
-          <p>OpenSearch ist vollständig offen – keine Lizenzbarrieren</p>
-          <ul>
-            <li>✅ Apache 2.0 Lizenz</li>
-            <li>✅ Community-getrieben</li>
-            <li>✅ Kompatibel mit vielen Elasticsearch APIs</li>
-          </ul>
+          <h3>Logging-Systeme</h3>
+          <p>Einsatz in Tools wie <strong>Graylog</strong> zur Analyse, Filterung und Visualisierung von Log-Daten.</p>
         </section>
 
         <section>
-          <h2>Live-Demo & Dashboards</h2>
-          <p>Mit <strong>OpenSearch Dashboards</strong> kannst du Daten interaktiv erkunden:</p>
-          <img src="https://opensearch.org/assets/media/opensearch-dashboards.png" alt="OpenSearch Dashboards" style="width: 80%;">
+          <h3>Cloud-Integration</h3>
+          <p>Bereitstellung über <strong>AWS OpenSearch Service</strong> für skalierbare und verwaltete Such- und
+            Analytics-Workloads.</p>
         </section>
 
         <section>
-          <h2>Fazit</h2>
-          <p><strong>OpenSearch</strong> ist die moderne, offene Plattform für Suche, Analyse und Visualisierung.</p>
-          <p>Bereit für deine Datenprojekte – lokal oder in der Cloud!</p>
+          <h3>Interne Suchfunktionen</h3>
+          <p>Nutzung in <strong>Web-Anwendungen</strong> zur Verbesserung von Navigation und Datenzugriff (z. B.
+            Produktsuche, Dokumentensuche).</p>
         </section>
 
-      </div>
+        <section>
+          <h3>Sicherheits-Monitoring (SIEM)</h3>
+          <p>Erkennung und Analyse von Bedrohungen in Echtzeit zur Unterstützung von <strong>Sicherheits- und
+              Compliance-Prozessen</strong>.</p>
+        </section>
+
+      </section>
+
+
+      <section>
+        <h2>Live-Demo & Dashboards</h2>
+      </section>
     </div>
+  </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.js"></script>
-    <script>
-      Reveal.initialize();
-    </script>
-  </body>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.js"></script>
+  <script>
+    Reveal.initialize();
+  </script>
+</body>
+
 </html>
