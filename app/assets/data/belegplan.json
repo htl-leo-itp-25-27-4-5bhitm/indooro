@@ -3,150 +3,240 @@
     "id": 1,
     "name": "Gala Äpfel lose",
     "price": 2.99,
-    "layoutCode": "310/1/1/1/1/50"
+    "layoutCode": "310/1/1/1"
   },
   {
     "id": 2,
     "name": "Bananen lose",
     "price": 1.99,
-    "layoutCode": "310/1/1/2/1/60"
+    "layoutCode": "310/1/1/2"
   },
   {
     "id": 3,
-    "name": "SPAR Tomaten passiert 500g",
-    "price": 0.99,
-    "layoutCode": "420/3/2/1/1/24"
+    "name": "SPAR Natur*pur Bio-Bananen",
+    "price": 2.49,
+    "layoutCode": "310/1/2/1"
   },
   {
     "id": 4,
-    "name": "Mutti Tomatenmark 200g",
-    "price": 1.19,
-    "layoutCode": "420/3/2/2/1/30"
+    "name": "S-BUDGET Toastbrot 500g",
+    "price": 1.49,
+    "layoutCode": "320/2/2/1"
   },
   {
     "id": 5,
-    "name": "Barilla Spaghetti N.5 500g",
+    "name": "SPAR Kaisersemmeln 5 Stk.",
     "price": 1.99,
-    "layoutCode": "430/2/3/1/1/25"
+    "layoutCode": "320/2/2/2"
   },
   {
     "id": 6,
-    "name": "Barilla Penne Rigate 500g",
-    "price": 1.99,
-    "layoutCode": "430/2/3/2/1/25"
+    "name": "SPAR Hühnerbrustfilet 500g",
+    "price": 6.49,
+    "layoutCode": "330/3/1/1"
   },
   {
     "id": 7,
-    "name": "SPAR Speiseöl Sonnenblume 1L",
-    "price": 3.29,
-    "layoutCode": "450/2/3/1/1/18"
+    "name": "SPAR Leberkäse geschnitten 150g",
+    "price": 2.29,
+    "layoutCode": "330/3/2/1"
   },
   {
     "id": 8,
-    "name": "Kelly’s Chips Classic",
-    "price": 2.49,
-    "layoutCode": "470/4/2/2/1/18"
+    "name": "SPAR Käferbohnen 700g Glas",
+    "price": 3.29,
+    "layoutCode": "420/1/1/1"
   },
   {
     "id": 9,
-    "name": "Manner Schnitten 200g",
-    "price": 2.79,
-    "layoutCode": "470/4/2/3/1/20"
+    "name": "SPAR Tomaten passiert 500g",
+    "price": 0.99,
+    "layoutCode": "420/3/2/1"
   },
   {
     "id": 10,
-    "name": "Vöslauer Mineralwasser prickelnd 1.5L",
-    "price": 0.89,
-    "layoutCode": "510/3/3/2/1/16"
+    "name": "Mutti Tomatenmark 200g",
+    "price": 1.19,
+    "layoutCode": "420/3/2/2"
   },
   {
     "id": 11,
-    "name": "Vöslauer Mineralwasser still 1.5L",
-    "price": 0.89,
-    "layoutCode": "510/3/3/3/1/16"
+    "name": "Barilla Spaghetti N.5 500g",
+    "price": 1.99,
+    "layoutCode": "430/2/3/1"
   },
   {
     "id": 12,
-    "name": "Coca-Cola 1.5L",
-    "price": 1.69,
-    "layoutCode": "510/4/3/1/1/18"
+    "name": "Barilla Penne Rigate 500g",
+    "price": 1.99,
+    "layoutCode": "430/2/3/2"
   },
   {
     "id": 13,
-    "name": "Fanta Orange 1.5L",
+    "name": "S-BUDGET Spaghetti 1kg",
     "price": 1.69,
-    "layoutCode": "510/4/3/2/1/18"
+    "layoutCode": "430/1/3/3"
   },
   {
     "id": 14,
-    "name": "SPAR Frische Vollmilch 1L",
-    "price": 1.59,
-    "layoutCode": "520/3/2/1/1/20"
+    "name": "SPAR Natur*pur Bio-Haferflocken 500g",
+    "price": 1.89,
+    "layoutCode": "440/1/3/1"
   },
   {
     "id": 15,
-    "name": "SPAR Haltbare Vollmilch 1L",
-    "price": 1.39,
-    "layoutCode": "520/3/2/2/1/25"
+    "name": "Kellogg’s Cornflakes 375g",
+    "price": 2.49,
+    "layoutCode": "440/1/3/2"
   },
   {
     "id": 16,
-    "name": "SPAR Natur*pur Bio-Eier 10 Stk.",
-    "price": 4.19,
-    "layoutCode": "520/3/1/1/1/15"
+    "name": "SPAR Speiseöl Sonnenblume 1L",
+    "price": 3.29,
+    "layoutCode": "450/2/3/1"
   },
   {
     "id": 17,
-    "name": "Rama Original 500g",
-    "price": 2.59,
-    "layoutCode": "520/3/1/2/1/20"
+    "name": "S-BUDGET Kristallzucker 1kg",
+    "price": 1.29,
+    "layoutCode": "460/1/2/1"
   },
   {
     "id": 18,
-    "name": "SPAR Gouda in Scheiben 250g",
-    "price": 3.49,
-    "layoutCode": "525/3/2/1/1/20"
+    "name": "SPAR Mehl glatt 1kg",
+    "price": 1.19,
+    "layoutCode": "460/2/2/2"
   },
   {
     "id": 19,
-    "name": "SPAR Edamer in Scheiben 250g",
-    "price": 3.29,
-    "layoutCode": "525/3/2/2/1/20"
+    "name": "Kelly’s Chips Classic",
+    "price": 2.49,
+    "layoutCode": "470/4/2/2"
   },
   {
     "id": 20,
-    "name": "Iglo Fischstäbchen 15 Stk.",
-    "price": 4.99,
-    "layoutCode": "530/2/2/1/1/12"
+    "name": "Manner Schnitten 200g",
+    "price": 2.79,
+    "layoutCode": "470/4/2/3"
   },
   {
     "id": 21,
-    "name": "Iglo Rahmspinat 450g",
-    "price": 2.79,
-    "layoutCode": "530/2/2/2/1/15"
+    "name": "S-BUDGET Mineralwasser prickelnd 1.5L",
+    "price": 0.49,
+    "layoutCode": "510/1/1/1"
   },
   {
     "id": 22,
-    "name": "SPAR Natur*pur Bio-Haferflocken 500g",
-    "price": 1.89,
-    "layoutCode": "440/1/3/1/1/30"
+    "name": "SPAR Apfelsaft klar 1L",
+    "price": 1.99,
+    "layoutCode": "510/2/2/1"
   },
   {
     "id": 23,
-    "name": "Kellogg’s Cornflakes 375g",
-    "price": 2.49,
-    "layoutCode": "440/1/3/2/1/25"
+    "name": "Vöslauer Mineralwasser prickelnd 1.5L",
+    "price": 0.89,
+    "layoutCode": "510/3/3/2"
   },
   {
     "id": 24,
-    "name": "Frosch Citrus Dusche & Bad-Reiniger",
-    "price": 2.79,
-    "layoutCode": "610/2/2/1/1/15"
+    "name": "Vöslauer Mineralwasser still 1.5L",
+    "price": 0.89,
+    "layoutCode": "510/3/3/3"
   },
   {
     "id": 25,
+    "name": "Coca-Cola 1.5L",
+    "price": 1.69,
+    "layoutCode": "510/4/3/1"
+  },
+  {
+    "id": 26,
+    "name": "Fanta Orange 1.5L",
+    "price": 1.69,
+    "layoutCode": "510/4/3/2"
+  },
+  {
+    "id": 27,
+    "name": "SPAR Natur*pur Bio-Eier 10 Stk.",
+    "price": 4.19,
+    "layoutCode": "520/3/1/1"
+  },
+  {
+    "id": 28,
+    "name": "Rama Original 500g",
+    "price": 2.59,
+    "layoutCode": "520/3/1/2"
+  },
+  {
+    "id": 29,
+    "name": "SPAR Frische Vollmilch 1L",
+    "price": 1.59,
+    "layoutCode": "520/3/2/1"
+  },
+  {
+    "id": 30,
+    "name": "SPAR Haltbare Vollmilch 1L",
+    "price": 1.39,
+    "layoutCode": "520/3/2/2"
+  },
+  {
+    "id": 31,
+    "name": "SPAR Butter 250g",
+    "price": 2.79,
+    "layoutCode": "520/2/2/3"
+  },
+  {
+    "id": 32,
+    "name": "SPAR Gouda in Scheiben 250g",
+    "price": 3.49,
+    "layoutCode": "525/3/2/1"
+  },
+  {
+    "id": 33,
+    "name": "SPAR Edamer in Scheiben 250g",
+    "price": 3.29,
+    "layoutCode": "525/3/2/2"
+  },
+  {
+    "id": 34,
+    "name": "Iglo Fischstäbchen 15 Stk.",
+    "price": 4.99,
+    "layoutCode": "530/2/2/1"
+  },
+  {
+    "id": 35,
+    "name": "Iglo Rahmspinat 450g",
+    "price": 2.79,
+    "layoutCode": "530/2/2/2"
+  },
+  {
+    "id": 36,
+    "name": "Frosch Citrus Dusche & Bad-Reiniger",
+    "price": 2.79,
+    "layoutCode": "610/2/2/1"
+  },
+  {
+    "id": 37,
     "name": "Meister Proper Allzweckreiniger 1L",
     "price": 2.99,
-    "layoutCode": "610/2/2/2/1/20"
+    "layoutCode": "610/2/2/2"
+  },
+  {
+    "id": 38,
+    "name": "SPAR Waschmittel Universal 2.6L",
+    "price": 7.49,
+    "layoutCode": "610/3/1/1"
+  },
+  {
+    "id": 39,
+    "name": "SPAR Duschgel Classic 300ml",
+    "price": 1.49,
+    "layoutCode": "640/1/2/1"
+  },
+  {
+    "id": 40,
+    "name": "S-BUDGET Toilettenpapier 8 Rollen",
+    "price": 3.49,
+    "layoutCode": "640/2/1/1"
   }
 ]

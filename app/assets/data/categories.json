@@ -1,0 +1,138 @@
+[
+  {
+    "categoryCode": 310,
+    "categoryName": "Obst & Gemüse"
+  },
+  {
+    "categoryCode": 320,
+    "categoryName": "Brot & Gebäck"
+  },
+  {
+    "categoryCode": 330,
+    "categoryName": "Fleisch & Wurstwaren"
+  },
+  {
+    "categoryCode": 340,
+    "categoryName": "Fisch & Meeresfrüchte"
+  },
+  {
+    "categoryCode": 350,
+    "categoryName": "Feinkost & Salate"
+  },
+  {
+    "categoryCode": 410,
+    "categoryName": "Reis, Hülsenfrüchte & Getreide"
+  },
+  {
+    "categoryCode": 420,
+    "categoryName": "Konserven & Saucen"
+  },
+  {
+    "categoryCode": 430,
+    "categoryName": "Teigwaren & Nudeln"
+  },
+  {
+    "categoryCode": 440,
+    "categoryName": "Müsli & Frühstück"
+  },
+  {
+    "categoryCode": 450,
+    "categoryName": "Öle & Essig"
+  },
+  {
+    "categoryCode": 460,
+    "categoryName": "Backzutaten & Zucker"
+  },
+  {
+    "categoryCode": 470,
+    "categoryName": "Snacks & Süßwaren"
+  },
+  {
+    "categoryCode": 480,
+    "categoryName": "Internationale Spezialitäten"
+  },
+  {
+    "categoryCode": 490,
+    "categoryName": "Babynahrung & Kinderprodukte"
+  },
+  {
+    "categoryCode": 500,
+    "categoryName": "Getränke allgemein"
+  },
+  {
+    "categoryCode": 510,
+    "categoryName": "Alkoholfreie Getränke"
+  },
+  {
+    "categoryCode": 515,
+    "categoryName": "Bier & Radler"
+  },
+  {
+    "categoryCode": 516,
+    "categoryName": "Wein & Sekt"
+  },
+  {
+    "categoryCode": 517,
+    "categoryName": "Spirituosen"
+  },
+  {
+    "categoryCode": 520,
+    "categoryName": "Molkereiprodukte"
+  },
+  {
+    "categoryCode": 525,
+    "categoryName": "Käse & Wurst"
+  },
+  {
+    "categoryCode": 530,
+    "categoryName": "Tiefkühlprodukte"
+  },
+  {
+    "categoryCode": 540,
+    "categoryName": "Fertiggerichte & Pizza"
+  },
+  {
+    "categoryCode": 550,
+    "categoryName": "Vegetarisch & Vegan"
+  },
+  {
+    "categoryCode": 560,
+    "categoryName": "Bio-Produkte"
+  },
+  {
+    "categoryCode": 600,
+    "categoryName": "Haushalt allgemein"
+  },
+  {
+    "categoryCode": 610,
+    "categoryName": "Haushalt & Reinigung"
+  },
+  {
+    "categoryCode": 620,
+    "categoryName": "Tiernahrung & Zubehör"
+  },
+  {
+    "categoryCode": 630,
+    "categoryName": "Papierwaren & Schreibwaren"
+  },
+  {
+    "categoryCode": 640,
+    "categoryName": "Körperpflege & Hygiene"
+  },
+  {
+    "categoryCode": 650,
+    "categoryName": "Kosmetik & Beauty"
+  },
+  {
+    "categoryCode": 660,
+    "categoryName": "Gesundheit & Apotheke"
+  },
+  {
+    "categoryCode": 670,
+    "categoryName": "Saisonartikel & Aktionen"
+  },
+  {
+    "categoryCode": 680,
+    "categoryName": "Non-Food & Elektroartikel"
+  }
+]
