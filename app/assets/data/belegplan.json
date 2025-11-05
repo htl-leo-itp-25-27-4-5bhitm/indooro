@@ -52,11 +52,11 @@
 {"id":48,"name":"SPAR Natur*pur Bio-Risotto 300g","price":3.49,"layoutCode":"440/2/1/1"},
 {"id":49,"name":"S-BUDGET Risotto 300g","price":1.79,"layoutCode":"440/2/1/2"},
 
-{"id":41,"name":"S-BUDGET Mehl 1kg","price":0.79,"layoutCode":"445/1/2/2"},
-{"id":50,"name":"SPAR Zucker 1kg","price":1.49,"layoutCode":"445/2/2/1"},
-{"id":51,"name":"S-BUDGET Zucker 1kg","price":0.99,"layoutCode":"445/2/2/2"},
-{"id":52,"name":"S-BUDGET Mehl 1kg","price":0.79,"layoutCode":"445/2/3/1"},
-{"id":53,"name":"SPAR Mehl 1kg","price":1.09,"layoutCode":"445/2/3/2"},
+{"id":41,"name":"S-BUDGET Mehl 1kg","price":0.79,"layoutCode":"445/1/1/1"},
+{"id":50,"name":"SPAR Zucker 1kg","price":1.49,"layoutCode":"445/1/1/2"},
+{"id":51,"name":"S-BUDGET Zucker 1kg","price":0.99,"layoutCode":"445/2/1/1"},
+{"id":52,"name":"S-BUDGET Mehl 1kg","price":0.79,"layoutCode":"445/2/2/1"},
+{"id":53,"name":"SPAR Mehl 1kg","price":1.09,"layoutCode":"445/2/2/2"},
 
 {"id":54,"name":"S-BUDGET Öl Essig 500ml","price":1.99,"layoutCode":"450/1/2/1"},
 {"id":55,"name":"SPAR Balsamico Essig 500ml","price":3.29,"layoutCode":"450/1/2/2"},
