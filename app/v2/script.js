@@ -8,10 +8,10 @@ async function loadProducts() {
 function parseLayoutCode(code) {
   if (typeof code !== 'string') return null;
   const parts = code.split('/');
-  if (parts.length !== 6) return null;
-  const [cat, meter, fach, reihe, reihenAnzahl, kapazitaet] = parts.map(n => Number.parseInt(n, 10));
-  if ([cat, meter, fach, reihe, reihenAnzahl, kapazitaet].some(n => !Number.isFinite(n))) return null;
-  return { cat, meter, fach, reihe, reihenAnzahl, kapazitaet };
+  if (parts.length !== 4) return null;
+  const [cat, meter, fach, reihe] = parts.map(n => Number.parseInt(n, 10));
+  if ([cat, meter, fach, reihe].some(n => !Number.isFinite(n))) return null;
+  return { cat, meter, fach, reihe };
 }
 
 function enrichProducts(products) {
@@ -22,7 +22,11 @@ function enrichProducts(products) {
       console.warn('Ignoriere Produkt mit ungültigem layoutCode:', p);
       continue;
     }
-    out.push({ ...p, layout });
+    out.push({ 
+      ...p, 
+      categoryCode: layout.cat,
+      layout 
+    });
   }
   return out;
 }
@@ -34,7 +38,7 @@ function buildModel(products) {
     if (!model[cat]) {
       model[cat] = {
         categoryCode: cat,
-        categoryName: p.category,
+        categoryName: cat,
         products: [],
         meters: { 1: [], 2: [], 3: [], 4: [], 5: [] }
       };
@@ -124,7 +128,7 @@ function renderShelfDetail(categoryCode, meter, model) {
   panel.innerHTML = '';
   
   const header = document.createElement('h2');
-  header.textContent = `${resolveCategoryName(categoryCode, model)} – Meter ${meter}`;
+  header.textContent = `Kategorie ${categoryCode} – Meter ${meter}`;
   panel.appendChild(header);
   
   const list = (model[categoryCode]?.meters?.[meter] ?? []).filter(p => p?.layout);
@@ -154,7 +158,7 @@ function renderShelfDetail(categoryCode, meter, model) {
   );
   
   for (const p of list) {
-    const { fach, reihe, reihenAnzahl, kapazitaet } = p.layout;
+    const { fach, reihe } = p.layout;
     const key = `${fach}-${reihe}`;
     
     if (!cellMap.has(key)) {
@@ -181,7 +185,6 @@ function renderShelfDetail(categoryCode, meter, model) {
     li.innerHTML = `
       <div class="product-name">${p.name}</div>
       <div class="product-price">€${Number(p.price).toFixed(2)}</div>
-      <div class="product-meta">Reihenanzahl: ${reihenAnzahl} · Kapazität: ${kapazitaet}</div>
     `;
     ul.appendChild(li);
   }
@@ -190,7 +193,7 @@ function renderShelfDetail(categoryCode, meter, model) {
 }
 
 function resolveCategoryName(categoryCode, model) {
-  return model[categoryCode]?.categoryName || String(categoryCode);
+  return `Kategorie ${categoryCode}`;
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
