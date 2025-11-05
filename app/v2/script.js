@@ -1,3 +1,19 @@
+let categoriesMap = {};
+
+async function loadCategories() {
+  try {
+    const res = await fetch('../assets/data/categories.json');
+    if (!res.ok) throw new Error('Categories nicht gefunden');
+    const categories = await res.json();
+    categoriesMap = {};
+    categories.forEach(cat => {
+      categoriesMap[cat.categoryCode] = cat.categoryName;
+    });
+  } catch (error) {
+    console.warn('Categories konnten nicht geladen werden:', error);
+  }
+}
+
 async function loadProducts() {
   const res = await fetch('../assets/data/belegplan.json');
   if (!res.ok) throw new Error('Netzwerkfehler');
@@ -8,10 +24,10 @@ async function loadProducts() {
 function parseLayoutCode(code) {
   if (typeof code !== 'string') return null;
   const parts = code.split('/');
-  if (parts.length !== 6) return null;
-  const [cat, meter, fach, reihe, reihenAnzahl, kapazitaet] = parts.map(n => Number.parseInt(n, 10));
-  if ([cat, meter, fach, reihe, reihenAnzahl, kapazitaet].some(n => !Number.isFinite(n))) return null;
-  return { cat, meter, fach, reihe, reihenAnzahl, kapazitaet };
+  if (parts.length !== 4) return null;
+  const [cat, meter, fach, reihe] = parts.map(n => Number.parseInt(n, 10));
+  if ([cat, meter, fach, reihe].some(n => !Number.isFinite(n))) return null;
+  return { cat, meter, fach, reihe };
 }
 
 function enrichProducts(products) {
@@ -22,7 +38,11 @@ function enrichProducts(products) {
       console.warn('Ignoriere Produkt mit ungültigem layoutCode:', p);
       continue;
     }
-    out.push({ ...p, layout });
+    out.push({ 
+      ...p, 
+      categoryCode: layout.cat,
+      layout 
+    });
   }
   return out;
 }
@@ -34,7 +54,7 @@ function buildModel(products) {
     if (!model[cat]) {
       model[cat] = {
         categoryCode: cat,
-        categoryName: p.category,
+        categoryName: categoriesMap[cat] || `Kategorie ${cat}`,
         products: [],
         meters: { 1: [], 2: [], 3: [], 4: [], 5: [] }
       };
@@ -123,8 +143,10 @@ function renderShelfDetail(categoryCode, meter, model) {
   const panel = document.getElementById('shelf-details-content');
   panel.innerHTML = '';
   
+  const categoryName = model[categoryCode]?.categoryName || `Kategorie ${categoryCode}`;
+  
   const header = document.createElement('h2');
-  header.textContent = `${resolveCategoryName(categoryCode, model)} – Meter ${meter}`;
+  header.textContent = `${categoryName} – Meter ${meter}`;
   panel.appendChild(header);
   
   const list = (model[categoryCode]?.meters?.[meter] ?? []).filter(p => p?.layout);
@@ -154,7 +176,7 @@ function renderShelfDetail(categoryCode, meter, model) {
   );
   
   for (const p of list) {
-    const { fach, reihe, reihenAnzahl, kapazitaet } = p.layout;
+    const { fach, reihe } = p.layout;
     const key = `${fach}-${reihe}`;
     
     if (!cellMap.has(key)) {
@@ -181,7 +203,6 @@ function renderShelfDetail(categoryCode, meter, model) {
     li.innerHTML = `
       <div class="product-name">${p.name}</div>
       <div class="product-price">€${Number(p.price).toFixed(2)}</div>
-      <div class="product-meta">Reihenanzahl: ${reihenAnzahl} · Kapazität: ${kapazitaet}</div>
     `;
     ul.appendChild(li);
   }
@@ -190,11 +211,12 @@ function renderShelfDetail(categoryCode, meter, model) {
 }
 
 function resolveCategoryName(categoryCode, model) {
-  return model[categoryCode]?.categoryName || String(categoryCode);
+  return `Kategorie ${categoryCode}`;
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
   try {
+    await loadCategories();
     const enriched = await loadProducts();
     const model = buildModel(enriched);
     renderMarket(model);
