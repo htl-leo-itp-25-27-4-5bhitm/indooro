@@ -1,4 +1,5 @@
 let categoriesMap = {};
+const API_BASE = 'http://localhost:8080/api';
 
 async function loadCategories() {
   try {
@@ -15,10 +16,27 @@ async function loadCategories() {
 }
 
 async function loadProducts() {
-  const res = await fetch('../assets/data/belegplan.json');
-  if (!res.ok) throw new Error('Netzwerkfehler');
-  const raw = await res.json();
-  return enrichProducts(raw);
+  try {
+    const res = await fetch(`${API_BASE}/products?size=200`);
+    if (!res.ok) throw new Error('Netzwerkfehler');
+    const raw = await res.json();
+    return enrichProducts(raw);
+  } catch (error) {
+    console.error('Fehler beim Laden der Produkte:', error);
+    throw error;
+  }
+}
+
+async function searchProducts(query) {
+  try {
+    const res = await fetch(`${API_BASE}/products/search?q=${encodeURIComponent(query)}&size=50`);
+    if (!res.ok) throw new Error('Suchfehler');
+    const raw = await res.json();
+    return enrichProducts(raw);
+  } catch (error) {
+    console.error('Fehler bei der Suche:', error);
+    throw error;
+  }
 }
 
 function parseLayoutCode(code) {
@@ -210,20 +228,131 @@ function renderShelfDetail(categoryCode, meter, model) {
   panel.appendChild(grid);
 }
 
-function resolveCategoryName(categoryCode, model) {
-  return `Kategorie ${categoryCode}`;
+function renderSearchResults(products) {
+  const panel = document.getElementById('shelf-details-content');
+  panel.innerHTML = '';
+  
+  const header = document.createElement('h2');
+  header.textContent = `Suchergebnisse (${products.length})`;
+  panel.appendChild(header);
+  
+  if (products.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-message';
+    empty.textContent = 'Keine Produkte gefunden.';
+    panel.appendChild(empty);
+    return;
+  }
+  
+  const resultList = document.createElement('div');
+  resultList.className = 'search-results';
+  
+  products.forEach(p => {
+    const item = document.createElement('div');
+    item.className = 'search-result-item';
+    
+    const categoryName = categoriesMap[p.categoryCode] || `Kategorie ${p.categoryCode}`;
+    const location = p.layout 
+      ? `${categoryName} – Meter ${p.layout.meter}, Fach ${p.layout.fach}, Reihe ${p.layout.reihe}`
+      : categoryName;
+    
+    item.innerHTML = `
+      <div class="product-name">${p.name}</div>
+      <div class="product-price">€${Number(p.price).toFixed(2)}</div>
+      <div class="product-location">${location}</div>
+    `;
+    
+    if (p.layout) {
+      item.addEventListener('click', () => {
+        document.querySelectorAll('.shelf-meter').forEach(el => el.classList.remove('selected'));
+        const meter = document.querySelector(
+          `.shelf-meter[data-cat="${p.categoryCode}"][data-meter="${p.layout.meter}"]`
+        );
+        if (meter) {
+          meter.classList.add('selected');
+          meter.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        
+        const model = buildModel(window.currentProducts || []);
+        renderShelfDetail(p.categoryCode, p.layout.meter, model);
+      });
+      item.style.cursor = 'pointer';
+    }
+    
+    resultList.appendChild(item);
+  });
+  
+  panel.appendChild(resultList);
+}
+
+function setupSearch() {
+  const searchInput = document.getElementById('search-input');
+  const searchButton = document.getElementById('search-button');
+  const clearButton = document.getElementById('clear-search');
+  
+  let searchTimeout;
+  
+  async function performSearch() {
+    const query = searchInput.value.trim();
+    
+    if (!query) {
+      clearButton.style.display = 'none';
+      if (window.currentProducts) {
+        const model = buildModel(window.currentProducts);
+        renderMarket(model);
+      }
+      return;
+    }
+    
+    clearButton.style.display = 'inline-block';
+    
+    try {
+      const results = await searchProducts(query);
+      window.searchResults = results;
+      renderSearchResults(results);
+    } catch (error) {
+      const panel = document.getElementById('shelf-details-content');
+      panel.innerHTML = '<div class="error-message">Fehler bei der Suche.</div>';
+    }
+  }
+  
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(performSearch, 300);
+  });
+  
+  searchButton.addEventListener('click', performSearch);
+  
+  searchInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      performSearch();
+    }
+  });
+  
+  clearButton.addEventListener('click', () => {
+    searchInput.value = '';
+    clearButton.style.display = 'none';
+    if (window.currentProducts) {
+      const model = buildModel(window.currentProducts);
+      renderMarket(model);
+    }
+    const panel = document.getElementById('shelf-details-content');
+    panel.innerHTML = '<p>Klicken Sie auf ein Regal, um Details anzuzeigen.</p>';
+  });
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     await loadCategories();
     const enriched = await loadProducts();
+    window.currentProducts = enriched;
     const model = buildModel(enriched);
     renderMarket(model);
+    setupSearch();
   } catch (e) {
     const panel = document.getElementById('shelf-details-content');
     if (panel) {
-      panel.innerHTML = '<div class="error-message">Daten konnten nicht geladen werden.</div>';
+      panel.innerHTML = '<div class="error-message">Daten konnten nicht geladen werden. Bitte stellen Sie sicher, dass der Server läuft.</div>';
     }
     console.error(e);
   }
