@@ -1,28 +1,69 @@
-<div id="container"></div>
-
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>Supermarkt Layout Editor</title>
 <style>
   body {
     margin: 0;
-    background: #f0f0f0;
     font-family: sans-serif;
-  }
-  #container {
-    width: 100vw;
+    display: flex;
     height: 100vh;
+    overflow: hidden;
+  }
+
+  /* Linke Toolbar */
+  #toolbar {
+    width: 180px;
+    background: #ffffff;
+    border-right: 2px solid #ddd;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .item {
+    padding: 10px;
+    border-radius: 8px;
+    color: white;
+    text-align: center;
+    cursor: grab;
+    user-select: none;
+  }
+
+  .item:active {
+    cursor: grabbing;
+    opacity: 0.8;
+  }
+
+  #container {
+    flex: 1;
+    background: #f0f0f0;
   }
 </style>
+</head>
+<body>
+
+<!-- Toolbar mit Typen -->
+<div id="toolbar">
+  <div class="item" draggable="true" data-type="Kassa" style="background:#8b0000">Kassa</div>
+  <div class="item" draggable="true" data-type="Tiefkühlung" style="background:#1e90ff">Tiefkühlung</div>
+  <div class="item" draggable="true" data-type="Obst" style="background:#228b22">Obst</div>
+  <div class="item" draggable="true" data-type="Regal" style="background:#8b4513">Normales Regal</div>
+</div>
+
+<!-- Zeichenbereich -->
+<div id="container"></div>
 
 <script src="https://unpkg.com/konva@9/konva.min.js"></script>
-
 <script>
-  // --- Parameter ---
   const gridSize = 50;
-  const shelfWidth = 100;
-  const shelfHeight = 50;
 
+  // Konva Bühne
   const stage = new Konva.Stage({
     container: 'container',
-    width: window.innerWidth,
+    width: window.innerWidth - 180, // Platz für Toolbar
     height: window.innerHeight,
   });
 
@@ -31,8 +72,8 @@
   stage.add(gridLayer);
   stage.add(shelfLayer);
 
-  // --- Grid zeichnen ---
-  for (let i = 0; i < stage.width() / gridSize; i++) {
+  // Grid zeichnen
+  for (let i = 0; i <= stage.width() / gridSize; i++) {
     gridLayer.add(
       new Konva.Line({
         points: [i * gridSize, 0, i * gridSize, stage.height()],
@@ -41,7 +82,7 @@
       })
     );
   }
-  for (let j = 0; j < stage.height() / gridSize; j++) {
+  for (let j = 0; j <= stage.height() / gridSize; j++) {
     gridLayer.add(
       new Konva.Line({
         points: [0, j * gridSize, stage.width(), j * gridSize],
@@ -52,19 +93,22 @@
   }
   gridLayer.draw();
 
-  // --- Auswahlrahmen ---
-  const selectionRect = new Konva.Rect({
-    stroke: '#ff6600',
-    strokeWidth: 2,
-    dash: [4, 4],
-    visible: false,
-  });
-  shelfLayer.add(selectionRect);
+  // --- Regal / Objekt erstellen ---
+  function createShelf(x, y, type) {
+    const colors = {
+      Kassa: '#8b0000',
+      Tiefkühlung: '#1e90ff',
+      Obst: '#228b22',
+      Regal: '#8b4513',
+    };
 
-  let selectedShelf = null;
+    const labels = {
+      Kassa: 'Kassa',
+      Tiefkühlung: 'Tiefkühlung',
+      Obst: 'Obst',
+      Regal: 'Regal',
+    };
 
-  // --- Regal erstellen ---
-  function createShelf(x, y, color, label) {
     const group = new Konva.Group({
       x,
       y,
@@ -72,38 +116,30 @@
     });
 
     const rect = new Konva.Rect({
-      width: shelfWidth,
-      height: shelfHeight,
-      fill: color,
+      width: 100,
+      height: 50,
+      fill: colors[type],
       stroke: '#333',
       strokeWidth: 2,
-      cornerRadius: 4,
-      offsetX: shelfWidth / 2,
-      offsetY: shelfHeight / 2,
+      cornerRadius: 5,
     });
 
     const text = new Konva.Text({
-      text: label,
+      text: labels[type],
       fontSize: 14,
       fontFamily: 'Arial',
       fill: 'white',
+      width: 100,
+      height: 50,
       align: 'center',
       verticalAlign: 'middle',
-      width: shelfWidth,
-      height: shelfHeight,
-      offsetX: shelfWidth / 2,
-      offsetY: shelfHeight / 2,
     });
 
     group.add(rect);
     group.add(text);
+    shelfLayer.add(group);
 
-    // Startposition mittig ins Grid einrasten
-    const snappedX = Math.round(x / gridSize) * gridSize;
-    const snappedY = Math.round(y / gridSize) * gridSize;
-    group.position({ x: snappedX, y: snappedY });
-
-    // --- Snap beim Loslassen ---
+    // Snap beim Loslassen
     group.on('dragend', () => {
       const snappedX = Math.round(group.x() / gridSize) * gridSize;
       const snappedY = Math.round(group.y() / gridSize) * gridSize;
@@ -111,52 +147,66 @@
       shelfLayer.batchDraw();
     });
 
-    // --- Klick zum Auswählen ---
-    group.on('click', () => {
-      selectedShelf = group;
-      const box = group.getClientRect();
-      selectionRect.visible(true);
-      selectionRect.position({ x: box.x, y: box.y });
-      selectionRect.size({ width: box.width, height: box.height });
-      shelfLayer.batchDraw();
-    });
-
-    shelfLayer.add(group);
+    shelfLayer.batchDraw();
   }
 
-  // --- Drei Regale ---
-  createShelf(100, 100, '#8b4513', 'Normales Regal');
-  createShelf(250, 100, '#1e90ff', 'Tiefkühlregal');
-  createShelf(400, 100, '#228b22', 'Obstregal');
-  shelfLayer.draw();
+  // --- Drag & Drop vom HTML-Toolbar ins Konva-Feld ---
+  const container = stage.container();
 
-  // --- Rotation per Tastatur ---
-  window.addEventListener('keydown', (e) => {
-    if (!selectedShelf) return;
-    if (e.key === 'r' || e.key === 'R') {
-      // Drehen um 45 Grad
-      selectedShelf.rotate(45);
+  let draggedType = null;
 
-      // Snap nach Rotation neu ausrichten
-      const snappedX = Math.round(selectedShelf.x() / gridSize) * gridSize;
-      const snappedY = Math.round(selectedShelf.y() / gridSize) * gridSize;
-      selectedShelf.position({ x: snappedX, y: snappedY });
-
-      // Auswahlrahmen neu berechnen
-      const box = selectedShelf.getClientRect();
-      selectionRect.visible(true);
-      selectionRect.position({ x: box.x, y: box.y });
-      selectionRect.size({ width: box.width, height: box.height });
-      shelfLayer.batchDraw();
-    }
+  document.querySelectorAll('.item').forEach((el) => {
+    el.addEventListener('dragstart', (e) => {
+      draggedType = e.target.dataset.type;
+    });
   });
 
-  // --- Klick auf leere Fläche = Auswahl entfernen ---
-  stage.on('click', (e) => {
-    if (e.target === stage) {
-      selectedShelf = null;
-      selectionRect.visible(false);
-      shelfLayer.batchDraw();
+  container.addEventListener('dragover', (e) => {
+    e.preventDefault();
+  });
+
+  container.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (!draggedType) return;
+
+    // Position relativ zur Bühne berechnen
+    const rect = container.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Snap zur Gridmitte
+    const snappedX = Math.round(x / gridSize) * gridSize;
+    const snappedY = Math.round(y / gridSize) * gridSize;
+
+    createShelf(snappedX, snappedY, draggedType);
+    draggedType = null;
+  });
+
+  // --- Responsive Resize ---
+  window.addEventListener('resize', () => {
+    stage.width(window.innerWidth - 180);
+    stage.height(window.innerHeight);
+    gridLayer.destroyChildren();
+    for (let i = 0; i <= stage.width() / gridSize; i++) {
+      gridLayer.add(
+        new Konva.Line({
+          points: [i * gridSize, 0, i * gridSize, stage.height()],
+          stroke: '#ddd',
+          strokeWidth: 1,
+        })
+      );
     }
+    for (let j = 0; j <= stage.height() / gridSize; j++) {
+      gridLayer.add(
+        new Konva.Line({
+          points: [0, j * gridSize, stage.width(), j * gridSize],
+          stroke: '#ddd',
+          strokeWidth: 1,
+        })
+      );
+    }
+    gridLayer.draw();
   });
 </script>
+</body>
+</html>
