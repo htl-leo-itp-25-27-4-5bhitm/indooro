@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Konva Beispiel</title>
+  <style>
+    body {
+      margin: 0;
+      background: #f0f0f0;
+    }
+    #container {
+      width: 100vw;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+
+  <!-- Konva.js einbinden -->
+  <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+
+  <script>
+    // --- Dein Konva-Code ---
+    const gridSize = 50;
+    const shelfWidth = 100;
+    const shelfHeight = 50;
+
+    const stage = new Konva.Stage({
+      container: 'container',
+      width: window.innerWidth,
+      height: window.innerHeight,
+    });
+
+    const gridLayer = new Konva.Layer();
+    const shelfLayer = new Konva.Layer();
+
+    for (let i = 0; i < stage.width() / gridSize; i++) {
+      gridLayer.add(new Konva.Line({
+        points: [i * gridSize, 0, i * gridSize, stage.height()],
+        stroke: '#ddd',
+        strokeWidth: 1,
+      }));
+    }
+
+    for (let j = 0; j < stage.height() / gridSize; j++) {
+      gridLayer.add(new Konva.Line({
+        points: [0, j * gridSize, stage.width(), j * gridSize],
+        stroke: '#ddd',
+        strokeWidth: 1,
+      }));
+    }
+
+    stage.add(gridLayer);
+    stage.add(shelfLayer);
+
+    function createShelf(x, y, color, label) {
+      const group = new Konva.Group({ x, y, draggable: true });
+      const rect = new Konva.Rect({
+        width: shelfWidth,
+        height: shelfHeight,
+        fill: color,
+        stroke: '#333',
+        strokeWidth: 2,
+        cornerRadius: 4,
+      });
+      const text = new Konva.Text({
+        text: label,
+        fontSize: 14,
+        fontFamily: 'Arial',
+        fill: 'white',
+        align: 'center',
+        width: shelfWidth,
+        height: shelfHeight,
+        verticalAlign: 'middle',
+      });
+      group.add(rect);
+      group.add(text);
+      group.on('dragend', () => {
+        const snappedX = Math.round(group.x() / gridSize) * gridSize;
+        const snappedY = Math.round(group.y() / gridSize) * gridSize;
+        group.position({ x: snappedX, y: snappedY });
+        shelfLayer.batchDraw();
+      });
+      shelfLayer.add(group);
+    }
+
+    createShelf(100, 100, '#8b4513', 'Normales Regal');
+    createShelf(250, 100, '#1e90ff', 'Tiefkühlregal');
+    createShelf(400, 100, '#228b22', 'Obstregal');
+
+    shelfLayer.draw();
+  </script>
+</body>
+</html>
