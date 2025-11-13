@@ -2,211 +2,579 @@
 <html lang="de">
 <head>
 <meta charset="utf-8" />
-<title>Supermarkt Layout Editor</title>
+<title>Shop-Generator — Supermarkt nachbauen</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
-  body {
-    margin: 0;
-    font-family: sans-serif;
-    display: flex;
-    height: 100vh;
-    overflow: hidden;
-  }
-
-  /* Linke Toolbar */
-  #toolbar {
-    width: 180px;
-    background: #ffffff;
-    border-right: 2px solid #ddd;
-    display: flex;
-    flex-direction: column;
-    padding: 10px;
-    gap: 10px;
-  }
-
-  .item {
-    padding: 10px;
-    border-radius: 8px;
-    color: white;
-    text-align: center;
-    cursor: grab;
-    user-select: none;
-  }
-
-  .item:active {
-    cursor: grabbing;
-    opacity: 0.8;
-  }
-
-  #container {
-    flex: 1;
-    background: #f0f0f0;
-  }
+  :root { --toolbar-w: 220px; --props-w: 300px; --top-h: 50px; }
+  body { margin:0; font-family:system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial; height:100vh; display:flex; flex-direction:column; }
+  #topbar { height:var(--top-h); background:#fff; border-bottom:1px solid #e3e3e3; display:flex; align-items:center; gap:8px; padding:6px 12px; }
+  #topbar button, #topbar input[type=file] { padding:8px 10px; border-radius:6px; border:1px solid #ccc; background:#fafafa; cursor:pointer; }
+  #wrap { flex:1; display:flex; min-height:0; }
+  #left { width:var(--toolbar-w); border-right:1px solid #eaeaea; padding:10px; box-sizing:border-box; background:#fbfbfb; overflow:auto; }
+  #canvasWrap { flex:1; position:relative; background:#f0f0f0; display:flex; align-items:stretch; justify-content:center; padding:10px; box-sizing:border-box; }
+  #stage-parent { background:linear-gradient(#fff,#fff); box-shadow:0 1px 3px rgba(0,0,0,0.06); border:1px solid #ddd; }
+  #right { width:var(--props-w); border-left:1px solid #eaeaea; padding:10px; box-sizing:border-box; background:#fff; overflow:auto; }
+  h3 { margin:8px 0; font-size:14px; }
+  .tool { margin-bottom:8px; padding:10px; border-radius:8px; display:flex; gap:8px; align-items:center; cursor:grab; user-select:none; border:1px solid #e6e6e6; background:#fff; }
+  .tool .preview { width:46px; height:34px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:18px; color:white; }
+  label { display:block; font-size:13px; margin-top:8px; }
+  input[type="text"], select, input[type="color"], input[type="number"] { width:100%; padding:8px; box-sizing:border-box; border-radius:6px; border:1px solid #ccc; margin-top:4px; }
+  .row { display:flex; gap:8px; }
+  .row > * { flex:1; }
+  .muted { color:#666; font-size:13px; }
+  #gridControls { margin-top:10px; display:flex; gap:6px; align-items:center; }
+  small { color:#666; }
+  #canvas-tools { display:flex; gap:6px; align-items:center; }
+  button.primary { background:#0078d4; color:white; border-color:#0064b0; }
+  .footer-note { font-size:12px; color:#666; margin-top:12px; }
 </style>
 </head>
 <body>
 
-<!-- Toolbar mit Typen -->
-<div id="toolbar">
-  <div class="item" draggable="true" data-type="Kassa" style="background:#8b0000">Kassa</div>
-  <div class="item" draggable="true" data-type="Tiefkühlung" style="background:#1e90ff">Tiefkühlung</div>
-  <div class="item" draggable="true" data-type="Obst" style="background:#228b22">Obst</div>
-  <div class="item" draggable="true" data-type="Regal" style="background:#8b4513">Normales Regal</div>
+<div id="topbar">
+  <div id="canvas-tools">
+    <button id="newLayout">Neu</button>
+    <button id="exportPNG" class="primary">Export PNG</button>
+    <button id="downloadJSON">Speichern (JSON)</button>
+    <input id="loadJSON" type="file" accept=".json" />
+    <button id="toggleGrid">Grid an/aus</button>
+  </div>
+  <div style="flex:1"></div>
+  <div class="muted">Shop-Generator — exakte Nachbildung: Regale, Zonen, Servicepunkte</div>
 </div>
 
-<!-- Zeichenbereich -->
-<div id="container"></div>
+<div id="wrap">
+  <div id="left">
+    <h3>Vorlagen & Objekte</h3>
 
+    <!-- Draggable tools -->
+    <div class="tool" draggable="true" data-type="entrance">
+      <div class="preview" style="background:#2d7aee">⇢</div>
+      <div>
+        <strong>Eingang</strong><br><small class="muted">Einkaufswagenzone, Sitzbereich</small>
+      </div>
+    </div>
+
+    <div class="tool" draggable="true" data-type="shelf">
+      <div class="preview" style="background:#8b4513">▯</div>
+      <div><strong>Regal</strong><br><small class="muted">Standard-Regal (Größe anpassen)</small></div>
+    </div>
+
+    <div class="tool" draggable="true" data-type="island">
+      <div class="preview" style="background:#3bbf63">◉</div>
+      <div><strong>Insel</strong><br><small class="muted">Obst/Gemüse-Insel</small></div>
+    </div>
+
+    <div class="tool" draggable="true" data-type="counter">
+      <div class="preview" style="background:#ff8a00">▦</div>
+      <div><strong>Theke / Bedienung</strong><br><small class="muted">Käse/Fleisch / Backstation</small></div>
+    </div>
+
+    <div class="tool" draggable="true" data-type="fridge">
+      <div class="preview" style="background:#1e90ff">❄</div>
+      <div><strong>Kühlregal</strong><br><small class="muted">Molke, Käse, Fleisch</small></div>
+    </div>
+
+    <div class="tool" draggable="true" data-type="freezer">
+      <div class="preview" style="background:#0b66c3">❄❄</div>
+      <div><strong>Tiefkühl</strong><br><small class="muted">Gefriertruhen</small></div>
+    </div>
+
+    <div class="tool" draggable="true" data-type="kassa">
+      <div class="preview" style="background:#8b0000">$</div>
+      <div><strong>Kassenbereich</strong><br><small class="muted">Kassen & Promozone</small></div>
+    </div>
+
+    <div class="tool" draggable="true" data-type="service">
+      <div class="preview" style="background:#6b5b95">i</div>
+      <div><strong>Servicepunkt</strong><br><small class="muted">Info / Rückgabe</small></div>
+    </div>
+
+    <div class="tool" draggable="true" data-type="wc">
+      <div class="preview" style="background:#777">WC</div>
+      <div><strong>Kunden-WC</strong><br><small class="muted">Toilette</small></div>
+    </div>
+
+    <div class="tool" draggable="true" data-type="seating">
+      <div class="preview" style="background:#c94">☕</div>
+      <div><strong>Sitzbereich</strong><br><small class="muted">Café / Wartezone</small></div>
+    </div>
+
+    <div class="tool" draggable="true" data-type="promo">
+      <div class="preview" style="background:#e91e63">★</div>
+      <div><strong>Aktionsfläche</strong><br><small class="muted">Sonderverkauf / Saison</small></div>
+    </div>
+
+    <h3 style="margin-top:14px">Grid & Canvas</h3>
+    <label>Gridgröße (px)</label>
+    <input id="gridSize" type="number" value="50" min="10" step="5" />
+    <div id="gridControls">
+      <label style="margin:0"><input id="snapToggle" type="checkbox" checked /> Snap</label>
+      <label style="margin:0"><input id="showLabels" type="checkbox" checked /> Labels</label>
+    </div>
+
+    <h3 style="margin-top:14px">Vorlagen</h3>
+    <button id="template-small">Kleiner Markt</button>
+    <button id="template-medium">Typischer Mittelmarkt</button>
+    <div class="footer-note">Vorlagen legen vordefinierte Bereiche & Grundriss an. Danach anpassen.</div>
+  </div>
+
+  <!-- Canvas -->
+  <div id="canvasWrap">
+    <div id="stage-parent"></div>
+  </div>
+
+  <!-- Properties -->
+  <div id="right">
+    <h3>Ausgewähltes Objekt</h3>
+    <div id="noSelection" class="muted">Kein Objekt ausgewählt — Objekt anklicken oder aus der linken Liste ziehen.</div>
+
+    <div id="props" style="display:none">
+      <label>Typ</label>
+      <input id="prop-type" type="text" disabled />
+
+      <label>Beschriftung</label>
+      <input id="prop-label" type="text" />
+
+      <label>Kategorie (Produktgruppe)</label>
+      <select id="prop-category">
+        <option>—</option>
+        <option>Obst & Gemüse</option>
+        <option>Backwaren</option>
+        <option>Frische</option>
+        <option>Molkerei</option>
+        <option>Getränke</option>
+        <option>Pflege & Haushalt</option>
+        <option>Non-Food</option>
+        <option>Saison / Aktion</option>
+        <option>Service</option>
+      </select>
+
+      <label>Farbe</label>
+      <input id="prop-color" type="color" value="#8b4513" />
+
+      <label>Icon (Emoji)</label>
+      <input id="prop-icon" type="text" placeholder="z. B. 🍎, 🥐, ❄️" />
+
+      <div class="row" style="margin-top:8px">
+        <div>
+          <label>Breite (px)</label>
+          <input id="prop-w" type="number" value="100" />
+        </div>
+        <div>
+          <label>Höhe (px)</label>
+          <input id="prop-h" type="number" value="50" />
+        </div>
+      </div>
+
+      <label>Rotation (°)</label>
+      <input id="prop-rot" type="number" value="0" />
+
+      <div style="margin-top:10px; display:flex; gap:8px">
+        <button id="bringFront">Vorne</button>
+        <button id="sendBack">Hinten</button>
+        <button id="deleteObj" style="background:#ffdddd">Löschen</button>
+      </div>
+      <div style="margin-top:10px; display:flex; gap:8px">
+        <button id="duplicateObj">Duplizieren</button>
+        <button id="centerObj">Zentrieren</button>
+      </div>
+    </div>
+
+    <h3 style="margin-top:14px">Hilfsmittel</h3>
+    <p class="muted">- Ziehe Objekte links auf das Canvas (Drag & Drop).<br>
+    - Objekt anklicken → Eigenschaften rechts bearbeiten.<br>
+    - Layout als JSON speichern / laden.</p>
+  </div>
+</div>
+
+<!-- Konva -->
 <script src="https://unpkg.com/konva@9/konva.min.js"></script>
 <script>
-  const gridSize = 50;
+  // --- Setup Stage ---
+  const stageParent = document.getElementById('stage-parent');
+  const toolbarWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--toolbar-w')) || 220;
+  const propsWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--props-w')) || 300;
+  const topH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--top-h')) || 50;
+  function computeStageSize() {
+    const w = window.innerWidth - toolbarWidth - propsWidth - 40;
+    const h = window.innerHeight - topH - 20;
+    return { w, h };
+  }
+  const size = computeStageSize();
+  stageParent.style.width = size.w + 'px';
+  stageParent.style.height = size.h + 'px';
 
-  // Konva Bühne
-  const stage = new Konva.Stage({
-    container: 'container',
-    width: window.innerWidth - 180, // Platz für Toolbar
-    height: window.innerHeight,
-  });
-
+  const stage = new Konva.Stage({ container: 'stage-parent', width: size.w, height: size.h });
   const gridLayer = new Konva.Layer();
-  const shelfLayer = new Konva.Layer();
+  const itemsLayer = new Konva.Layer();
+  const uiLayer = new Konva.Layer();
   stage.add(gridLayer);
-  stage.add(shelfLayer);
+  stage.add(itemsLayer);
+  stage.add(uiLayer);
 
-  // Grid zeichnen
-  for (let i = 0; i <= stage.width() / gridSize; i++) {
-    gridLayer.add(
-      new Konva.Line({
-        points: [i * gridSize, 0, i * gridSize, stage.height()],
-        stroke: '#ddd',
-        strokeWidth: 1,
-      })
-    );
+  // state
+  let gridSize = parseInt(document.getElementById('gridSize').value,10) || 50;
+  let snapEnabled = true;
+  let showLabels = true;
+  let selectedNode = null;
+  let idCounter = 1;
+  let gridVisible = true;
+
+  // draw grid
+  function drawGrid() {
+    gridLayer.destroyChildren();
+    if (!gridVisible) { gridLayer.draw(); return; }
+    const w = stage.width(), h = stage.height();
+    for (let x=0; x<=w; x+=gridSize) {
+      gridLayer.add(new Konva.Line({ points:[x,0,x,h], stroke:'#eee', strokeWidth:1 }));
+    }
+    for (let y=0; y<=h; y+=gridSize) {
+      gridLayer.add(new Konva.Line({ points:[0,y,w,y], stroke:'#eee', strokeWidth:1 }));
+    }
+    gridLayer.draw();
   }
-  for (let j = 0; j <= stage.height() / gridSize; j++) {
-    gridLayer.add(
-      new Konva.Line({
-        points: [0, j * gridSize, stage.width(), j * gridSize],
-        stroke: '#ddd',
-        strokeWidth: 1,
-      })
-    );
-  }
-  gridLayer.draw();
+  drawGrid();
 
-  // --- Regal / Objekt erstellen ---
-  function createShelf(x, y, type) {
-    const colors = {
-      Kassa: '#8b0000',
-      Tiefkühlung: '#1e90ff',
-      Obst: '#228b22',
-      Regal: '#8b4513',
-    };
+  // utilities
+  function uniqueId(prefix='obj') { return `${prefix}_${Date.now().toString(36)}_${idCounter++}`; }
+  function snap(val) { return snapEnabled ? Math.round(val / gridSize) * gridSize : val; }
 
-    const labels = {
-      Kassa: 'Kassa',
-      Tiefkühlung: 'Tiefkühlung',
-      Obst: 'Obst',
-      Regal: 'Regal',
+  function createObject(type, x, y, opts={}) {
+    // default dims per type
+    const defs = {
+      shelf:{w:120,h:50, color:'#8b4513', label:'Regal', icon:'▯'},
+      island:{w:120,h:80, color:'#3bbf63', label:'Insel', icon:'◉'},
+      counter:{w:160,h:60, color:'#ff8a00', label:'Theke', icon:'▦'},
+      fridge:{w:120,h:50, color:'#1e90ff', label:'Kühlregal', icon:'❄'},
+      freezer:{w:120,h:50, color:'#0b66c3', label:'Tiefkühl', icon:'❄❄'},
+      kassa:{w:200,h:70, color:'#8b0000', label:'Kassen', icon:'$'},
+      service:{w:120,h:60, color:'#6b5b95', label:'Service', icon:'i'},
+      seating:{w:140,h:80, color:'#c94', label:'Sitzbereich', icon:'☕'},
+      wc:{w:90,h:70, color:'#777', label:'WC', icon:'WC'},
+      entrance:{w:220,h:120, color:'#2d7aee', label:'Eingang', icon:'⇢'},
+      promo:{w:120,h:80, color:'#e91e63', label:'Aktion', icon:'★'}
     };
+    const def = defs[type] || defs.shelf;
+    const w = opts.w || def.w;
+    const h = opts.h || def.h;
+    const color = opts.color || def.color;
+    const label = opts.label || def.label;
+    const icon = opts.icon || def.icon;
 
     const group = new Konva.Group({
-      x,
-      y,
+      x: snap(x),
+      y: snap(y),
       draggable: true,
+      id: uniqueId(type),
+      name: 'placeable'
     });
 
     const rect = new Konva.Rect({
-      width: 100,
-      height: 50,
-      fill: colors[type],
-      stroke: '#333',
-      strokeWidth: 2,
-      cornerRadius: 5,
+      width: w, height: h,
+      fill: color,
+      stroke:'#444', strokeWidth:1,
+      cornerRadius:6,
+      offsetX: w/2, offsetY: h/2
     });
 
-    const text = new Konva.Text({
-      text: labels[type],
-      fontSize: 14,
-      fontFamily: 'Arial',
-      fill: 'white',
-      width: 100,
-      height: 50,
-      align: 'center',
-      verticalAlign: 'middle',
+    const iconText = new Konva.Text({
+      text: icon,
+      fontSize: Math.min(h, 30),
+      x: -w/2 + 8,
+      y: -h/2 + 6,
+      width: w-16,
+      height: 24,
+      align:'left',
+      verticalAlign:'top'
+    });
+
+    const labelText = new Konva.Text({
+      text: label,
+      fontSize: 13,
+      x: -w/2,
+      y: h/2 - 20,
+      width: w,
+      align:'center',
+      verticalAlign:'middle',
+      fill:'#fff'
     });
 
     group.add(rect);
-    group.add(text);
-    shelfLayer.add(group);
+    if (showLabels) group.add(labelText);
+    if (icon) group.add(iconText);
 
-    // Snap beim Loslassen
-    group.on('dragend', () => {
-      const snappedX = Math.round(group.x() / gridSize) * gridSize;
-      const snappedY = Math.round(group.y() / gridSize) * gridSize;
-      group.position({ x: snappedX, y: snappedY });
-      shelfLayer.batchDraw();
+    // metadata stored on group
+    group._meta = { type, w, h, color, label, category:'—', icon, rot:0 };
+
+    // events
+    group.on('dragmove', () => {
+      if (snapEnabled) {
+        const newX = snap(group.x());
+        const newY = snap(group.y());
+        group.position({ x:newX, y:newY });
+      }
     });
+    group.on('dragend', () => {
+      group.fire('select');
+    });
+    group.on('dblclick', () => {
+      // quick duplicate
+      duplicateSelected(group);
+    });
+    group.on('click', (e) => {
+      e.cancelBubble = true;
+      selectNode(group);
+    });
+    group.on('select', () => selectNode(group));
 
-    shelfLayer.batchDraw();
+    itemsLayer.add(group);
+    itemsLayer.draw();
+    return group;
   }
 
-  // --- Drag & Drop vom HTML-Toolbar ins Konva-Feld ---
-  const container = stage.container();
+  // selection handling
+  function selectNode(node) {
+    selectedNode = node;
+    // highlight
+    itemsLayer.find('.selectionRect').forEach(n=>n.destroy());
+    const meta = node._meta;
+    const selRect = new Konva.Rect({
+      name:'selectionRect',
+      width: meta.w + 8,
+      height: meta.h + 8,
+      stroke:'#ff9900', strokeWidth:2, dash:[6,4],
+      offsetX:(meta.w+8)/2, offsetY:(meta.h+8)/2,
+      x: node.x(), y: node.y()
+    });
+    itemsLayer.add(selRect);
+    selRect.moveToTop();
+    node.moveToTop();
+    itemsLayer.draw();
 
-  let draggedType = null;
+    // populate props
+    document.getElementById('noSelection').style.display = 'none';
+    document.getElementById('props').style.display = 'block';
+    document.getElementById('prop-type').value = meta.type;
+    document.getElementById('prop-label').value = meta.label;
+    document.getElementById('prop-category').value = meta.category || '—';
+    document.getElementById('prop-color').value = meta.color;
+    document.getElementById('prop-icon').value = meta.icon;
+    document.getElementById('prop-w').value = meta.w;
+    document.getElementById('prop-h').value = meta.h;
+    document.getElementById('prop-rot').value = meta.rot || 0;
+  }
 
-  document.querySelectorAll('.item').forEach((el) => {
-    el.addEventListener('dragstart', (e) => {
-      draggedType = e.target.dataset.type;
+  function clearSelection() {
+    selectedNode = null;
+    itemsLayer.find('.selectionRect').forEach(n=>n.destroy());
+    document.getElementById('noSelection').style.display = 'block';
+    document.getElementById('props').style.display = 'none';
+    itemsLayer.draw();
+  }
+
+  // property updates
+  document.getElementById('prop-label').addEventListener('input', (e)=>{
+    if (!selectedNode) return;
+    selectedNode._meta.label = e.target.value;
+    const txt = selectedNode.findOne(node=>node.className==='Text' && node.text()===selectedNode._meta.label) || selectedNode.findOne('Text');
+    // rebuild label/texts
+    rebuildNodeVisual(selectedNode);
+  });
+  document.getElementById('prop-category').addEventListener('change', (e)=>{ if(selectedNode) selectedNode._meta.category=e.target.value; });
+  document.getElementById('prop-color').addEventListener('input', (e)=>{ if(selectedNode){ selectedNode._meta.color=e.target.value; rebuildNodeVisual(selectedNode); } });
+  document.getElementById('prop-icon').addEventListener('input', (e)=>{ if(selectedNode){ selectedNode._meta.icon=e.target.value; rebuildNodeVisual(selectedNode); } });
+  document.getElementById('prop-w').addEventListener('change', (e)=>{ if(selectedNode){ selectedNode._meta.w=parseInt(e.target.value,10)||50; rebuildNodeVisual(selectedNode); } });
+  document.getElementById('prop-h').addEventListener('change', (e)=>{ if(selectedNode){ selectedNode._meta.h=parseInt(e.target.value,10)||30; rebuildNodeVisual(selectedNode); } });
+  document.getElementById('prop-rot').addEventListener('change', (e)=>{ if(selectedNode){ const r=parseInt(e.target.value,10)||0; selectedNode.rotation(r); selectedNode._meta.rot=r; itemsLayer.batchDraw(); } });
+
+  document.getElementById('bringFront').addEventListener('click', ()=>{ if(selectedNode){ selectedNode.moveToTop(); itemsLayer.batchDraw(); } });
+  document.getElementById('sendBack').addEventListener('click', ()=>{ if(selectedNode){ selectedNode.moveToBottom(); itemsLayer.batchDraw(); } });
+  document.getElementById('deleteObj').addEventListener('click', ()=>{ if(selectedNode){ selectedNode.destroy(); clearSelection(); itemsLayer.batchDraw(); } });
+  document.getElementById('duplicateObj').addEventListener('click', ()=>{ if(selectedNode) duplicateSelected(selectedNode); });
+  document.getElementById('centerObj').addEventListener('click', ()=>{ if(selectedNode){ selectedNode.position({ x: stage.width()/2, y: stage.height()/2 }); itemsLayer.batchDraw(); } });
+
+  function duplicateSelected(node) {
+    const meta = Object.assign({}, node._meta);
+    const pos = { x: node.x() + (gridSize||20), y: node.y() + (gridSize||20) };
+    createObject(meta.type, pos.x, pos.y, { w:meta.w, h:meta.h, color:meta.color, label:meta.label, icon:meta.icon });
+  }
+
+  function rebuildNodeVisual(node) {
+    // remove children, rebuild rect + texts
+    const meta = node._meta;
+    node.destroyChildren();
+    const rect = new Konva.Rect({
+      width: meta.w, height: meta.h, fill: meta.color,
+      stroke:'#444', strokeWidth:1, cornerRadius:6, offsetX: meta.w/2, offsetY: meta.h/2
+    });
+    const iconText = new Konva.Text({ text: meta.icon || '', fontSize: Math.min(meta.h,30), x:-meta.w/2+8, y:-meta.h/2+6, width: meta.w-16, height:24, align:'left', verticalAlign:'top' });
+    const labelText = new Konva.Text({ text: meta.label || '', fontSize:13, x:-meta.w/2, y: meta.h/2 - 20, width: meta.w, align:'center', verticalAlign:'middle', fill:'#fff' });
+    node.add(rect);
+    if (meta.icon) node.add(iconText);
+    if (showLabels) node.add(labelText);
+    node._meta.w = meta.w; node._meta.h = meta.h; node._meta.color = meta.color; node._meta.label = meta.label; node._meta.icon = meta.icon;
+    itemsLayer.batchDraw();
+  }
+
+  // drag & drop from left panel
+  document.querySelectorAll('.tool').forEach(t => {
+    t.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', t.dataset.type);
     });
   });
-
-  container.addEventListener('dragover', (e) => {
+  const container = stage.container();
+  container.addEventListener('dragover', (e)=> e.preventDefault());
+  container.addEventListener('drop', (e)=>{
     e.preventDefault();
-  });
-
-  container.addEventListener('drop', (e) => {
-    e.preventDefault();
-    if (!draggedType) return;
-
-    // Position relativ zur Bühne berechnen
+    const type = e.dataTransfer.getData('text/plain');
+    if (!type) return;
     const rect = container.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-
-    // Snap zur Gridmitte
-    const snappedX = Math.round(x / gridSize) * gridSize;
-    const snappedY = Math.round(y / gridSize) * gridSize;
-
-    createShelf(snappedX, snappedY, draggedType);
-    draggedType = null;
+    const node = createObject(type, x, y);
+    selectNode(node);
   });
 
-  // --- Responsive Resize ---
+  // canvas background click -> deselect
+  stage.on('click', (e) => {
+    if (e.target === stage) clearSelection();
+  });
+
+  // topbar actions
+  document.getElementById('newLayout').addEventListener('click', ()=> {
+    if (!confirm('Neues Layout erstellen? Nicht gespeicherte Änderungen gehen verloren.')) return;
+    itemsLayer.destroyChildren(); itemsLayer.draw(); clearSelection();
+  });
+
+  // save JSON
+  function exportJSON() {
+    const items = [];
+    itemsLayer.find('.placeable').forEach(g=>{
+      items.push({
+        id: g.id(),
+        type: g._meta.type,
+        x: g.x(), y: g.y(),
+        w: g._meta.w, h: g._meta.h,
+        color: g._meta.color,
+        label: g._meta.label,
+        category: g._meta.category,
+        icon: g._meta.icon,
+        rot: g._meta.rot || g.rotation()
+      });
+    });
+    const payload = {
+      meta:{ created: new Date().toISOString(), gridSize },
+      items
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'layout.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  }
+  document.getElementById('downloadJSON').addEventListener('click', exportJSON);
+
+  // load JSON
+  document.getElementById('loadJSON').addEventListener('change', (ev)=>{
+    const f = ev.target.files[0]; if (!f) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (!data.items) throw new Error('Ungültiges Format');
+        itemsLayer.destroyChildren();
+        data.items.forEach(it=>{
+          createObject(it.type, it.x, it.y, { w:it.w, h:it.h, color:it.color, label:it.label, icon:it.icon });
+        });
+        if (data.meta && data.meta.gridSize) { document.getElementById('gridSize').value = data.meta.gridSize; gridSize = data.meta.gridSize; drawGrid(); }
+        itemsLayer.draw();
+      } catch(err) {
+        alert('Fehler beim Laden: ' + err.message);
+      }
+    };
+    reader.readAsText(f);
+    ev.target.value = '';
+  });
+
+  // export PNG
+  document.getElementById('exportPNG').addEventListener('click', ()=>{
+    // temporarily hide selectionRect
+    itemsLayer.find('.selectionRect').forEach(n=>n.hide());
+    itemsLayer.draw();
+    const dataURL = stage.toDataURL({ pixelRatio:2 });
+    const a = document.createElement('a'); a.href = dataURL; a.download = 'layout.png'; document.body.appendChild(a); a.click(); a.remove();
+    // restore selection
+    itemsLayer.find('.selectionRect').forEach(n=>n.show());
+    itemsLayer.draw();
+  });
+
+  // grid controls
+  document.getElementById('toggleGrid').addEventListener('click', ()=>{ gridVisible = !gridVisible; drawGrid(); });
+  document.getElementById('gridSize').addEventListener('change', (e)=>{ gridSize = parseInt(e.target.value,10) || 50; drawGrid(); });
+  document.getElementById('snapToggle').addEventListener('change', (e)=>{ snapEnabled = e.target.checked; });
+  document.getElementById('showLabels').addEventListener('change', (e)=>{ showLabels = e.target.checked; rebuildAllLabels(); });
+
+  function rebuildAllLabels() {
+    itemsLayer.find('.placeable').forEach(g => {
+      const meta = g._meta;
+      // rebuild visuals with or without label
+      rebuildNodeVisual(g);
+    });
+  }
+
+  // templates
+  document.getElementById('template-small').addEventListener('click', ()=> {
+    if (!confirm('Vorlage "Kleiner Markt" laden? Aktuelles Layout wird ersetzt.')) return;
+    itemsLayer.destroyChildren();
+    // simple small layout
+    createObject('entrance', 160, 80);
+    createObject('seating', 360, 100);
+    createObject('shelf', 160, 260);
+    createObject('shelf', 340, 260);
+    createObject('island', 520, 200);
+    createObject('fridge', 160, 420);
+    createObject('kassa', 520, 520);
+    createObject('promo', 420, 420);
+    itemsLayer.draw();
+  });
+
+  document.getElementById('template-medium').addEventListener('click', ()=> {
+    if (!confirm('Vorlage "Typischer Mittelmarkt" laden? Aktuelles Layout wird ersetzt.')) return;
+    itemsLayer.destroyChildren();
+    // entrance area
+    createObject('entrance', 160, 80);
+    createObject('seating', 360, 90);
+    createObject('wc', 420, 90);
+    // fresh / bakery
+    createObject('island', 200, 240);
+    createObject('island', 320, 240);
+    createObject('counter', 480, 240); // bakery
+    // central aisles
+    createObject('shelf', 160, 380);
+    createObject('shelf', 340, 380);
+    createObject('shelf', 520, 380);
+    // fridges / deli
+    createObject('fridge', 700, 180);
+    createObject('counter', 700, 320);
+    // frozen & non-food
+    createObject('freezer', 880, 380);
+    createObject('promo', 520, 540);
+    // checkout
+    createObject('kassa', 700, 580);
+    createObject('service', 540, 620);
+    itemsLayer.draw();
+  });
+
+  // responsive
   window.addEventListener('resize', () => {
-    stage.width(window.innerWidth - 180);
-    stage.height(window.innerHeight);
-    gridLayer.destroyChildren();
-    for (let i = 0; i <= stage.width() / gridSize; i++) {
-      gridLayer.add(
-        new Konva.Line({
-          points: [i * gridSize, 0, i * gridSize, stage.height()],
-          stroke: '#ddd',
-          strokeWidth: 1,
-        })
-      );
-    }
-    for (let j = 0; j <= stage.height() / gridSize; j++) {
-      gridLayer.add(
-        new Konva.Line({
-          points: [0, j * gridSize, stage.width(), j * gridSize],
-          stroke: '#ddd',
-          strokeWidth: 1,
-        })
-      );
-    }
-    gridLayer.draw();
+    const newSize = computeStageSize();
+    stage.width(newSize.w); stage.height(newSize.h);
+    stageParent.style.width = newSize.w + 'px'; stageParent.style.height = newSize.h + 'px';
+    drawGrid();
+    itemsLayer.batchDraw();
   });
+
+  // initial small tip
+  console.log('Shop-Generator geladen — ziehe Objekte vom linken Bereich auf das Canvas, klicke, um Eigenschaften rechts zu bearbeiten.');
 </script>
 </body>
 </html>
