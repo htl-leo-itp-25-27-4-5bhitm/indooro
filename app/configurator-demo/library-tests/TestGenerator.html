@@ -20,11 +20,12 @@
   max-height: 100vh;
 }
 
+
   </style>
 </head>
 <body class="h-screen antialiased text-gray-800 bg-gray-50">
 
-<div class="flex h-screen">
+<div class="flex h-screen" >
   <!-- Sidebar -->
   <aside class="w-80 bg-white border-r border-gray-200 overflow-y-auto">
     <div class="p-4 border-b">
@@ -294,7 +295,7 @@ function initUI() {
   showGridCheckbox.onchange = () => { showGrid = showGridCheckbox.checked; renderCanvas(); };
 
   // zoom
-  function setZoom(z) { zoom = Math.max(0.5, Math.min(2, Math.round(z*10)/10)); zoomLabel.innerText = Math.round(zoom*100)+'%'; renderCanvas(); }
+  function setZoom(z) { zoom = Math.max(0.1, Math.min(3, Math.round(z*10)/10)); zoomLabel.innerText = Math.round(zoom*100)+'%'; renderCanvas(); }
   zoomInBtn.onclick = () => setZoom(zoom + 0.1);
   zoomOutBtn.onclick = () => setZoom(zoom - 0.1);
 
