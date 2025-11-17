@@ -1,7 +1,7 @@
 /* Globale Einstellungen */
 :root {
-    --primary-color: #4CAF50; /* Ein klares Grün (wie "Go" oder "Fresh") */
-    --secondary-color: #2196F3; /* Blau für Akzente/Buttons */
+    --primary-color: #4CAF50;
+    --secondary-color: #2196F3;
     --text-color: #444;
     --heading-color: #222;
     --background-light: #f7f7f7;
@@ -14,11 +14,43 @@
     padding: 0;
 }
 
+html {
+    scroll-behavior: smooth;
+}
+
 body {
     font-family: var(--font-family);
     line-height: 1.6;
     color: var(--text-color);
     background-color: white;
+    overflow-x: hidden;
+}
+
+/* Scroll Reveal Animation */
+.reveal {
+    opacity: 0;
+    transform: translateY(50px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+.reveal.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.fade-in {
+    animation: fadeInUp 1s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Styling für das Logo-Bild in der Navigation */
@@ -27,11 +59,11 @@ body {
     width: auto;
     vertical-align: middle; 
     margin-left: 5px;
-    transition: transform 0.3s ease-in-out;
+    transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 .logo:hover .logo-icon {
-    transform: rotate(5deg);
+    transform: rotate(360deg) scale(1.1);
 }
 
 .logo {
@@ -39,7 +71,12 @@ body {
     font-weight: bold;
     color: var(--primary-color);
     display: inline-flex;
-    align-items: center; 
+    align-items: center;
+    transition: transform 0.3s ease;
+}
+
+.logo:hover {
+    transform: scale(1.05);
 }
 
 /* Layout Container */
@@ -49,13 +86,21 @@ body {
     padding: 0 20px;
 }
 
-/* Navigationsleiste */
+/* Navigationsleiste - Glasmorphismus */
 nav {
-    background-color: white;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
     position: sticky;
     top: 0;
     z-index: 100;
+    transition: all 0.3s ease;
+}
+
+nav.scrolled {
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.12);
 }
 
 nav .container {
@@ -74,24 +119,109 @@ nav ul li a {
     text-decoration: none;
     color: var(--heading-color);
     padding: 0 15px;
-    transition: color 0.3s;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+nav ul li a::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    width: 0;
+    height: 2px;
+    background: var(--primary-color);
+    transition: width 0.3s ease, left 0.3s ease;
+}
+
+nav ul li a:hover::after {
+    width: 80%;
+    left: 10%;
 }
 
 nav ul li a:hover {
     color: var(--primary-color);
+    transform: translateY(-2px);
 }
 
-/* Hero Sektion */
+/* Hero Sektion mit animiertem Gradient */
 .hero {
     background: linear-gradient(135deg, #e0ffe0 0%, #f0f0ff 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 15s ease infinite;
     padding: 100px 0;
     text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.hero-shapes {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    z-index: 0;
+}
+
+.shape {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0.1;
+    animation: float 20s ease-in-out infinite;
+}
+
+.shape-1 {
+    width: 300px;
+    height: 300px;
+    background: var(--primary-color);
+    top: 10%;
+    left: 10%;
+    animation-delay: 0s;
+}
+
+.shape-2 {
+    width: 200px;
+    height: 200px;
+    background: var(--secondary-color);
+    top: 60%;
+    right: 10%;
+    animation-delay: 5s;
+}
+
+.shape-3 {
+    width: 150px;
+    height: 150px;
+    background: var(--primary-color);
+    bottom: 10%;
+    left: 50%;
+    animation-delay: 10s;
+}
+
+@keyframes float {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    25% { transform: translate(50px, 50px) rotate(90deg); }
+    50% { transform: translate(0, 100px) rotate(180deg); }
+    75% { transform: translate(-50px, 50px) rotate(270deg); }
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
 }
 
 .hero h1 {
     font-size: 3.5em;
     color: var(--primary-color);
     margin-bottom: 20px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .hero .tagline {
@@ -101,7 +231,7 @@ nav ul li a:hover {
     color: var(--heading-color);
 }
 
-/* Buttons (Call-to-Action) */
+/* Buttons mit modernen Effekten */
 .cta-buttons {
     margin-top: 30px;
 }
@@ -113,29 +243,62 @@ nav ul li a:hover {
     text-decoration: none;
     border-radius: 50px;
     font-weight: bold;
-    transition: background-color 0.3s, transform 0.2s;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     border: 2px solid transparent;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.btn:hover::before {
+    width: 300px;
+    height: 300px;
 }
 
 .btn.primary {
     background-color: var(--primary-color);
     color: white;
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
 }
 
 .btn.primary:hover {
     background-color: #43A047;
-    transform: translateY(-2px);
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
 }
 
 .btn.secondary {
     background-color: var(--secondary-color);
     color: white;
+    box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+}
+
+.btn.secondary:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 25px rgba(33, 150, 243, 0.4);
 }
 
 .btn.secondary.coming-soon {
     background-color: #ccc;
     cursor: not-allowed;
     border: 2px solid #ccc;
+    box-shadow: none;
+}
+
+.btn.secondary.coming-soon:hover {
+    transform: none;
 }
 
 /* Sektionen allgemein */
@@ -172,16 +335,29 @@ nav ul li a:hover {
 .benefit-card {
     flex: 1 1 300px;
     padding: 30px;
-    background-color: var(--background-light);
-    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(247, 247, 247, 0.9));
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
     text-align: center;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.benefit-card:hover {
+    transform: translateY(-10px) scale(1.02);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
 }
 
 .benefit-card .icon {
     font-size: 3em;
     display: block;
     margin-bottom: 15px;
+    transition: transform 0.5s ease;
+}
+
+.benefit-card:hover .icon {
+    transform: scale(1.2) rotate(10deg);
 }
 
 .benefit-card h3 {
@@ -208,21 +384,50 @@ nav ul li a:hover {
     text-align: center;
     border-top: 5px solid var(--primary-color);
     background-color: white;
-    border-radius: 5px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.step-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(76, 175, 80, 0.1), transparent);
+    transition: left 0.5s ease;
+}
+
+.step-card:hover::before {
+    left: 100%;
+}
+
+.step-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
 }
 
 .step-number {
     font-size: 2em;
     font-weight: bold;
-    color: var(--secondary-color);
+    color: white;
     margin-bottom: 10px;
     border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    line-height: 40px;
+    width: 60px;
+    height: 60px;
+    line-height: 60px;
     margin: 0 auto 10px auto;
-    background-color: #e3f2fd;
+    background: linear-gradient(135deg, var(--secondary-color), #1976D2);
+    box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+    transition: transform 0.3s ease;
+}
+
+.step-card:hover .step-number {
+    transform: rotate(360deg) scale(1.1);
 }
 
 /* Technologie Sektion */
@@ -242,6 +447,27 @@ nav ul li a:hover {
     padding: 20px;
     border-left: 3px solid var(--secondary-color);
     text-align: left;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.tech-detail::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 3px;
+    height: 0;
+    background: var(--primary-color);
+    transition: height 0.4s ease;
+}
+
+.tech-detail:hover::before {
+    height: 100%;
+}
+
+.tech-detail:hover {
+    transform: translateX(10px);
 }
 
 .tech-detail h3 {
@@ -253,8 +479,15 @@ nav ul li a:hover {
     max-width: 600px;
     margin: 0 auto;
     padding: 20px;
-    background-color: #f1f8e9; /* Sehr helles Grün */
-    border-radius: 8px;
+    background: linear-gradient(135deg, #f1f8e9, #dcedc8);
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+.tech-focus:hover {
+    transform: scale(1.02);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
 }
 
 .tech-focus h4 {
@@ -277,8 +510,31 @@ nav ul li a:hover {
 .status-box {
     flex: 1 1 45%;
     padding: 30px;
-    border-radius: 8px;
+    border-radius: 15px;
     min-width: 300px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.status-box::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.3), transparent);
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+.status-box:hover::after {
+    opacity: 1;
+}
+
+.status-box:hover {
+    transform: translateY(-5px);
 }
 
 .status-box h3 {
@@ -287,13 +543,15 @@ nav ul li a:hover {
 }
 
 .status-box.scope {
-    background-color: #e8f5e9; /* Hellgrün */
+    background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
     border-left: 5px solid var(--primary-color);
+    box-shadow: 0 5px 20px rgba(76, 175, 80, 0.2);
 }
 
 .status-box.no-scope {
-    background-color: #ffebee; /* Hellrot */
+    background: linear-gradient(135deg, #ffebee, #ffcdd2);
     border-left: 5px solid #E57373;
+    box-shadow: 0 5px 20px rgba(229, 115, 115, 0.2);
 }
 
 .status-box ul {
@@ -325,12 +583,18 @@ nav ul li a:hover {
 }
 
 .team-member {
-    background-color: var(--secondary-color);
+    background: linear-gradient(135deg, var(--secondary-color), #1976D2);
     color: white;
     padding: 15px 25px;
     border-radius: 50px;
     font-weight: 500;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 5px 15px rgba(33, 150, 243, 0.3);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.team-member:hover {
+    transform: translateY(-5px) scale(1.05);
+    box-shadow: 0 10px 25px rgba(33, 150, 243, 0.4);
 }
 
 .aufraggeber-info {
