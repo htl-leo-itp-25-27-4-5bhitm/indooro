@@ -1,4 +1,5 @@
 let categoriesMap = {};
+let categoriesData = {};
 const API_BASE = 'http://localhost:8080/api';
 
 async function loadCategories() {
@@ -7,8 +8,12 @@ async function loadCategories() {
     if (!res.ok) throw new Error('Categories nicht gefunden');
     const categories = await res.json();
     categoriesMap = {};
+    categoriesData = categories;
     categories.forEach(cat => {
-      categoriesMap[cat.categoryCode] = cat.categoryName;
+      categoriesMap[cat.categoryCode] = {
+        name: cat.categoryName,
+        emoji: cat.emoji || '📦'
+      };
     });
   } catch (error) {
     console.warn('Categories konnten nicht geladen werden:', error);
@@ -70,9 +75,11 @@ function buildModel(products) {
   for (const p of products) {
     const cat = p.categoryCode;
     if (!model[cat]) {
+      const catInfo = categoriesMap[cat] || { name: `Kategorie ${cat}`, emoji: '📦' };
       model[cat] = {
         categoryCode: cat,
-        categoryName: categoriesMap[cat] || `Kategorie ${cat}`,
+        categoryName: catInfo.name,
+        categoryEmoji: catInfo.emoji,
         products: [],
         meters: { 1: [], 2: [], 3: [], 4: [], 5: [] }
       };
@@ -96,7 +103,10 @@ function renderMarket(model) {
     
     const label = document.createElement('div');
     label.className = 'shelf-label';
-    label.textContent = category.categoryCode;
+    label.innerHTML = `
+      <span class="category-emoji">${category.categoryEmoji}</span>
+      <span class="category-name">${category.categoryName}</span>
+    `;
     row.appendChild(label);
     
     for (let meter = 1; meter <= 5; meter++) {
@@ -106,7 +116,7 @@ function renderMarket(model) {
       shelfMeter.dataset.meter = meter;
       shelfMeter.setAttribute('role', 'button');
       shelfMeter.setAttribute('tabindex', '0');
-      shelfMeter.setAttribute('aria-label', `Kategorie ${category.categoryCode}, Meter ${meter}`);
+      shelfMeter.setAttribute('aria-label', `${category.categoryName}, Meter ${meter}`);
       
       const productsInMeter = category.meters[meter] || [];
       productsInMeter.forEach(product => {
@@ -161,10 +171,12 @@ function renderShelfDetail(categoryCode, meter, model) {
   const panel = document.getElementById('shelf-details-content');
   panel.innerHTML = '';
   
-  const categoryName = model[categoryCode]?.categoryName || `Kategorie ${categoryCode}`;
+  const category = model[categoryCode];
+  const categoryName = category?.categoryName || `Kategorie ${categoryCode}`;
+  const categoryEmoji = category?.categoryEmoji || '📦';
   
   const header = document.createElement('h2');
-  header.textContent = `${categoryName} – Meter ${meter}`;
+  header.innerHTML = `<span class="detail-emoji">${categoryEmoji}</span> ${categoryName} – Meter ${meter}`;
   panel.appendChild(header);
   
   const list = (model[categoryCode]?.meters?.[meter] ?? []).filter(p => p?.layout);
@@ -233,7 +245,7 @@ function renderSearchResults(products) {
   panel.innerHTML = '';
   
   const header = document.createElement('h2');
-  header.textContent = `Suchergebnisse (${products.length})`;
+  header.innerHTML = `<span class="detail-emoji">🔍</span> Suchergebnisse (${products.length})`;
   panel.appendChild(header);
   
   if (products.length === 0) {
@@ -251,10 +263,10 @@ function renderSearchResults(products) {
     const item = document.createElement('div');
     item.className = 'search-result-item';
     
-    const categoryName = categoriesMap[p.categoryCode] || `Kategorie ${p.categoryCode}`;
+    const catInfo = categoriesMap[p.categoryCode] || { name: `Kategorie ${p.categoryCode}`, emoji: '📦' };
     const location = p.layout 
-      ? `${categoryName} – Meter ${p.layout.meter}, Fach ${p.layout.fach}, Reihe ${p.layout.reihe}`
-      : categoryName;
+      ? `${catInfo.emoji} ${catInfo.name} – Meter ${p.layout.meter}, Fach ${p.layout.fach}, Reihe ${p.layout.reihe}`
+      : `${catInfo.emoji} ${catInfo.name}`;
     
     item.innerHTML = `
       <div class="product-name">${p.name}</div>

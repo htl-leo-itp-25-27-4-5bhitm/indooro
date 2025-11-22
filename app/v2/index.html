@@ -3,22 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Indooro v2 - Regal-Layout nach Belegplan</title>
+  <title>Indooro - Produktsuche & Navigation</title>
   <link rel="stylesheet" href="style.css">
   <script src="script.js" defer></script>
 </head>
 <body>
   <header>
-    <h1>Indooro Supermarkt - Regalvisualisierung</h1>
+    <h1>🛒 Indooro Supermarkt</h1>
+    <p class="subtitle">Finden Sie Ihre Produkte im Handumdrehen</p>
     <div class="search-container">
-      <input 
-        type="text" 
-        id="search-input" 
-        placeholder="Produkt suchen..." 
-        aria-label="Produkt suchen"
-      />
-      <button id="search-button" aria-label="Suchen">🔍</button>
-      <button id="clear-search" style="display: none;" aria-label="Suche löschen">✕</button>
+      <div class="search-wrapper">
+        <span class="search-icon">🔍</span>
+        <input 
+          type="text" 
+          id="search-input" 
+          placeholder="Produkt suchen..." 
+          aria-label="Produkt suchen"
+        />
+        <button id="clear-search" style="display: none;" aria-label="Suche löschen">✕</button>
+      </div>
     </div>
   </header>
   <div class="content-wrapper">
@@ -27,7 +30,10 @@
     </main>
     <aside id="shelf-details-panel" aria-live="polite">
       <div id="shelf-details-content">
-        <p>Klicken Sie auf ein Regal, um Details anzuzeigen.</p>
+        <div class="welcome-message">
+          <span class="welcome-icon">👈</span>
+          <p>Klicken Sie auf ein Regal, um Produkte anzuzeigen</p>
+        </div>
       </div>
     </aside>
   </div>

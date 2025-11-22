@@ -1,15 +1,15 @@
 [
-  {"categoryCode": 310,"categoryName": "Obst & Gemüse"},
-  {"categoryCode": 420,"categoryName": "Konserven & Saucen"},
-  {"categoryCode": 430,"categoryName": "Teigwaren & Nudeln"},
-  {"categoryCode": 440,"categoryName": "Müsli & Frühstück"},
-  {"categoryCode": 445,"categoryName": "Backmittel"},
-  {"categoryCode": 450,"categoryName": "Öle & Essig"},
-  {"categoryCode": 470,"categoryName": "Snacks & Süßwaren"},
-  {"categoryCode": 510,"categoryName": "Alkoholfreie Getränke"},
-  {"categoryCode": 520,"categoryName": "Molkereiprodukte"},
-  {"categoryCode": 525,"categoryName": "Käse & Wurst"},
-  {"categoryCode": 530,"categoryName": "Tiefkühlprodukte"},
-  {"categoryCode": 610,"categoryName": "Haushalt & Reinigung"},
-  {"categoryCode": 640,"categoryName": "Körperpflege & Hygiene"}
+  {"categoryCode": 310,"categoryName": "Obst & Gemüse", "emoji": "🥬"},
+  {"categoryCode": 420,"categoryName": "Konserven & Saucen", "emoji": "🥫"},
+  {"categoryCode": 430,"categoryName": "Teigwaren & Nudeln", "emoji": "🍝"},
+  {"categoryCode": 440,"categoryName": "Müsli & Frühstück", "emoji": "🥣"},
+  {"categoryCode": 445,"categoryName": "Backmittel", "emoji": "🍞"},
+  {"categoryCode": 450,"categoryName": "Öle & Essig", "emoji": "🫒"},
+  {"categoryCode": 470,"categoryName": "Snacks & Süßwaren", "emoji": "🍫"},
+  {"categoryCode": 510,"categoryName": "Alkoholfreie Getränke", "emoji": "🧃"},
+  {"categoryCode": 520,"categoryName": "Molkereiprodukte", "emoji": "🥛"},
+  {"categoryCode": 525,"categoryName": "Käse & Wurst", "emoji": "🧀"},
+  {"categoryCode": 530,"categoryName": "Tiefkühlprodukte", "emoji": "🧊"},
+  {"categoryCode": 610,"categoryName": "Haushalt & Reinigung", "emoji": "🧹"},
+  {"categoryCode": 640,"categoryName": "Körperpflege & Hygiene", "emoji": "🧴"}
 ]
