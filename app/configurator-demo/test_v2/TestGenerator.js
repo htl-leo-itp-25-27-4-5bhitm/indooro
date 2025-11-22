@@ -34,6 +34,47 @@ let shopName = 'Mein Supermarkt';
 
 const cellSize = 20; // pixels per meter cell
 
+/* ----- Undo/Redo System ----- */
+let history = [];
+let historyIndex = -1;
+const MAX_HISTORY = 50;
+
+function saveState() {
+  // Remove any future states if we're not at the end
+  history = history.slice(0, historyIndex + 1);
+  
+  // Deep clone current state
+  const state = JSON.parse(JSON.stringify(elements));
+  history.push(state);
+  
+  // Limit history size
+  if (history.length > MAX_HISTORY) {
+    history.shift();
+  } else {
+    historyIndex++;
+  }
+}
+
+function undo() {
+  if (historyIndex > 0) {
+    historyIndex--;
+    elements = JSON.parse(JSON.stringify(history[historyIndex]));
+    selectedElement = null;
+    renderCanvas();
+    renderProperties();
+  }
+}
+
+function redo() {
+  if (historyIndex < history.length - 1) {
+    historyIndex++;
+    elements = JSON.parse(JSON.stringify(history[historyIndex]));
+    selectedElement = null;
+    renderCanvas();
+    renderProperties();
+  }
+}
+
 /* ----- DOM references ----- */
 const toolSelectBtn = document.getElementById('toolSelect');
 const toolDrawBtn = document.getElementById('toolDraw');
@@ -174,8 +215,23 @@ async function initUI() {
   // shop name
   shopNameInput.addEventListener('input', () => shopName = shopNameInput.value);
 
+  // Keyboard shortcuts for undo/redo
+  window.addEventListener('keydown', (e) => {
+    // Undo: Ctrl+Z or Cmd+Z
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      undo();
+    }
+    // Redo: Ctrl+Y or Ctrl+Shift+Z or Cmd+Shift+Z
+    else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+      e.preventDefault();
+      redo();
+    }
+  });
+
   // initial render
   setTool('select');
+  saveState(); // Initial state
   renderCanvas();
 }
 
@@ -265,11 +321,11 @@ function renderCanvas() {
     inner.className = 'p-1 flex flex-col items-center justify-center';
     const icon = cat ? cat.icon : '📦';
     
-    // Smart rendering: hide text if element is too small
-    const isSmall = el.width < 2 || el.height < 2;
+    // Refined smart rendering: hide text if element is narrow in ANY dimension
+    const isNarrow = el.width < 2 || el.height < 2;
     
-    if (isSmall) {
-      // Only show icon for small elements
+    if (isNarrow) {
+      // Only show icon for narrow elements (thin strips)
       inner.innerHTML = `<div class="text-lg">${icon}</div>`;
     } else {
       // Show full details for larger elements
@@ -284,6 +340,9 @@ function renderCanvas() {
     // click to select
     div.addEventListener('mousedown', (ev) => {
       ev.stopPropagation();
+      // Save state before dragging starts
+      saveState();
+      
       // compute cell coords with snapping
       const rect = canvasContainer.getBoundingClientRect();
       const x = Math.round((ev.clientX - rect.left) / (cellSize * zoom));
@@ -340,6 +399,8 @@ canvasContainer.addEventListener('mousedown', (e) => {
       // handled by element mousedown handler (stops propagation)
     }
   } else if (currentTool === 'draw') {
+    // Save state before drawing
+    saveState();
     isDrawing = true;
     drawStart = { x, y };
     currentMouseCell = { x, y };
@@ -422,6 +483,7 @@ window.addEventListener('keydown', (e) => {
     // Only delete element if not typing in a text field
     if (!isTyping && selectedElement) {
       e.preventDefault(); // Prevent browser back navigation
+      saveState(); // Save state before deletion
       elements = elements.filter(el => el.id !== selectedElement.id);
       selectedElement = null;
       renderProperties();
@@ -446,16 +508,62 @@ function renderProperties() {
   const header = document.createElement('div');
   header.className = 'flex items-center justify-between pb-3 border-b';
   header.innerHTML = `<h4 class="font-medium">Element bearbeiten</h4>`;
+  
+  // Action buttons (delete and duplicate)
+  const actionsDiv = document.createElement('div');
+  actionsDiv.className = 'flex gap-1';
+  
+  const duplicateBtn = document.createElement('button');
+  duplicateBtn.className = 'p-2 text-blue-500 hover:bg-blue-50 rounded';
+  duplicateBtn.title = 'Duplizieren';
+  duplicateBtn.innerHTML = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke-width="2"/></svg>';
+  duplicateBtn.onclick = () => {
+    saveState(); // Save state before duplication
+    
+    // Deep clone the element
+    const duplicate = JSON.parse(JSON.stringify(el));
+    
+    // Assign new unique ID
+    duplicate.id = Date.now() + Math.floor(Math.random() * 1000);
+    
+    // Offset position
+    let newX = el.x + 1;
+    let newY = el.y + 1;
+    
+    // Keep within grid bounds
+    if (newX + duplicate.width > gridSize.width) {
+      newX = Math.max(0, gridSize.width - duplicate.width);
+    }
+    if (newY + duplicate.height > gridSize.height) {
+      newY = Math.max(0, gridSize.height - duplicate.height);
+    }
+    
+    duplicate.x = newX;
+    duplicate.y = newY;
+    
+    // Add to elements and select
+    elements.push(duplicate);
+    selectedElement = duplicate;
+    
+    renderCanvas();
+    renderProperties();
+  };
+  
   const delBtn = document.createElement('button');
   delBtn.className = 'p-2 text-red-500 hover:bg-red-50 rounded';
+  delBtn.title = 'Löschen';
   delBtn.innerHTML = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
   delBtn.onclick = () => {
+    saveState(); // Save state before deletion
     elements = elements.filter(it => it.id !== el.id);
     selectedElement = null;
     renderProperties();
     renderCanvas();
   };
-  header.appendChild(delBtn);
+  
+  actionsDiv.appendChild(duplicateBtn);
+  actionsDiv.appendChild(delBtn);
+  header.appendChild(actionsDiv);
   container.appendChild(header);
 
   // label
@@ -485,6 +593,7 @@ function renderProperties() {
     btn.style.backgroundColor = el.category === c.id ? c.color : 'transparent';
     btn.innerHTML = `<span>${c.icon}</span><span class="flex-1">${c.name}</span>`;
     btn.onclick = () => {
+      saveState(); // Save state before category change
       el.category = c.id;
       el.color = c.color;
       el.label = c.name;
@@ -523,13 +632,21 @@ function renderProperties() {
   propertiesWrapper.appendChild(container);
 
   // listeners
+  let labelTimeout;
   document.getElementById('propLabel').addEventListener('input', (ev) => {
+    // Debounce state saving for input events
+    clearTimeout(labelTimeout);
     el.label = ev.target.value;
     elements = elements.map(it => it.id === el.id ? el : it);
     renderCanvas();
+    
+    labelTimeout = setTimeout(() => {
+      saveState();
+    }, 500);
   });
 
   document.getElementById('propW').addEventListener('change', (ev) => {
+    saveState(); // Save state before dimension change
     el.width = Math.max(1, Math.round(parseFloat(ev.target.value)) || 1);
     el.width = Math.min(el.width, gridSize.width - el.x);
     elements = elements.map(it => it.id === el.id ? el : it);
@@ -538,6 +655,7 @@ function renderProperties() {
   });
 
   document.getElementById('propH').addEventListener('change', (ev) => {
+    saveState(); // Save state before dimension change
     el.height = Math.max(1, Math.round(parseFloat(ev.target.value)) || 1);
     el.height = Math.min(el.height, gridSize.height - el.y);
     elements = elements.map(it => it.id === el.id ? el : it);
@@ -547,6 +665,8 @@ function renderProperties() {
 
   // Rotate button handler
   document.getElementById('rotateBtn').addEventListener('click', () => {
+    saveState(); // Save state before rotation
+    
     // Swap width and height
     const newWidth = el.height;
     const newHeight = el.width;
@@ -586,6 +706,7 @@ function escapeHtml(s) {
 
 /* ----- Templates ----- */
 function applyTemplate(t) {
+  saveState(); // Save state before applying template
   gridSize.width = t.width;
   gridSize.height = t.height;
   gridWidthInput.value = gridSize.width;
