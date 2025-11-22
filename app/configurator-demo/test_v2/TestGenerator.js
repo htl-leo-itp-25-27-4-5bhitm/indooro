@@ -75,6 +75,23 @@ function redo() {
   }
 }
 
+/* ----- Collision Detection Helper ----- */
+function checkCollision(el1, el2) {
+  // Check if two elements overlap
+  return !(
+    el1.x + el1.width <= el2.x ||
+    el2.x + el2.width <= el1.x ||
+    el1.y + el1.height <= el2.y ||
+    el2.y + el2.height <= el1.y
+  );
+}
+
+function hasCollisions(element) {
+  return elements.some(other => 
+    other.id !== element.id && checkCollision(element, other)
+  );
+}
+
 /* ----- DOM references ----- */
 const toolSelectBtn = document.getElementById('toolSelect');
 const toolDrawBtn = document.getElementById('toolDraw');
@@ -229,6 +246,45 @@ async function initUI() {
     }
   });
 
+  // Arrow key navigation for selected element
+  window.addEventListener('keydown', (e) => {
+    // Check if user is typing in an input or textarea
+    const activeElement = document.activeElement;
+    const isTyping = activeElement && (
+      activeElement.tagName === 'INPUT' || 
+      activeElement.tagName === 'TEXTAREA' ||
+      activeElement.isContentEditable
+    );
+    
+    // Only process arrow keys if not typing and an element is selected
+    if (!isTyping && selectedElement && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+      saveState(); // Save state before movement
+      
+      const el = selectedElement;
+      
+      switch(e.key) {
+        case 'ArrowUp':
+          el.y = Math.max(0, el.y - 1);
+          break;
+        case 'ArrowDown':
+          el.y = Math.min(gridSize.height - el.height, el.y + 1);
+          break;
+        case 'ArrowLeft':
+          el.x = Math.max(0, el.x - 1);
+          break;
+        case 'ArrowRight':
+          el.x = Math.min(gridSize.width - el.width, el.x + 1);
+          break;
+      }
+      
+      // Update element in array
+      elements = elements.map(it => it.id === el.id ? el : it);
+      renderCanvas();
+      renderProperties();
+    }
+  });
+
   // initial render
   setTool('select');
   saveState(); // Initial state
@@ -302,19 +358,36 @@ function renderCanvas() {
     const cat = el.category ? PRODUCT_CATEGORIES.find(c => c.id === el.category) : null;
     const elementType = ELEMENT_TYPES.find(t => t.id === el.type) || ELEMENT_TYPES[0];
     
+    // Check for collisions
+    const hasCollision = hasCollisions(el);
+    
     const div = document.createElement('div');
     div.className = 'absolute border-2 element-box flex items-center justify-center text-center text-xs font-medium overflow-hidden';
     if (selectedElement && selectedElement.id === el.id) div.classList.add('selected');
+    
+    // Apply collision styling
+    if (hasCollision) {
+      div.classList.add('border-red-600');
+      div.style.borderWidth = '3px';
+    }
+    
     div.style.left = (el.x * cellSize * zoom) + 'px';
     div.style.top = (el.y * cellSize * zoom) + 'px';
     div.style.width = (el.width * cellSize * zoom) + 'px';
     div.style.height = (el.height * cellSize * zoom) + 'px';
-    div.style.backgroundColor = el.color || '#E5E7EB';
+    
+    // Background color with collision warning
+    if (hasCollision) {
+      div.style.backgroundColor = '#fca5a5'; // light red tint
+    } else {
+      div.style.backgroundColor = el.color || '#E5E7EB';
+    }
+    
     div.style.opacity = '0.95';
     div.dataset.id = el.id;
     
     // Add tooltip with full information
-    const tooltipText = `${elementType.name}${cat ? ' - ' + cat.name : ' - Leer'}`;
+    const tooltipText = `${elementType.name}${cat ? ' - ' + cat.name : ' - Leer'}${hasCollision ? ' ⚠️ ÜBERLAPPUNG!' : ''}`;
     div.title = tooltipText;
 
     const inner = document.createElement('div');
@@ -526,16 +599,27 @@ function renderProperties() {
     // Assign new unique ID
     duplicate.id = Date.now() + Math.floor(Math.random() * 1000);
     
-    // Offset position
-    let newX = el.x + 1;
-    let newY = el.y + 1;
+    // Smart placement logic
+    let newX, newY;
     
-    // Keep within grid bounds
+    // Try 1: Place to the right
+    newX = el.x + el.width;
+    newY = el.y;
+    
     if (newX + duplicate.width > gridSize.width) {
-      newX = Math.max(0, gridSize.width - duplicate.width);
-    }
-    if (newY + duplicate.height > gridSize.height) {
-      newY = Math.max(0, gridSize.height - duplicate.height);
+      // Try 2: Place below
+      newX = el.x;
+      newY = el.y + el.height;
+      
+      if (newY + duplicate.height > gridSize.height) {
+        // Fallback: Original offset logic with bounds checking
+        newX = Math.min(el.x + 1, gridSize.width - duplicate.width);
+        newY = Math.min(el.y + 1, gridSize.height - duplicate.height);
+        
+        // Ensure non-negative
+        newX = Math.max(0, newX);
+        newY = Math.max(0, newY);
+      }
     }
     
     duplicate.x = newX;
