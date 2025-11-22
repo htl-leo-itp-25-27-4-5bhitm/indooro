@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Supermarket Builder (Vanilla JS)</title>
+
+  <!-- Tailwind Play CDN (kein Build nötig) -->
+  <script defer src="https://cdn.tailwindcss.com"></script>
+  <script defer src="TestGenerator.js"></script>
+  <link rel="stylesheet" href="TestGenertor.css">
+
+
+</head>
+<body class="h-screen antialiased text-gray-800 bg-gray-50">
+
+<div class="flex h-screen overflow-hidden">
+  <!-- Left Sidebar -->
+  <aside class="w-80 bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0">
+    <div class="p-4 border-b">
+      <input id="shopName" type="text" value="Mein Supermarkt" class="w-full px-3 py-2 text-lg font-bold border border-gray-300 rounded" />
+    </div>
+
+    <!-- Tools -->
+    <div class="p-4 border-b">
+      <h3 class="font-semibold mb-2">Werkzeuge</h3>
+      <div class="flex gap-2">
+        <button id="toolSelect" class="flex-1 px-3 py-2 rounded flex items-center justify-center gap-2 bg-blue-500 text-white">
+          <!-- move icon -->
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h14M12 5v14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Auswählen
+        </button>
+        <button id="toolDraw" class="flex-1 px-3 py-2 rounded flex items-center justify-center gap-2 bg-gray-100">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Zeichnen
+        </button>
+      </div>
+    </div>
+
+    <!-- Element Type -->
+    <div class="p-4 border-b">
+      <h3 class="font-semibold mb-2">Element-Typ</h3>
+      <div id="elementTypes" class="grid grid-cols-2 gap-2">
+        <!-- filled by JS -->
+      </div>
+    </div>
+
+    <!-- Templates -->
+    <div class="p-4 border-b">
+      <h3 class="font-semibold mb-2">Vorlagen</h3>
+      <div id="templates" class="space-y-2"></div>
+    </div>
+
+    <!-- Grid Settings -->
+    <div class="p-4">
+      <h3 class="font-semibold mb-2">Rastergröße</h3>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-xs font-medium mb-1">Breite (m)</label>
+          <input id="gridWidth" type="number" value="40" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium mb-1">Höhe (m)</label>
+          <input id="gridHeight" type="number" value="60" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main area -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <!-- Top toolbar -->
+    <div class="bg-white border-b border-gray-200 p-3 flex items-center justify-between flex-shrink-0">
+      <div class="flex items-center gap-3">
+        <label class="flex items-center gap-2">
+          <input id="showGrid" type="checkbox" checked />
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3h4v4H3V3zm7 0h4v4h-4V3zm7 0h4v4h-4V3M3 10h4v4H3v-4zm7 0h4v4h-4v-4zm7 0h4v4h-4v-4M3 17h4v4H3v-4zm7 0h4v4h-4v-4zm7 0h4v4h-4v-4"/></svg>
+          Raster anzeigen
+        </label>
+
+        <div class="flex items-center gap-2 ml-4">
+          <span class="text-sm">Zoom:</span>
+          <button id="zoomOut" class="px-2 py-1 bg-gray-100 rounded">-</button>
+          <span id="zoomLabel" class="text-sm w-12 text-center">100%</span>
+          <button id="zoomIn" class="px-2 py-1 bg-gray-100 rounded">+</button>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="newBtn" class="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 flex items-center gap-2">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M3 6h18M9 6v12m6-12v12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Neu
+        </button>
+
+        <label class="px-3 py-2 bg-blue-500 text-white rounded cursor-pointer hover:bg-blue-600 flex items-center gap-2">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 5 17 10"/>
+            <line x1="12" y1="5" x2="12" y2="19"/>
+          </svg>
+          Importieren
+          <input id="fileInput" type="file" accept=".json" class="hidden" />
+        </label>
+
+        <button id="exportBtn" class="px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 flex items-center gap-2">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 5 17 10"/>
+          </svg>
+          Exportieren
+        </button>
+      </div>
+    </div>
+
+    <!-- Canvas wrapper -->
+    <div class="flex-1 overflow-auto bg-gray-100 p-8">
+      <div id="canvasContainer" class="bg-white mx-auto relative canvas-area" style="min-width:200px; min-height:200px;">
+        <!-- grid and elements rendered by JS -->
+      </div>
+    </div>
+
+    <!-- Status bar -->
+    <div class="bg-white border-t border-gray-200 px-4 py-2 flex items-center justify-between text-sm text-gray-600 flex-shrink-0">
+      <div>Elemente: <span id="countElements">0</span></div>
+      <div>Ladenfläche: <span id="areaSize">40</span>m × <span id="areaSizeH">60</span>m</div>
+      <div id="modeLabel">Auswahlmodus</div>
+    </div>
+  </div>
+
+  <!-- Right Sidebar (Properties) -->
+  <aside id="rightSidebar" class="w-80 bg-white border-l border-gray-200 overflow-y-auto flex-shrink-0">
+    <div class="p-4">
+      <h3 class="font-semibold mb-3">Eigenschaften</h3>
+      <div id="propertiesWrapper" class="text-sm text-gray-500">
+        Wähle ein Element aus, um seine Eigenschaften zu bearbeiten.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script>
+
+</script>
+</body>
+</html>
