@@ -256,17 +256,29 @@ function renderCanvas() {
     div.style.backgroundColor = el.color || '#E5E7EB';
     div.style.opacity = '0.95';
     div.dataset.id = el.id;
+    
+    // Add tooltip with full information
+    const tooltipText = `${elementType.name}${cat ? ' - ' + cat.name : ' - Leer'}`;
+    div.title = tooltipText;
 
     const inner = document.createElement('div');
     inner.className = 'p-1 flex flex-col items-center justify-center';
     const icon = cat ? cat.icon : '📦';
     
-    // Display Element Type prominently at top
-    inner.innerHTML = `
-      <div class="font-bold text-[11px] mb-0.5 px-1.5 py-0.5 bg-white bg-opacity-70 rounded">${elementType.name}</div>
-      <div class="text-lg">${icon}</div>
-      <div class="text-[10px] leading-tight">${el.label}</div>
-    `;
+    // Smart rendering: hide text if element is too small
+    const isSmall = el.width < 2 || el.height < 2;
+    
+    if (isSmall) {
+      // Only show icon for small elements
+      inner.innerHTML = `<div class="text-lg">${icon}</div>`;
+    } else {
+      // Show full details for larger elements
+      inner.innerHTML = `
+        <div class="font-bold text-[11px] mb-0.5 px-1.5 py-0.5 bg-white bg-opacity-70 rounded">${elementType.name}</div>
+        <div class="text-lg">${icon}</div>
+        <div class="text-[10px] leading-tight">${el.label}</div>
+      `;
+    }
     div.appendChild(inner);
 
     // click to select
@@ -483,18 +495,26 @@ function renderProperties() {
     categoriesList.appendChild(btn);
   });
 
-  // dimensions
+  // dimensions with rotate button
   const dimDiv = document.createElement('div');
   dimDiv.innerHTML = `
-    <div class="grid grid-cols-2 gap-2">
-      <div>
-        <label class="block text-sm font-medium mb-1">Breite</label>
-        <input id="propW" type="number" value="${el.width}" min="1" class="w-full px-2 py-1 border border-gray-300 rounded" />
+    <div class="space-y-2">
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-sm font-medium mb-1">Breite</label>
+          <input id="propW" type="number" value="${el.width}" min="1" class="w-full px-2 py-1 border border-gray-300 rounded" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Höhe</label>
+          <input id="propH" type="number" value="${el.height}" min="1" class="w-full px-2 py-1 border border-gray-300 rounded" />
+        </div>
       </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">Höhe</label>
-        <input id="propH" type="number" value="${el.height}" min="1" class="w-full px-2 py-1 border border-gray-300 rounded" />
-      </div>
+      <button id="rotateBtn" class="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm flex items-center justify-center gap-2">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Drehen (90°)
+      </button>
     </div>
   `;
   container.appendChild(dimDiv);
@@ -520,6 +540,39 @@ function renderProperties() {
   document.getElementById('propH').addEventListener('change', (ev) => {
     el.height = Math.max(1, Math.round(parseFloat(ev.target.value)) || 1);
     el.height = Math.min(el.height, gridSize.height - el.y);
+    elements = elements.map(it => it.id === el.id ? el : it);
+    renderCanvas();
+    renderProperties();
+  });
+
+  // Rotate button handler
+  document.getElementById('rotateBtn').addEventListener('click', () => {
+    // Swap width and height
+    const newWidth = el.height;
+    const newHeight = el.width;
+    
+    // Check if rotation would push element out of bounds
+    let newX = el.x;
+    let newY = el.y;
+    
+    // Adjust position if needed to keep element within grid
+    if (newX + newWidth > gridSize.width) {
+      newX = gridSize.width - newWidth;
+    }
+    if (newY + newHeight > gridSize.height) {
+      newY = gridSize.height - newHeight;
+    }
+    
+    // Ensure position is not negative
+    newX = Math.max(0, newX);
+    newY = Math.max(0, newY);
+    
+    // Apply rotation
+    el.width = newWidth;
+    el.height = newHeight;
+    el.x = newX;
+    el.y = newY;
+    
     elements = elements.map(it => it.id === el.id ? el : it);
     renderCanvas();
     renderProperties();
