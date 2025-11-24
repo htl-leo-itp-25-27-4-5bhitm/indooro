@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Indooro - Live Produktsuche</title>
+  <script defer src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header>
+    <h1>🛒 <span id="shopNameDisplay">Indooro</span></h1>
+    <p class="subtitle">Finden Sie Ihre Produkte im Handumdrehen</p>
+    <div class="search-container">
+      <div class="search-wrapper">
+        <span class="search-icon">🔍</span>
+        <input 
+          type="text" 
+          id="search-input" 
+          placeholder="Produkt suchen..." 
+          aria-label="Produkt suchen"
+        />
+        <button id="clear-search" style="display: none;" aria-label="Suche löschen">✕</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="main-container">
+    <!-- Left Sidebar: Search Results -->
+    <aside class="sidebar" id="sidebar">
+      <div id="search-results-panel">
+        <div class="welcome-message">
+          <span class="welcome-icon">👉</span>
+          <p>Suchen Sie nach einem Produkt, um es auf der Karte zu finden</p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Area: Interactive Map -->
+    <main class="map-container">
+      <div class="map-header">
+        <h2 id="mapTitle">Ladenlayout</h2>
+        <div class="map-controls">
+          <button id="zoomOut" class="zoom-btn">−</button>
+          <span id="zoomLabel">100%</span>
+          <button id="zoomIn" class="zoom-btn">+</button>
+        </div>
+      </div>
+      <div class="map-viewport" id="mapViewport">
+        <div id="mapCanvas" class="map-canvas">
+          <!-- Map will be rendered here -->
+        </div>
+      </div>
+      <div class="map-legend">
+        <span>💡 Tipp: Klicken Sie auf ein Suchergebnis, um die Position auf der Karte zu sehen</span>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
