@@ -3,15 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Indooro</title>
+    
+    <!-- SEO Meta Tags -->
+    <title>Indooro - Indoor Navigation für Supermärkte | Produktsuche per App</title>
+    <meta name="description" content="Indooro ist die smarte Indoor-Navigationslösung für Ihren Supermarkt-Einkauf. Finden Sie Produkte schneller mit unserer iOS-App. Entwickelt von Schülern der HTBLA Leonding.">
+    <meta name="keywords" content="Indoor Navigation, Supermarkt App, Produktsuche, iOS App, SPAR, Einkaufen, Beacon-Technologie, HTBLA Leonding, Swift">
+    <meta name="author" content="Erik Bergmair, David Berghahn, Fabian Joos, Niilo Rieser, Michael Stelzmüller">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="Indooro - Indoor Navigation für Supermärkte">
+    <meta property="og:description" content="Nie wieder suchen. Einfach finden. Smarte Navigationslösung für effizientes Einkaufen im Supermarkt.">
+    <meta property="og:image" content="./img/indooro.png">
+    <meta property="og:url" content="https://indooro.app">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="de_DE">
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Indooro - Indoor Navigation für Supermärkte">
+    <meta name="twitter:description" content="Nie wieder suchen. Einfach finden. Smarte Navigationslösung für effizientes Einkaufen.">
+    <meta name="twitter:image" content="./img/indooro.png">
+    
     <link rel="icon" href="./img/indooro.png" type="image/png">
+    <link rel="canonical" href="https://indooro.app">
     <link rel="stylesheet" href="style.css">
+    
+    <!-- Structured Data (Schema.org) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Indooro",
+      "applicationCategory": "NavigationApplication",
+      "operatingSystem": "iOS",
+      "description": "Indoor-Navigationslösung für Supermärkte. Finden Sie Produkte schneller mit Beacon-Technologie und intelligenter Routenberechnung.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR"
+      },
+      "author": {
+        "@type": "Organization",
+        "name": "HTBLA Leonding Projektteam",
+        "member": [
+          {"@type": "Person", "name": "Erik Bergmair"},
+          {"@type": "Person", "name": "David Berghahn"},
+          {"@type": "Person", "name": "Fabian Joos"},
+          {"@type": "Person", "name": "Niilo Rieser"},
+          {"@type": "Person", "name": "Michael Stelzmüller"}
+        ]
+      }
+    }
+    </script>
 </head>
 <body>
 
-    <nav>
+    <nav role="navigation" aria-label="Hauptnavigation">
         <div class="container">
-            <span class="logo">Indooro <img src="./img/indooro.png" alt="Logo der Indooro App" class="logo-icon"></span> 
+            <span class="logo">Indooro <img src="./img/indooro.png" alt="Indooro Logo - Indoor Navigation App" class="logo-icon"></span> 
             <ul>
                 <li><a href="#vorteile">Vorteile</a></li>
                 <li><a href="#funktion">Funktionsweise</a></li>
@@ -29,10 +79,10 @@
                     die Ihren Lebensmitteleinkauf effizienter, schneller und stressfreier macht.</p>
                 <div class="cta-buttons">
                     <a href="#vorteile" class="btn primary">Mehr erfahren</a>
-                    <a href="#" class="btn secondary coming-soon">Bald verfügbar im App Store (iOS)</a>
+                    <a href="#" class="btn secondary coming-soon" aria-label="App bald verfügbar im App Store für iOS">Bald verfügbar im App Store (iOS)</a>
                 </div>
             </div>
-            <div class="hero-shapes">
+            <div class="hero-shapes" aria-hidden="true">
                 <div class="shape shape-1"></div>
                 <div class="shape shape-2"></div>
                 <div class="shape shape-3"></div>
@@ -47,24 +97,24 @@
                 <p class="section-description reveal">Wir lösen das häufigste Problem im Supermarkt: 
                     Das zeitaufwendige Suchen nach Produkten.</p>
                 <div class="benefit-grid">
-                    <div class="benefit-card reveal">
-                        <span class="icon">⏱️</span>
+                    <article class="benefit-card reveal">
+                        <span class="icon" role="img" aria-label="Zeitersparnis">⏱️</span>
                         <h3>Zeitersparnis</h3>
                         <p>Die App berechnet den schnellsten Weg zum Produkt. Kein zielloses Umherirren mehr, 
                             kein Warten auf Mitarbeiter.</p>
-                    </div>
-                    <div class="benefit-card reveal">
-                        <span class="icon">🎯</span>
+                    </article>
+                    <article class="benefit-card reveal">
+                        <span class="icon" role="img" aria-label="Gezieltes Einkaufen">🎯</span>
                         <h3>Gezieltes Einkaufen</h3>
                         <p>Geben Sie einfach den gewünschten Artikel ein – 
                             die App leitet Sie direkt zum richtigen Regal.</p>
-                    </div>
-                    <div class="benefit-card reveal">
-                        <span class="icon">😌</span>
+                    </article>
+                    <article class="benefit-card reveal">
+                        <span class="icon" role="img" aria-label="Stressfrei">😌</span>
                         <h3>Stressfrei</h3>
                         <p>Ein strukturierter Einkauf, der den Fokus auf die Produkte legt, die Sie wirklich benötigen. 
                             Einfach und entspannt.</p>
-                    </div>
+                    </article>
                 </div>
             </div>
         </section>
@@ -73,28 +123,28 @@
             <div class="container">
                 <h2 class="reveal">So funktioniert Ihre Indoor-Navigation</h2>
                 <div class="step-container">
-                    <div class="step-card reveal">
-                        <div class="step-number">1</div>
+                    <article class="step-card reveal">
+                        <div class="step-number" aria-hidden="true">1</div>
                         <h3>Eintritt & Position</h3>
                         <p>Beim Betreten des Geschäfts erkennt die App dank Beacon-Technologie 
                             schnell Ihren aktuellen Standort.</p>
-                    </div>
-                    <div class="step-card reveal">
-                        <div class="step-number">2</div>
+                    </article>
+                    <article class="step-card reveal">
+                        <div class="step-number" aria-hidden="true">2</div>
                         <h3>Produkt suchen</h3>
                         <p>Sie geben Ihr gewünschtes Produkt (z.B. "Hafermilch") in die Suche der App ein.</p>
-                    </div>
-                    <div class="step-card reveal">
-                        <div class="step-number">3</div>
+                    </article>
+                    <article class="step-card reveal">
+                        <div class="step-number" aria-hidden="true">3</div>
                         <h3>Route starten</h3>
                         <p>Die App berechnet sofort den kürzesten Weg zum Regal und zeigt die Route 
                             übersichtlich im Grundriss an.</p>
-                    </div>
-                    <div class="step-card reveal">
-                        <div class="step-number">4</div>
+                    </article>
+                    <article class="step-card reveal">
+                        <div class="step-number" aria-hidden="true">4</div>
                         <h3>Ziel erreicht</h3>
                         <p>Sie folgen der Route zum Regal, greifen das Produkt und setzen Ihren effizienten Einkauf fort!</p>
-                    </div>
+                    </article>
                 </div>
             </div>
         </section>
@@ -103,24 +153,24 @@
             <div class="container">
                 <h2 class="reveal">Hinter den Kulissen: Unser Projekt im Überblick</h2>
                 <div class="tech-info-grid">
-                    <div class="tech-detail reveal">
+                    <article class="tech-detail reveal">
                         <h3>Präzise Ortung</h3>
                         <p>Wir nutzen fest installierte drahtlose Beacons (Beacon-Technologie)
                             zur hochpräzisen Bestimmung der Startposition im Geschäft.</p>
-                    </div>
-                    <div class="tech-detail reveal">
+                    </article>
+                    <article class="tech-detail reveal">
                         <h3>Intelligente Routen</h3>
                         <p>Die Routenberechnung basiert auf einem Algorithmus, der immer den optimalen und 
                             kürzesten Weg vom Startpunkt zum Regal findet.</p>
-                    </div>
-                    <div class="tech-detail reveal">
+                    </article>
+                    <article class="tech-detail reveal">
                         <h3>Einfache Wartung</h3>
                         <p>Ladenbesitzer können Produkte und Regale einfach über einen Web-basierten Admin-Editor pflegen. 
                             So bleiben die Daten immer aktuell.</p>
-                    </div>
+                    </article>
                 </div>
                 <div class="tech-focus reveal">
-                    <h4>Tech-Stack</h4>
+                    <h3>Tech-Stack</h3>
                     <p>Entwicklung als native iOS-App (Swift/SwiftUI) mit einem Java/Quarkus Backend und 
                         einer SQL-Datenbank.</p>
                 </div>
@@ -131,20 +181,20 @@
             <div class="container">
                 <h2 class="reveal">Unser Realistischer Fokus</h2>
                 <div class="status-flex">
-                    <div class="status-box scope reveal">
+                    <article class="status-box scope reveal">
                         <h3>Ziel & Ergebnis</h3>
                         <p>Eine voll funktionsfähige Navigationslösung (App + Backend + Editor).<br> 
                             Erfolg = Zuverlässige Signalerkennung und Routendarstellung.</p>
                         <br>
                         <p class="deadline">Geplantes Ende: Mitte Schuljahr 2026/2027</p>
-                    </div>
-                    <div class="status-box no-scope reveal">
+                    </article>
+                    <article class="status-box no-scope reveal">
                         <h3>Was wir bewusst NICHT umsetzen</h3>
                         <ul>
                             <li>Keine komplexen Kundenprofile/Konten.</li>
                             <li>Keine Analyse von Verkaufs- oder Marketingdaten.</li>
                         </ul>
-                    </div>
+                    </article>
                 </div>
             </div>
         </section>
@@ -154,11 +204,20 @@
                 <h2 class="reveal">Das Projekt-Team</h2>
                 <p class="reveal">Dieses Projekt wird im Rahmen des Projektauftrags der HTBLA Leonding entwickelt und umgesetzt.</p>
                 <div class="team-grid">
-                    <div class="team-member reveal">Erik Bergmair, David Berghahn (App)</div>
-                    <div class="team-member reveal">Fabian Joos, Niilo Rieser (Server/Backend)</div>
-                    <div class="team-member reveal">Michael Stelzmüller, David Berghahn (Ortung)</div>
+                    <article class="team-member reveal">
+                        <strong>Erik Bergmair, David Berghahn</strong>
+                        <p>App-Entwicklung</p>
+                    </article>
+                    <article class="team-member reveal">
+                        <strong>Fabian Joos, Niilo Rieser</strong>
+                        <p>Server/Backend</p>
+                    </article>
+                    <article class="team-member reveal">
+                        <strong>Michael Stelzmüller, David Berghahn</strong>
+                        <p>Ortungstechnologie</p>
+                    </article>
                 </div>
-                <p class="aufraggeber-info reveal">Auftraggeber: Dietmar Steiner, Christian Aberger, Dejan Sivak</p>
+                <p class="aufraggeber-info reveal"><strong>Auftraggeber:</strong> Dietmar Steiner, Christian Aberger, Dejan Sivak</p>
             </div>
         </section>
 
@@ -166,7 +225,7 @@
 
     <footer>
         <div class="container">
-            <p>© 2025 Indooro</p>
+            <p>© 2025 Indooro - Ein Projekt der HTBLA Leonding</p>
         </div>
     </footer>
 
