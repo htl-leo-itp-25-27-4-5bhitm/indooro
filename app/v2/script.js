@@ -333,7 +333,6 @@ function setupSearch() {
     searchTimeout = setTimeout(performSearch, 300);
   });
   
-  searchButton.addEventListener('click', performSearch);
   
   searchInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
