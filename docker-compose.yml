@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   opensearch:
     image: opensearchproject/opensearch:2.9.0
@@ -13,6 +15,8 @@ services:
     ports:
       - "9200:9200"
       - "9600:9600"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
 
   dashboards:
     image: opensearchproject/opensearch-dashboards:2.9.0
@@ -23,3 +27,7 @@ services:
       - "5601:5601"
     depends_on:
       - opensearch
+
+volumes:
+  opensearch_data:
+    driver: local
