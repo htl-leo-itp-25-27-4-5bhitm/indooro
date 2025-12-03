@@ -8,7 +8,6 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  storageClassName: standard
 ---
 apiVersion: v1
 kind: Service
@@ -24,7 +23,7 @@ spec:
     - name: metrics
       port: 9600
       targetPort: 9600
-  type: ClusterIP
+  type: NodePort
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -74,7 +73,7 @@ spec:
     - name: http
       port: 5601
       targetPort: 5601
-  type: ClusterIP
+  type: NodePort
 ---
 apiVersion: apps/v1
 kind: Deployment

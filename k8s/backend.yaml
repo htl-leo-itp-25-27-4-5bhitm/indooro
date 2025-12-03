@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: indooro-backend
+  labels:
+    app: indooro-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: indooro-backend
+  template:
+    metadata:
+      labels:
+        app: indooro-backend
+    spec:
+      # falls das ghcr-Repo privat ist, musst du hier ein imagePullSecret eintragen:
+      # imagePullSecrets:
+      #   - name: ghcr-credentials
+      containers:
+        - name: indooro-backend
+          image: ghcr.io/htl-leo-itp-25-27-4-5bhitm/indooro-backend:latest
+          command: ["tail", "-f", "/dev/null"] # zum Testen, damit der Container nicht sofort beendet wird
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          # nur wenn du Quarkus Health-Extension hast:
+          # readinessProbe:
+          #   httpGet:
+          #     path: /q/health/ready
+          #     port: 8080
+          #   initialDelaySeconds: 10
+          #   periodSeconds: 10
+          # livenessProbe:
+          #   httpGet:
+          #     path: /q/health/live
+          #     port: 8080
+          #   initialDelaySeconds: 30
+          #   periodSeconds: 30
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "64Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: indooro-backend
+  labels:
+    app: indooro-backend
+spec:
+  selector:
+    app: indooro-backend
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: NodePort
