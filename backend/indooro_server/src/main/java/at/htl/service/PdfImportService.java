@@ -4,12 +4,9 @@ import at.htl.model.Product;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.common.PDRectangle;
-import org.apache.pdfbox.text.PDFTextStripperByArea;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.jboss.logging.Logger;
 
-import java.awt.geom.Rectangle2D;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -21,90 +18,100 @@ import java.util.regex.Pattern;
 public class PdfImportService {
 
     private static final Logger LOG = Logger.getLogger(PdfImportService.class);
-    private static final Pattern SHELF_CODE_PATTERN = Pattern.compile("(\\d+/\\d+/\\d+/\\d+)");
+
+    // Regex für Codes (Regalformat ODER 7-stellige Artikelnummern)
+    private static final Pattern CODE_PATTERN = Pattern.compile("(\\d+/\\d+/\\d+/\\d+|\\b\\d{7}\\b)");
 
     public List<Product> parsePdf(File pdfFile) throws IOException {
         List<Product> products = new ArrayList<>();
 
         try (PDDocument document = Loader.loadPDF(pdfFile)) {
-
-            // Wir nutzen StripperByArea, um Bereiche zu definieren
-            PDFTextStripperByArea stripper = new PDFTextStripperByArea();
+            PDFTextStripper stripper = new PDFTextStripper();
             stripper.setSortByPosition(true);
 
-            // Wir gehen jede Seite durch (falls der Plan mehrere Seiten hat)
-            for (PDPage page : document.getPages()) {
+            String text = stripper.getText(document);
+            String[] lines = text.split("\\r?\\n");
 
-                // 1. Maße der Seite holen
-                PDRectangle pageSize = page.getMediaBox();
-                float width = pageSize.getWidth();
-                float height = pageSize.getHeight();
+            String currentSection = "ALT_Bestand";
 
-                // 2. Zwei Bereiche definieren: Links (0 bis 50%) und Rechts (50% bis 100%)
-                // Rectangle2D.Float(x, y, width, height)
-                Rectangle2D rectLeft = new Rectangle2D.Float(0, 0, width / 2, height);
-                Rectangle2D rectRight = new Rectangle2D.Float(width / 2, 0, width / 2, height);
+            for (String line : lines) {
+                String cleanLine = line.trim();
+                if (cleanLine.length() < 5) continue;
 
-                // Regionen registrieren
-                stripper.addRegion("leftColumn", rectLeft);
-                stripper.addRegion("rightColumn", rectRight);
+                String upperLine = cleanLine.toUpperCase();
 
-                // Text aus diesen Regionen extrahieren
-                stripper.extractRegions(page);
+                // Müll-Filter
+                if (upperLine.contains("BELEGPLAN") || upperLine.contains("SEITE")) continue;
 
-                String textLeft = stripper.getTextForRegion("leftColumn");
-                String textRight = stripper.getTextForRegion("rightColumn");
+                // Sektions-Erkennung (ändert Status, läuft aber weiter)
+                if (upperLine.contains("NEU IM SORTIMENT") || upperLine.contains("NEU:")) {
+                    currentSection = "NEU_Bestand";
+                } else if (upperLine.contains("SORTIMENT") && (upperLine.contains("AUS") || upperLine.contains("US ") || upperLine.contains("ALT"))) {
+                    currentSection = "ALT_Bestand";
+                }
 
-                // 3. Verarbeiten
-                products.addAll(extractCodesFromText(textLeft, "ALT_Bestand"));
-                products.addAll(extractCodesFromText(textRight, "NEU_Bestand"));
+                // CODE SUCHEN
+                Matcher matcher = CODE_PATTERN.matcher(cleanLine);
+                if (matcher.find()) {
+                    String code = matcher.group(1);
 
-                // Regionen für nächste Seite löschen/resetten
-                stripper.removeRegion("leftColumn");
-                stripper.removeRegion("rightColumn");
+                    // Strategie: Name steht oft DAHINTER bei dieser Art von Liste
+                    String textBefore = cleanLine.substring(0, matcher.start()).trim();
+                    String textAfter = cleanLine.substring(matcher.end()).trim();
+
+                    // Bereinigung von Datum und Müll
+                    textBefore = cleanText(textBefore);
+                    textAfter = cleanText(textAfter);
+
+                    String productName = "Unbekannt";
+
+                    // ENTSCHEIDUNG: Wo steht der Name?
+                    // Wenn "textBefore" nach einer Überschrift aussieht ("Neu im Sortiment"),
+                    // dann muss der Name im "textAfter" stehen!
+                    boolean beforeIsHeader = textBefore.toUpperCase().contains("SORTIMENT") || textBefore.toUpperCase().contains("NEU:");
+
+                    if (!textAfter.isEmpty() && beforeIsHeader) {
+                        productName = textAfter; // Nimm den Text DANACH (z.B. Koawach)
+                    } else if (!textBefore.isEmpty() && !beforeIsHeader) {
+                        productName = textBefore; // Nimm den Text DAVOR (Klassisch)
+                    } else if (!textAfter.isEmpty()) {
+                        productName = textAfter; // Fallback: Besser Text danach als gar nix
+                    } else {
+                        // Notfall: Wenn gar kein Name da ist, nehmen wir den bereinigten Header als Hinweis
+                        productName = textBefore.isEmpty() ? "Artikel (" + currentSection + ")" : textBefore;
+                    }
+
+                    Product p = new Product();
+                    p.setId(Math.abs((code + productName + currentSection).hashCode()));
+                    p.setName(productName);
+                    p.setLayoutCode(code);
+                    p.setPrice(0.0);
+
+                    // Status für CSV anhängen
+                    if ("NEU_Bestand".equals(currentSection)) {
+                        p.setName(productName + " [NEU]");
+                    }
+
+                    products.add(p);
+                    LOG.info("-> TREFFER: " + code + " | Name: " + productName);
+                }
             }
-
         } catch (IOException e) {
             LOG.error("Fehler beim Lesen des PDFs", e);
             throw e;
         }
-
         return products;
     }
 
-    /**
-     * Hilfsmethode: Sucht Codes in einem Textblock und weist ihnen den Bereichsnamen zu
-     */
-    private List<Product> extractCodesFromText(String text, String sectionName) {
-        List<Product> list = new ArrayList<>();
-        String[] lines = text.split("\\r?\\n");
-
-        for (String line : lines) {
-            Matcher matcher = SHELF_CODE_PATTERN.matcher(line);
-            if (matcher.find()) {
-                String code = matcher.group(1);
-
-                // Optional: Falls Text vor dem Code steht (z.B. "Nutella 310/1..."), nehmen wir den
-                String textBefore = line.substring(0, matcher.start()).trim();
-
-                // Name bauen
-                String productName;
-                if (!textBefore.isEmpty() && !textBefore.equals("ALT:") && !textBefore.equals("NEU:")) {
-                    productName = textBefore + " (" + sectionName + ")";
-                } else {
-                    productName = sectionName;
-                }
-
-                Product p = new Product();
-                // Unique ID generieren
-                p.setId(Math.abs((sectionName + code + productName).hashCode()));
-                p.setName(productName);
-                p.setLayoutCode(code);
-                p.setPrice(0.0);
-
-                list.add(p);
-            }
-        }
-        return list;
+    // Hilfsmethode zum Putzen
+    private String cleanText(String input) {
+        if (input == null) return "";
+        // Entfernt "t-------l", "Neu im Sortiment:", Datum "02-12-2025" und Sonderzeichen am Rand
+        String cleaned = input.replaceAll("(?i)(neu im sortiment|aus dem sortiment|us dem sortiment|t[-]+l)", "")
+                .replaceAll("\\d{2}-\\d{2}-\\d{4}", "") // Datum weg
+                .replaceAll("[:]", "") // Doppelpunkte weg
+                .trim();
+        // Entfernt führende/nachfolgende Sonderzeichen
+        return cleaned.replaceAll("^[^a-zA-Z0-9]+|[^a-zA-Z0-9)]+$", "").trim();
     }
 }

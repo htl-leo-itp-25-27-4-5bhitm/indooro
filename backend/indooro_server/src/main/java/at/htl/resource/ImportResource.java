@@ -1,6 +1,7 @@
 package at.htl.resource;
 
 import at.htl.model.Product;
+import at.htl.service.OpenSearchService;
 import at.htl.service.PdfImportService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
@@ -21,8 +22,11 @@ public class ImportResource {
     @Inject
     PdfImportService pdfImportService;
 
+    @Inject
+    OpenSearchService openSearchService;
+
     /**
-     * PDF rein -> CSV raus
+     * PDF rein -> Produkte in DB speichern -> CSV raus
      */
     @POST
     @Path("/pdf-to-csv")
@@ -40,7 +44,13 @@ public class ImportResource {
             // 1. PDF Parsen (nutzt deinen bestehenden Service)
             List<Product> products = pdfImportService.parsePdf(file);
 
-            // 2. CSV String zusammenbauen
+            // 2. WOW-EFFEKT: Produkte direkt in OpenSearch indexieren
+            if (!products.isEmpty()) {
+                // Hier werden alle gefundenen Produkte sofort in die Datenbank geladen
+                openSearchService.indexProducts(products);
+            }
+
+            // 3. CSV String zusammenbauen
             StringBuilder csv = new StringBuilder();
 
             // Header
@@ -54,7 +64,7 @@ public class ImportResource {
                         .append("\n");
             }
 
-            // 3. Als Datei-Download zurückgeben
+            // 4. Als Datei-Download zurückgeben
             return Response.ok(csv.toString())
                     .header("Content-Disposition", "attachment; filename=\"regalplan_export.csv\"")
                     .build();
