@@ -20,7 +20,7 @@ spec:
       containers:
         - name: indooro-backend
           image: ghcr.io/htl-leo-itp-25-27-4-5bhitm/indooro-backend:latest
-          command: ["tail", "-f", "/dev/null"] # zum Testen, damit der Container nicht sofort beendet wird
+          # command: ["tail", "-f", "/dev/null"] # zum Testen, damit der Container nicht sofort beendet wird
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -40,10 +40,10 @@ spec:
           resources:
             requests:
               cpu: "100m"
-              memory: "64Mi"
+              memory: "256Mi"
             limits:
               cpu: "500m"
-              memory: "64Mi"
+              memory: "256Mi"
 ---
 apiVersion: v1
 kind: Service
