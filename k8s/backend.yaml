@@ -20,6 +20,9 @@ spec:
       containers:
         - name: indooro-backend
           image: ghcr.io/htl-leo-itp-25-27-4-5bhitm/indooro-backend-v2:latest
+          env:
+            - name: OPENSEARCH_PORT
+              value: "9200"
           # command: ["tail", "-f", "/dev/null"] # zum Testen, damit der Container nicht sofort beendet wird
           imagePullPolicy: Always
           ports:
