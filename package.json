@@ -1,0 +1,9 @@
+{
+  "name": "indooro",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start:a": "node scripts/orchestrator.js start-a",
+    "start:b": "node scripts/orchestrator.js start-b"
+  }
+}
