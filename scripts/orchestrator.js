@@ -13,8 +13,8 @@ const PATHS = {
 };
 
 const CONTAINERS = {
-  opensearch: "indooro-kopie-opensearch-1",
-  dashboards: "indooro-kopie-dashboards-1"
+  opensearch: "indooro-opensearch-1",
+  dashboards: "indooro-dashboards-1"
 };
 
 const OPENSEARCH = {
