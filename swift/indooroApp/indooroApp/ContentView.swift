@@ -3,117 +3,151 @@ import SwiftUI
 struct ContentView: View {
     @StateObject var beaconManager = BeaconManager()
     
-    // Konfiguration Story #39: Maßstab
-    let pixelsPerMeter: Double = 80.0 // Etwas kleiner, damit es aufs Handy passt
+    // Maßstab: 1 Meter = 80 Pixel auf dem Handy
+    let pixelsPerMeter: Double = 80.0
     
     var body: some View {
         VStack {
-            Text("Indooro Radar")
+            Text("Indooro Map")
                 .font(.largeTitle)
                 .bold()
-                .padding()
+                .padding(.top)
             
-            // --- DIE KARTE (Story #39) ---
+            // === KALIBRIERUNGS-BEREICH ===
+            if beaconManager.isCalibrating {
+                VStack(spacing: 12) {
+                    Text("🔧 KALIBRIERUNG LÄUFT")
+                        .font(.headline)
+                        .foregroundColor(.orange)
+                    
+                    Text("1. Stelle dein iPhone GENAU 1 Meter\n   von einem Beacon entfernt")
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                    
+                    Text("2. Warte 10 Sekunden")
+                        .font(.caption)
+                    
+                    Text("3. Drücke 'Fertig' und notiere\n   die Werte aus der Konsole")
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                    
+                    Button("✅ Kalibrierung beenden") {
+                        beaconManager.stopCalibration()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                }
+                .padding()
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(12)
+                .padding(.horizontal)
+            } else {
+                Button("🔧 Kalibrierung starten") {
+                    beaconManager.startCalibration()
+                }
+                .buttonStyle(.bordered)
+                .padding(.bottom, 8)
+            }
+            
+            // --- DIE KARTE ---
             ZStack(alignment: .bottomLeading) {
                 // Raum-Hintergrund
                 Rectangle()
                     .fill(Color.gray.opacity(0.1))
                     .border(Color.black, width: 2)
                 
-                // Koordinaten-Gitter (Optional für Optik)
-                GridLines()
+                // Gitterlinien
+                GridLines(step: pixelsPerMeter)
                 
                 // Beacons zeichnen
                 ForEach(beaconManager.beacons) { beacon in
-                    BeaconView(beacon: beacon)
+                    BeaconMapItem(beacon: beacon, isCalibrating: beaconManager.isCalibrating)
                         .position(
-                            x: calculateX(beacon.positionX),
-                            y: calculateY(beacon.positionY) // Y muss gedreht werden!
+                            x: CGFloat(beacon.positionX * pixelsPerMeter),
+                            y: CGFloat(400 - (beacon.positionY * pixelsPerMeter)) // Y invertieren
                         )
                 }
             }
-            .frame(width: 350, height: 400) // Simulierter Raum ca 4.5m x 5m
-            .clipped()
+            .frame(width: 350, height: 400)
             .background(Color.white)
+            .clipped()
             
-            // --- LISTE (Debug Info für Story #38) ---
+            // --- LISTE ---
             List(beaconManager.beacons) { beacon in
                 HStack {
-                    Text(beacon.name)
-                        .bold()
+                    Text(beacon.name).bold()
                     Spacer()
-                    if beacon.smoothedRssi != 0 {
+                    if beaconManager.isCalibrating {
                         VStack(alignment: .trailing) {
-                            Text(String(format: "%.1f m", beacon.distance))
+                            Text("📏 1.00 m")
+                                .foregroundColor(.orange)
+                                .bold()
+                            Text("\(beacon.rssi) dBm")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    } else if beacon.distance > 0 {
+                        VStack(alignment: .trailing) {
+                            Text(String(format: "%.2f m", beacon.distance))
                                 .foregroundColor(.blue)
                                 .bold()
-                            Text("RSSI: \(Int(beacon.smoothedRssi))")
+                            Text("\(beacon.rssi) dBm")
                                 .font(.caption)
                                 .foregroundColor(.gray)
                         }
                     } else {
-                        Text("Nicht in Reichweite")
-                            .foregroundColor(.gray)
-                            .font(.caption)
+                        Text("Suche...").foregroundColor(.gray)
                     }
                 }
             }
         }
     }
-    
-    // Umrechnung Meter -> Pixel (X)
-    func calculateX(_ meters: Double) -> CGFloat {
-        return CGFloat(meters * pixelsPerMeter)
-    }
-    
-    // Umrechnung Meter -> Pixel (Y)
-    // Story #39: "0,0 ist linke untere Ecke".
-    // iOS: 0,0 ist OBEN links. Wir müssen also umrechnen.
-    func calculateY(_ meters: Double) -> CGFloat {
-        let mapHeight = 400.0
-        return CGFloat(mapHeight - (meters * pixelsPerMeter))
-    }
 }
 
-// Kleines View für den Beacon Punkt auf der Karte
-struct BeaconView: View {
+// Das Icon auf der Karte
+struct BeaconMapItem: View {
     let beacon: IndooroBeacon
+    let isCalibrating: Bool
+    
+    // Aktiv, wenn Signal da ist und logisch (< 10m)
+    var isActive: Bool {
+        return beacon.distance > 0 && beacon.distance < 10.0
+    }
     
     var body: some View {
-        VStack(spacing: 4) {
-            Image(systemName: "antenna.radiowaves.left.and.right")
+        VStack(spacing: 0) {
+            Image(systemName: isCalibrating ? "ruler" : "antenna.radiowaves.left.and.right")
                 .font(.system(size: 20))
-                .foregroundColor(isActive ? .blue : .gray)
+                .foregroundColor(isCalibrating ? .orange : (isActive ? .blue : .gray.opacity(0.3)))
                 .background(
                     Circle()
-                        .fill(isActive ? Color.blue.opacity(0.2) : Color.clear)
+                        .fill(isCalibrating ? Color.orange.opacity(0.2) : (isActive ? Color.blue.opacity(0.2) : Color.clear))
                         .frame(width: 40, height: 40)
                 )
-            
             Text(beacon.name)
                 .font(.caption2)
                 .bold()
+                .offset(y: 4)
         }
-    }
-    
-    var isActive: Bool {
-        return beacon.distance > 0 && beacon.distance < 5.0 // Aktiv wenn in Reichweite
     }
 }
 
-// Hilfsview für Gitterlinien
+// Gitterlinien-Zeichner
 struct GridLines: View {
+    let step: Double
     var body: some View {
         Path { path in
+            // Vertikal
             for i in 0..<10 {
-                let x = CGFloat(i) * 80 // Alle 1 Meter
-                path.move(to: CGPoint(x: x, y: 0))
-                path.addLine(to: CGPoint(x: x, y: 400))
+                let pos = CGFloat(Double(i) * step)
+                path.move(to: CGPoint(x: pos, y: 0))
+                path.addLine(to: CGPoint(x: pos, y: 400))
             }
+            // Horizontal
             for i in 0..<10 {
-                let y = CGFloat(i) * 80
-                path.move(to: CGPoint(x: 0, y: y))
-                path.addLine(to: CGPoint(x: 350, y: y))
+                let pos = CGFloat(Double(i) * step)
+                path.move(to: CGPoint(x: 0, y: pos))
+                path.addLine(to: CGPoint(x: 350, y: pos))
             }
         }
         .stroke(Color.gray.opacity(0.2))
