@@ -8,27 +8,28 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     
     private var centralManager: CBCentralManager?
     
-    // --- RSSI PUFFER (sammelt alle Werte der letzten Sekunde) ---
+    // --- RSSI PUFFER ---
     private var rssiBuffer: [String: [Int]] = [:]
     
-    // --- KALMAN FILTER PRO BEACON (glättet die Distanzwerte) ---
+    // --- KALMAN FILTER ---
     private var kalmanFilters: [String: KalmanFilter] = [:]
     
-    // Timer für das 1-Sekunden-Intervall
+    // Timer für das Intervall
     private var updateTimer: Timer?
     
+    // NEU: Zeitpunkt des App-Starts merken für die "Warmup-Phase"
+    private let startTime = Date()
+    
     // --- KONFIGURATION ---
-    // WICHTIG: Diese Werte müssen für jeden Beacon kalibriert werden!
-    // Platziere das iPhone 1m vom Beacon entfernt und miss den durchschnittlichen RSSI
     private let beaconCalibration: [String: Double] = [
-        "Indooro1": -60.0,  // ← Diese Werte musst du messen!
-        "Indooro2": -60.0,
-        "Indooro3": -60.0,
-        "Indooro4": -60.0,
-        "Indooro5": -60.0
+        "Indooro1": -58.0,
+        "Indooro2": -58.0,
+        "Indooro3": -58.0,
+        "Indooro4": -58.0,
+        "Indooro5": -58.0
     ]
     
-    let pathLossExp = 2.0  // 2.0 = freier Raum, 3.0-4.0 = Innenraum mit Hindernissen
+    let pathLossExp = 4.0 // 2.0 = freier Raum, 3.0-4.0 = Innenraum mit Hindernissen
     
     override init() {
         super.init()
@@ -42,12 +43,8 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
             IndooroBeacon(id: "ID_5", name: "Indooro5", positionX: 2.0, positionY: 2.0)
         ]
         
-        // Initialisiere Kalman Filter für jeden Beacon
         for beacon in beacons {
-            kalmanFilters[beacon.name] = KalmanFilter(
-                processNoise: 0.05,      // Wie stark sich die Distanz ändern kann
-                measurementNoise: 2.0     // Wie verrauscht die Messungen sind
-            )
+            kalmanFilters[beacon.name] = KalmanFilter(processNoise: 0.05, measurementNoise: 2.0)
         }
         
         centralManager = CBCentralManager(delegate: self, queue: nil)
@@ -56,7 +53,9 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     
     func startUpdateTimer() {
         updateTimer?.invalidate()
-        updateTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        
+        // ÄNDERUNG 1: Timer läuft jetzt alle 2.0 Sekunden (statt 1.0)
+        updateTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             self?.processBufferAndCalculate()
         }
     }
@@ -72,7 +71,7 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
             // Fehlerwerte filtern
             if val == 127 || val == 0 { return }
             
-            // In Puffer speichern
+            // Daten IMMER sammeln, auch in der Warmup-Phase
             if rssiBuffer[name] == nil {
                 rssiBuffer[name] = []
             }
@@ -80,8 +79,15 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
         }
     }
     
-    // --- SCHRITT 2: VERARBEITEN (1x pro Sekunde) ---
+    // --- SCHRITT 2: VERARBEITEN (alle 2 Sekunden) ---
     func processBufferAndCalculate() {
+        
+        // ÄNDERUNG 2: Warmup-Check
+        // Wenn seit Start weniger als 2 Sekunden vergangen sind -> Abbrechen (nichts anzeigen)
+        if Date().timeIntervalSince(startTime) < 2.0 {
+            print("⏳ Warmup... Daten werden gesammelt.")
+            return
+        }
         
         for (name, values) in rssiBuffer {
             guard !values.isEmpty else { continue }
@@ -89,44 +95,33 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
             // === RSSI FILTERING (Median-Mean) ===
             let sortedValues = values.sorted()
             
-            // Entferne Ausreißer bei genügend Samples
             let filteredValues: [Int]
-            if sortedValues.count >= 5 {
-                // Entferne schwächste und stärkste 20%
-                let removeCount = max(1, sortedValues.count / 5)
+            // Da wir jetzt 2 Sekunden sammeln, haben wir ca. 20 Werte.
+            // Wir können also aggressiver filtern (mehr Ausreißer wegwerfen).
+            if sortedValues.count >= 10 {
+                // Entferne die extremsten 20% oben und unten
+                let removeCount = sortedValues.count / 5
                 filteredValues = Array(sortedValues.dropFirst(removeCount).dropLast(removeCount))
             } else if sortedValues.count >= 3 {
-                // Bei wenigen Werten nur Min/Max entfernen
                 filteredValues = Array(sortedValues.dropFirst().dropLast())
             } else {
                 filteredValues = sortedValues
             }
             
-            // Durchschnitt berechnen
             let averageRssi = Double(filteredValues.reduce(0, +)) / Double(filteredValues.count)
             
-            // === KALIBRIERUNGS-MODUS ===
-            if isCalibrating {
-                calibrationValues[name] = Int(averageRssi)
-                updateBeaconUI(name: name, rssi: Int(averageRssi), distance: 1.0) // Zeige 1.0m an
-                continue // Keine Distanzberechnung im Kalibrier-Modus
-            }
-            
-            // === DISTANZ BERECHNUNG (Log-Distance Path Loss Model) ===
+            // === DISTANZ BERECHNUNG ===
             let txPower = beaconCalibration[name] ?? -59.0
             let rawDistance = calculateDistance(rssi: averageRssi, txPower: txPower)
             
-            // === KALMAN FILTER (glättet die Distanz über Zeit) ===
+            // === KALMAN FILTER ===
             let smoothedDistance = kalmanFilters[name]?.filter(rawDistance) ?? rawDistance
             
             // === UI UPDATE ===
             updateBeaconUI(name: name, rssi: Int(averageRssi), distance: smoothedDistance)
-            
-            // DEBUG OUTPUT (optional - auskommentieren wenn nicht benötigt)
-            // print("\(name): RSSI=\(Int(averageRssi)) Raw=\(String(format: "%.2f", rawDistance))m Smooth=\(String(format: "%.2f", smoothedDistance))m")
         }
         
-        // Puffer für nächste Sekunde leeren
+        // Puffer leeren für das nächste 2-Sekunden-Intervall
         rssiBuffer.removeAll()
     }
     
@@ -140,29 +135,8 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     }
     
     private func calculateDistance(rssi: Double, txPower: Double) -> Double {
-        // Log-Distance Path Loss Formel:
-        // distance = 10 ^ ((TxPower - RSSI) / (10 * N))
         let exponent = (txPower - rssi) / (10.0 * pathLossExp)
         return pow(10.0, exponent)
-    }
-    
-    // === KALIBRIERUNGS-MODUS ===
-    @Published var isCalibrating = false
-    @Published var calibrationValues: [String: Int] = [:]
-    
-    func startCalibration() {
-        print("🔧 KALIBRIERUNG GESTARTET")
-        isCalibrating = true
-        calibrationValues.removeAll()
-    }
-    
-    func stopCalibration() {
-        print("🔧 KALIBRIERUNG BEENDET")
-        print("=== ERGEBNISSE ===")
-        for (name, rssi) in calibrationValues.sorted(by: { $0.key < $1.key }) {
-            print("\"\(name)\": \(rssi),")
-        }
-        isCalibrating = false
     }
     
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
