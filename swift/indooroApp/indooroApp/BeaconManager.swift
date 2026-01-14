@@ -111,7 +111,7 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
             let averageRssi = Double(filteredValues.reduce(0, +)) / Double(filteredValues.count)
             
             // === DISTANZ BERECHNUNG ===
-            let txPower = beaconCalibration[name] ?? -59.0
+            let txPower = beaconCalibration[name] ?? -58.0
             let rawDistance = calculateDistance(rssi: averageRssi, txPower: txPower)
             
             // === KALMAN FILTER ===

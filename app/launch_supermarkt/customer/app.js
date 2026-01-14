@@ -67,39 +67,73 @@ function renderMap() {
   
   // Render each element
   elements.forEach(el => {
-    const div = document.createElement('div');
-    div.className = 'map-element';
-    div.dataset.elementId = el.id;
-    
-    const catInfo = el.category ? categoriesMap[el.category] : null;
-    const bgColor = el.color || '#E5E7EB';
-    
-    div.style.left = (el.x * cellSize * zoom) + 'px';
-    div.style.top = (el.y * cellSize * zoom) + 'px';
-    div.style.width = (el.width * cellSize * zoom) + 'px';
-    div.style.height = (el.height * cellSize * zoom) + 'px';
-    div.style.backgroundColor = bgColor;
-    
-    const content = document.createElement('div');
-    content.className = 'map-element-content';
-    
-    const icon = catInfo ? catInfo.emoji : '📦';
-    const isSmall = el.width < 3 || el.height < 2;
-    
-    if (isSmall) {
-      content.innerHTML = `<div class="element-icon">${icon}</div>`;
+    if (el.type === 'beacon') {
+      // Render beacon element
+      renderBeaconElement(el, canvas);
     } else {
-      content.innerHTML = `
-        <div class="element-icon">${icon}</div>
-        <div class="element-label">${el.label || 'Leer'}</div>
-      `;
+      // Render regular element
+      renderRegularElement(el, canvas);
     }
-    
-    div.appendChild(content);
-    canvas.appendChild(div);
   });
   
   updateZoomLabel();
+}
+
+function renderBeaconElement(el, canvas) {
+  const beaconSize = cellSize * zoom * 0.8; // 80% of cell size
+  
+  const div = document.createElement('div');
+  div.className = 'map-element beacon';
+  div.dataset.elementId = el.id;
+  
+  // Position beacon centered on its grid coordinates
+  div.style.left = (el.x * cellSize * zoom - beaconSize/2) + 'px';
+  div.style.top = (el.y * cellSize * zoom - beaconSize/2) + 'px';
+  div.style.width = beaconSize + 'px';
+  div.style.height = beaconSize + 'px';
+  
+  const content = document.createElement('div');
+  content.className = 'map-element-content';
+  content.innerHTML = `
+    <div class="beacon-marker">📡</div>
+    <div class="beacon-id">${el.beaconId || ''}</div>
+  `;
+  
+  div.appendChild(content);
+  canvas.appendChild(div);
+}
+
+function renderRegularElement(el, canvas) {
+  const div = document.createElement('div');
+  div.className = 'map-element';
+  div.dataset.elementId = el.id;
+  
+  const catInfo = el.category ? categoriesMap[el.category] : null;
+  const bgColor = el.color || '#E5E7EB';
+  
+  div.style.left = (el.x * cellSize * zoom) + 'px';
+  div.style.top = (el.y * cellSize * zoom) + 'px';
+  div.style.width = (el.width * cellSize * zoom) + 'px';
+  div.style.height = (el.height * cellSize * zoom) + 'px';
+  div.style.backgroundColor = bgColor;
+  
+  const content = document.createElement('div');
+  content.className = 'map-element-content';
+  
+  const icon = catInfo ? catInfo.emoji : '📦';
+  const isSmall = el.width < 3 || el.height < 2;
+  
+  if (isSmall) {
+    content.innerHTML = `<div class="element-icon">${icon}</div>`;
+  } else {
+    content.innerHTML = `
+      <div class="element-icon">${icon}</div>
+      <div class="element-label">${el.label || 'Leer'}</div>
+    `;
+  }
+  
+  div.appendChild(content);
+  canvas.appendChild(div);
 }
 
 // Search products

@@ -8,6 +8,7 @@ const ELEMENT_TYPES = [
   { id: 'freezer', name: 'Tiefkühlregal', icon: '🧊' },
   { id: 'entrance', name: 'Eingang', icon: '🚪' },
   { id: 'checkout', name: 'Kasse', icon: '💳' },
+  { id: 'beacon', name: 'Beacon', icon: '📡' },
 ];
 
 const TEMPLATES = [
@@ -375,100 +376,172 @@ function renderCanvas() {
 
   // elements
   elements.forEach(el => {
-    const cat = el.category ? PRODUCT_CATEGORIES.find(c => c.id === el.category) : null;
-    const elementType = ELEMENT_TYPES.find(t => t.id === el.type) || ELEMENT_TYPES[0];
+    const isBeacon = el.type === 'beacon';
     
-    // Check for collisions
-    const hasCollision = hasCollisions(el);
-    
-    const div = document.createElement('div');
-    div.className = 'absolute border-2 element-box flex items-center justify-center text-center text-xs font-medium overflow-hidden';
-    if (selectedElement && selectedElement.id === el.id) div.classList.add('selected');
-    
-    // Apply collision styling
-    if (hasCollision) {
-      div.classList.add('border-red-600');
-      div.style.borderWidth = '3px';
-    }
-    
-    div.style.left = (el.x * cellSize * zoom) + 'px';
-    div.style.top = (el.y * cellSize * zoom) + 'px';
-    div.style.width = (el.width * cellSize * zoom) + 'px';
-    div.style.height = (el.height * cellSize * zoom) + 'px';
-    
-    // Background color with collision warning
-    if (hasCollision) {
-      div.style.backgroundColor = '#fca5a5'; // light red tint
+    if (isBeacon) {
+      // Render beacon as circular element
+      renderBeaconElement(el);
     } else {
-      div.style.backgroundColor = el.color || '#E5E7EB';
+      // Render regular element
+      renderRegularElement(el);
     }
-    
-    div.style.opacity = '0.95';
-    div.dataset.id = el.id;
-    
-    // Add tooltip with full information
-    const tooltipText = `${elementType.name}${cat ? ' - ' + cat.name : ' - Leer'}${hasCollision ? ' ⚠️ ÜBERLAPPUNG!' : ''}`;
-    div.title = tooltipText;
-
-    const inner = document.createElement('div');
-    inner.className = 'p-1 flex flex-col items-center justify-center';
-    const icon = cat ? cat.icon : '📦';
-    
-    // Refined smart rendering: hide text if element is narrow in ANY dimension
-    const isNarrow = el.width < 2 || el.height < 2;
-    
-    if (isNarrow) {
-      // Only show icon for narrow elements (thin strips)
-      inner.innerHTML = `<div class="text-lg">${icon}</div>`;
-    } else {
-      // Show full details for larger elements
-      inner.innerHTML = `
-        <div class="font-bold text-[11px] mb-0.5 px-1.5 py-0.5 bg-white bg-opacity-70 rounded">${elementType.name}</div>
-        <div class="text-lg">${icon}</div>
-        <div class="text-[10px] leading-tight">${el.label}</div>
-      `;
-    }
-    div.appendChild(inner);
-
-    // click to select
-    div.addEventListener('mousedown', (ev) => {
-      ev.stopPropagation();
-      // Save state before dragging starts
-      saveState();
-      
-      // compute cell coords with snapping
-      const rect = canvasContainer.getBoundingClientRect();
-      const x = Math.round((ev.clientX - rect.left) / (cellSize * zoom));
-      const y = Math.round((ev.clientY - rect.top) / (cellSize * zoom));
-      selectedElement = el;
-      isDragging = true;
-      dragOffset = { x: x - el.x, y: y - el.y };
-      renderCanvas();
-      renderProperties();
-    });
-
-    canvasContainer.appendChild(div);
   });
 
   // drawing preview
   if (isDrawing && drawStart) {
-    const preview = document.createElement('div');
-    preview.className = 'absolute border-2 border-dashed border-blue-500 bg-blue-100 opacity-50';
-    const dx = Math.min(drawStart.x, currentMouseCell.x);
-    const dy = Math.min(drawStart.y, currentMouseCell.y);
-    const w = Math.abs(currentMouseCell.x - drawStart.x) + 1;
-    const h = Math.abs(currentMouseCell.y - drawStart.y) + 1;
-    preview.style.left = (dx * cellSize * zoom) + 'px';
-    preview.style.top = (dy * cellSize * zoom) + 'px';
-    preview.style.width = (w * cellSize * zoom) + 'px';
-    preview.style.height = (h * cellSize * zoom) + 'px';
-    canvasContainer.appendChild(preview);
+    const isBeaconTool = currentElementType.id === 'beacon';
+    
+    if (isBeaconTool) {
+      // Beacon preview: small circle snapped to grid
+      const preview = document.createElement('div');
+      preview.className = 'absolute rounded-full border-2 border-dashed border-blue-500 bg-blue-200 opacity-50';
+      const beaconSize = cellSize * zoom * 0.8; // 80% of cell size
+      const snappedX = Math.round(currentMouseCell.x);
+      const snappedY = Math.round(currentMouseCell.y);
+      preview.style.left = (snappedX * cellSize * zoom - beaconSize/2) + 'px';
+      preview.style.top = (snappedY * cellSize * zoom - beaconSize/2) + 'px';
+      preview.style.width = beaconSize + 'px';
+      preview.style.height = beaconSize + 'px';
+      canvasContainer.appendChild(preview);
+    } else {
+      // Regular rectangle preview
+      const preview = document.createElement('div');
+      preview.className = 'absolute border-2 border-dashed border-blue-500 bg-blue-100 opacity-50';
+      const dx = Math.min(drawStart.x, currentMouseCell.x);
+      const dy = Math.min(drawStart.y, currentMouseCell.y);
+      const w = Math.abs(currentMouseCell.x - drawStart.x) + 1;
+      const h = Math.abs(currentMouseCell.y - drawStart.y) + 1;
+      preview.style.left = (dx * cellSize * zoom) + 'px';
+      preview.style.top = (dy * cellSize * zoom) + 'px';
+      preview.style.width = (w * cellSize * zoom) + 'px';
+      preview.style.height = (h * cellSize * zoom) + 'px';
+      canvasContainer.appendChild(preview);
+    }
   }
 
   // update counters
   countElementsSpan.innerText = elements.length;
   areaSizeW.innerText = gridSize.width;
   areaSizeH.innerText = gridSize.height;
+}
+
+/* ----- Render Beacon Element ----- */
+function renderBeaconElement(el) {
+  const beaconSize = cellSize * zoom * 0.8; // 80% of cell size for compact look
+  
+  const div = document.createElement('div');
+  div.className = 'absolute element-box beacon-element flex items-center justify-center text-center overflow-hidden';
+  if (selectedElement && selectedElement.id === el.id) div.classList.add('selected');
+  
+  // Position beacon centered on its grid coordinates (snapped to integers)
+  const snappedX = Math.round(el.x);
+  const snappedY = Math.round(el.y);
+  div.style.left = (snappedX * cellSize * zoom - beaconSize/2) + 'px';
+  div.style.top = (snappedY * cellSize * zoom - beaconSize/2) + 'px';
+  div.style.width = beaconSize + 'px';
+  div.style.height = beaconSize + 'px';
+  div.dataset.id = el.id;
+  
+  // Tooltip
+  div.title = `Beacon: ${el.beaconId || 'Unbenannt'}\nPosition: (${el.x}m, ${el.y}m)`;
+
+  const inner = document.createElement('div');
+  inner.className = 'flex flex-col items-center justify-center gap-0';
+  inner.innerHTML = `
+    <div class="beacon-icon">📡</div>
+    <div class="beacon-label">${el.beaconId || ''}</div>
+  `;
+  div.appendChild(inner);
+
+  // click to select
+  div.addEventListener('mousedown', (ev) => {
+    ev.stopPropagation();
+    saveState();
+    
+    const rect = canvasContainer.getBoundingClientRect();
+    const x = (ev.clientX - rect.left) / (cellSize * zoom);
+    const y = (ev.clientY - rect.top) / (cellSize * zoom);
+    selectedElement = el;
+    isDragging = true;
+    dragOffset = { x: x - el.x, y: y - el.y };
+    renderCanvas();
+    renderProperties();
+  });
+
+  canvasContainer.appendChild(div);
+}
+
+/* ----- Render Regular Element ----- */
+function renderRegularElement(el) {
+  const cat = el.category ? PRODUCT_CATEGORIES.find(c => c.id === el.category) : null;
+  const elementType = ELEMENT_TYPES.find(t => t.id === el.type) || ELEMENT_TYPES[0];
+  
+  // Check for collisions
+  const hasCollision = hasCollisions(el);
+  
+  const div = document.createElement('div');
+  div.className = 'absolute border-2 element-box flex items-center justify-center text-center text-xs font-medium overflow-hidden';
+  if (selectedElement && selectedElement.id === el.id) div.classList.add('selected');
+  
+  // Apply collision styling
+  if (hasCollision) {
+    div.classList.add('border-red-600');
+    div.style.borderWidth = '3px';
+  }
+  
+  div.style.left = (el.x * cellSize * zoom) + 'px';
+  div.style.top = (el.y * cellSize * zoom) + 'px';
+  div.style.width = (el.width * cellSize * zoom) + 'px';
+  div.style.height = (el.height * cellSize * zoom) + 'px';
+  
+  // Background color with collision warning
+  if (hasCollision) {
+    div.style.backgroundColor = '#fca5a5';
+  } else {
+    div.style.backgroundColor = el.color || '#E5E7EB';
+  }
+  
+  div.style.opacity = '0.95';
+  div.dataset.id = el.id;
+  
+  // Add tooltip with full information
+  const tooltipText = `${elementType.name}${cat ? ' - ' + cat.name : ' - Leer'}${hasCollision ? ' ⚠️ ÜBERLAPPUNG!' : ''}`;
+  div.title = tooltipText;
+
+  const inner = document.createElement('div');
+  inner.className = 'p-1 flex flex-col items-center justify-center';
+  const icon = cat ? cat.icon : '📦';
+  
+  // Refined smart rendering: hide text if element is narrow in ANY dimension
+  const isNarrow = el.width < 2 || el.height < 2;
+  
+  if (isNarrow) {
+    inner.innerHTML = `<div class="text-lg">${icon}</div>`;
+  } else {
+    inner.innerHTML = `
+      <div class="font-bold text-[11px] mb-0.5 px-1.5 py-0.5 bg-white bg-opacity-70 rounded">${elementType.name}</div>
+      <div class="text-lg">${icon}</div>
+      <div class="text-[10px] leading-tight">${el.label}</div>
+    `;
+  }
+  div.appendChild(inner);
+
+  // click to select
+  div.addEventListener('mousedown', (ev) => {
+    ev.stopPropagation();
+    saveState();
+    
+    const rect = canvasContainer.getBoundingClientRect();
+    const x = Math.round((ev.clientX - rect.left) / (cellSize * zoom));
+    const y = Math.round((ev.clientY - rect.top) / (cellSize * zoom));
+    selectedElement = el;
+    isDragging = true;
+    dragOffset = { x: x - el.x, y: y - el.y };
+    renderCanvas();
+    renderProperties();
+  });
+
+  canvasContainer.appendChild(div);
 }
 
 /* track mouse cell for preview with snapping */
@@ -507,18 +580,27 @@ window.addEventListener('mousemove', (e) => {
   const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
   if (!inside && !isDragging && !isDrawing) return;
 
-  const x = Math.round((e.clientX - rect.left) / (cellSize * zoom));
-  const y = Math.round((e.clientY - rect.top) / (cellSize * zoom));
-  currentMouseCell = { x, y };
+  const x = (e.clientX - rect.left) / (cellSize * zoom);
+  const y = (e.clientY - rect.top) / (cellSize * zoom);
+  currentMouseCell = { x: Math.round(x), y: Math.round(y) };
 
   if (isDragging && selectedElement) {
-    // move selected element with snapping
-    selectedElement.x = Math.round(x - dragOffset.x);
-    selectedElement.y = Math.round(y - dragOffset.y);
-    // clamp
-    selectedElement.x = Math.max(0, Math.min(selectedElement.x, gridSize.width - selectedElement.width));
-    selectedElement.y = Math.max(0, Math.min(selectedElement.y, gridSize.height - selectedElement.height));
-    // update in elements array
+    const isBeacon = selectedElement.type === 'beacon';
+    
+    if (isBeacon) {
+      // Beacons snap to grid intersections (whole numbers)
+      const newX = Math.round(x - dragOffset.x);
+      const newY = Math.round(y - dragOffset.y);
+      selectedElement.x = Math.max(0, Math.min(newX, gridSize.width));
+      selectedElement.y = Math.max(0, Math.min(newY, gridSize.height));
+    } else {
+      // Regular elements snap to grid
+      selectedElement.x = Math.round(x - dragOffset.x);
+      selectedElement.y = Math.round(y - dragOffset.y);
+      selectedElement.x = Math.max(0, Math.min(selectedElement.x, gridSize.width - selectedElement.width));
+      selectedElement.y = Math.max(0, Math.min(selectedElement.y, gridSize.height - selectedElement.height));
+    }
+    
     elements = elements.map(el => el.id === selectedElement.id ? selectedElement : el);
     renderCanvas();
     renderProperties();
@@ -529,27 +611,46 @@ window.addEventListener('mousemove', (e) => {
 
 window.addEventListener('mouseup', (e) => {
   const rect = canvasContainer.getBoundingClientRect();
-  const x = Math.round((e.clientX - rect.left) / (cellSize * zoom));
-  const y = Math.round((e.clientY - rect.top) / (cellSize * zoom));
+  const x = (e.clientX - rect.left) / (cellSize * zoom);
+  const y = (e.clientY - rect.top) / (cellSize * zoom);
 
   if (isDrawing && drawStart) {
-    const nx = Math.max(0, Math.min(gridSize.width-1, x));
-    const ny = Math.max(0, Math.min(gridSize.height-1, y));
+    const isBeaconTool = currentElementType.id === 'beacon';
+    
+    if (isBeaconTool) {
+      // Create beacon at snapped grid position
+      const beaconCount = elements.filter(el => el.type === 'beacon').length + 1;
+      const snappedX = Math.max(0, Math.min(Math.round(x), gridSize.width));
+      const snappedY = Math.max(0, Math.min(Math.round(y), gridSize.height));
+      const newBeacon = {
+        id: Date.now() + Math.floor(Math.random()*1000),
+        type: 'beacon',
+        beaconId: `Indooro${beaconCount}`,
+        x: snappedX,
+        y: snappedY,
+      };
+      elements.push(newBeacon);
+      selectedElement = newBeacon;
+    } else {
+      // Create regular element
+      const nx = Math.max(0, Math.min(gridSize.width-1, Math.round(x)));
+      const ny = Math.max(0, Math.min(gridSize.height-1, Math.round(y)));
 
-    const newElement = {
-      id: Date.now() + Math.floor(Math.random()*1000),
-      type: currentElementType.id,
-      category: null, // No category assigned yet
-      x: Math.min(drawStart.x, nx),
-      y: Math.min(drawStart.y, ny),
-      width: Math.abs(nx - drawStart.x) + 1,
-      height: Math.abs(ny - drawStart.y) + 1,
-      label: 'Leer',
-      color: '#E5E7EB', // Neutral gray
-    };
-    // add and select
-    elements.push(newElement);
-    selectedElement = newElement;
+      const newElement = {
+        id: Date.now() + Math.floor(Math.random()*1000),
+        type: currentElementType.id,
+        category: null,
+        x: Math.min(drawStart.x, nx),
+        y: Math.min(drawStart.y, ny),
+        width: Math.abs(nx - drawStart.x) + 1,
+        height: Math.abs(ny - drawStart.y) + 1,
+        label: 'Leer',
+        color: '#E5E7EB',
+      };
+      elements.push(newElement);
+      selectedElement = newElement;
+    }
+    
     renderProperties();
     renderCanvas();
   }
@@ -593,6 +694,137 @@ function renderProperties() {
   }
 
   const el = selectedElement;
+  const isBeacon = el.type === 'beacon';
+  
+  if (isBeacon) {
+    renderBeaconProperties(el);
+  } else {
+    renderRegularProperties(el);
+  }
+}
+
+/* ----- Beacon Properties Panel ----- */
+function renderBeaconProperties(el) {
+  const container = document.createElement('div');
+  container.className = 'space-y-4';
+
+  const header = document.createElement('div');
+  header.className = 'flex items-center justify-between pb-3 border-b';
+  header.innerHTML = `<h4 class="font-medium">📡 Beacon bearbeiten</h4>`;
+  
+  const actionsDiv = document.createElement('div');
+  actionsDiv.className = 'flex gap-1';
+  
+  const duplicateBtn = document.createElement('button');
+  duplicateBtn.className = 'p-2 text-blue-500 hover:bg-blue-50 rounded';
+  duplicateBtn.title = 'Duplizieren';
+  duplicateBtn.innerHTML = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke-width="2"/></svg>';
+  duplicateBtn.onclick = () => {
+    saveState();
+    const beaconCount = elements.filter(e => e.type === 'beacon').length + 1;
+    const duplicate = {
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      type: 'beacon',
+      beaconId: `Indooro${beaconCount}`,
+      x: Math.min(el.x + 2, gridSize.width),
+      y: el.y,
+    };
+    elements.push(duplicate);
+    selectedElement = duplicate;
+    renderCanvas();
+    renderProperties();
+  };
+  
+  const delBtn = document.createElement('button');
+  delBtn.className = 'p-2 text-red-500 hover:bg-red-50 rounded';
+  delBtn.title = 'Löschen';
+  delBtn.innerHTML = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
+  delBtn.onclick = () => {
+    saveState();
+    elements = elements.filter(it => it.id !== el.id);
+    selectedElement = null;
+    renderProperties();
+    renderCanvas();
+  };
+  
+  actionsDiv.appendChild(duplicateBtn);
+  actionsDiv.appendChild(delBtn);
+  header.appendChild(actionsDiv);
+  container.appendChild(header);
+
+  // Beacon ID input
+  const idDiv = document.createElement('div');
+  idDiv.innerHTML = `
+    <div>
+      <label class="block text-sm font-medium mb-1">Beacon ID (Hardware-Name)</label>
+      <input id="propBeaconId" type="text" value="${escapeHtml(el.beaconId || '')}" 
+             placeholder="z.B. Indooro1" 
+             class="w-full px-2 py-1 border border-gray-300 rounded" />
+      <p class="text-xs text-gray-500 mt-1">Muss mit dem Hardware-Namen übereinstimmen</p>
+    </div>
+  `;
+  container.appendChild(idDiv);
+
+  // Position display - now integer values for grid snapping
+  const posDiv = document.createElement('div');
+  posDiv.innerHTML = `
+    <div class="grid grid-cols-2 gap-2">
+      <div>
+        <label class="block text-sm font-medium mb-1">X-Position (m)</label>
+        <input id="propBeaconX" type="number" value="${el.x}" step="1" min="0" max="${gridSize.width}"
+               class="w-full px-2 py-1 border border-gray-300 rounded" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Y-Position (m)</label>
+        <input id="propBeaconY" type="number" value="${el.y}" step="1" min="0" max="${gridSize.height}"
+               class="w-full px-2 py-1 border border-gray-300 rounded" />
+      </div>
+    </div>
+    <p class="text-xs text-gray-500 mt-1">Koordinaten rasten automatisch am Gitter ein</p>
+  `;
+  container.appendChild(posDiv);
+
+  // Info box
+  const infoDiv = document.createElement('div');
+  infoDiv.className = 'bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-800';
+  infoDiv.innerHTML = `
+    <strong>💡 Tipp:</strong> Beacons rasten an Gitterpunkten ein. 
+    Positionieren Sie sie an Säulen oder Deckenmontagen für präzise Indoor-Navigation.
+  `;
+  container.appendChild(infoDiv);
+
+  propertiesWrapper.innerHTML = '';
+  propertiesWrapper.appendChild(container);
+
+  // Event listeners
+  let idTimeout;
+  document.getElementById('propBeaconId').addEventListener('input', (ev) => {
+    clearTimeout(idTimeout);
+    el.beaconId = ev.target.value;
+    elements = elements.map(it => it.id === el.id ? el : it);
+    renderCanvas();
+    idTimeout = setTimeout(() => saveState(), 500);
+  });
+
+  document.getElementById('propBeaconX').addEventListener('change', (ev) => {
+    saveState();
+    el.x = Math.max(0, Math.min(Math.round(parseFloat(ev.target.value) || 0), gridSize.width));
+    elements = elements.map(it => it.id === el.id ? el : it);
+    renderCanvas();
+    renderProperties();
+  });
+
+  document.getElementById('propBeaconY').addEventListener('change', (ev) => {
+    saveState();
+    el.y = Math.max(0, Math.min(Math.round(parseFloat(ev.target.value) || 0), gridSize.height));
+    elements = elements.map(it => it.id === el.id ? el : it);
+    renderCanvas();
+    renderProperties();
+  });
+}
+
+/* ----- Regular Element Properties Panel ----- */
+function renderRegularProperties(el) {
   const cat = el.category ? PRODUCT_CATEGORIES.find(c => c.id === el.category) : null;
 
   const container = document.createElement('div');
@@ -611,32 +843,20 @@ function renderProperties() {
   duplicateBtn.title = 'Duplizieren';
   duplicateBtn.innerHTML = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke-width="2"/></svg>';
   duplicateBtn.onclick = () => {
-    saveState(); // Save state before duplication
-    
-    // Deep clone the element
+    saveState();
     const duplicate = JSON.parse(JSON.stringify(el));
-    
-    // Assign new unique ID
     duplicate.id = Date.now() + Math.floor(Math.random() * 1000);
     
-    // Smart placement logic
-    let newX, newY;
-    
-    // Try 1: Place to the right
-    newX = el.x + el.width;
-    newY = el.y;
+    let newX = el.x + el.width;
+    let newY = el.y;
     
     if (newX + duplicate.width > gridSize.width) {
-      // Try 2: Place below
       newX = el.x;
       newY = el.y + el.height;
       
       if (newY + duplicate.height > gridSize.height) {
-        // Fallback: Original offset logic with bounds checking
         newX = Math.min(el.x + 1, gridSize.width - duplicate.width);
         newY = Math.min(el.y + 1, gridSize.height - duplicate.height);
-        
-        // Ensure non-negative
         newX = Math.max(0, newX);
         newY = Math.max(0, newY);
       }
@@ -645,7 +865,6 @@ function renderProperties() {
     duplicate.x = newX;
     duplicate.y = newY;
     
-    // Add to elements and select
     elements.push(duplicate);
     selectedElement = duplicate;
     
@@ -658,7 +877,7 @@ function renderProperties() {
   delBtn.title = 'Löschen';
   delBtn.innerHTML = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
   delBtn.onclick = () => {
-    saveState(); // Save state before deletion
+    saveState();
     elements = elements.filter(it => it.id !== el.id);
     selectedElement = null;
     renderProperties();
@@ -685,7 +904,6 @@ function renderProperties() {
   categorySection.innerHTML = `
     <label class="block text-sm font-medium mb-2">Produktkategorie</label>
     <div id="categoriesList" class="space-y-1 max-h-64 overflow-y-auto border rounded p-2">
-      <!-- filled below -->
     </div>
   `;
   container.appendChild(categorySection);
@@ -697,7 +915,7 @@ function renderProperties() {
     btn.style.backgroundColor = el.category === c.id ? c.color : 'transparent';
     btn.innerHTML = `<span>${c.icon}</span><span class="flex-1">${c.name}</span>`;
     btn.onclick = () => {
-      saveState(); // Save state before category change
+      saveState();
       el.category = c.id;
       el.color = c.color;
       el.label = c.name;

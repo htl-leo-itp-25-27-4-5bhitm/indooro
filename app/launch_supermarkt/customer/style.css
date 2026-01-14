@@ -319,6 +319,30 @@ header h1 {
   }
 }
 
+/* Beacon styles for customer view */
+.map-element.beacon {
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.5) 0%, rgba(29, 78, 216, 0.5) 100%);
+  border: 1px dashed rgba(30, 64, 175, 0.4);
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.map-element.beacon .beacon-marker {
+  color: white;
+  font-size: 0.7rem;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+  line-height: 1;
+}
+
+.map-element.beacon .beacon-id {
+  font-size: 0.5rem;
+  color: white;
+  font-weight: 600;
+  line-height: 1;
+}
+
 .empty-message {
   text-align: center;
   padding: 2rem;
