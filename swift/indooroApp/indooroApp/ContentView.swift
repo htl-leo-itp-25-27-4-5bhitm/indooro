@@ -3,8 +3,8 @@ import SwiftUI
 struct ContentView: View {
     @StateObject var beaconManager = BeaconManager()
     
-    // Maßstab: 1 Meter = 80 Pixel auf dem Handy
-    let pixelsPerMeter: Double = 80.0
+    // Maßstab: ca 23 Pixel pro Meter
+    let pixelsPerMeter: Double = 23.0
     
     var body: some View {
         VStack {
@@ -13,21 +13,25 @@ struct ContentView: View {
                 .bold()
                 .padding(.top)
             
-            // --- DIE KARTE (U8) ---
-            ZStack(alignment: .bottomLeading) {
+            // --- KARTE ---
+            ZStack(alignment: .topLeading) {
                 
-                // 1. Raum-Hintergrund
+                // 1. Hintergrund & Gitter
                 Rectangle()
                     .fill(Color.gray.opacity(0.1))
                     .border(Color.black, width: 2)
                 
-                // 2. Gitterlinien
-                GridLines(step: pixelsPerMeter)
+                GridLines(step: pixelsPerMeter, width: 350, height: 500)
                 
-                // 3. Achsen-Beschriftung (Maßstab)
-                MapAxes(pixelsPerMeter: pixelsPerMeter, width: 350, height: 400)
+                // 2. REGALE ZEICHNEN (Ausgelagert in Subview!)
+                ForEach(beaconManager.shelves) { element in
+                    ShelfView(element: element, pixelsPerMeter: pixelsPerMeter)
+                }
                 
-                // 4. Beacons zeichnen
+                // 3. Achsenbeschriftung
+                MapAxes(pixelsPerMeter: pixelsPerMeter, width: 350, height: 500)
+                
+                // 4. BEACONS ZEICHNEN
                 ForEach(beaconManager.beacons) { beacon in
                     BeaconMapItem(
                         beacon: beacon,
@@ -35,49 +39,74 @@ struct ContentView: View {
                     )
                     .position(
                         x: CGFloat(beacon.positionX * pixelsPerMeter),
-                        y: CGFloat(400 - (beacon.positionY * pixelsPerMeter)) // Y invertiert (0 ist unten)
+                        y: CGFloat(beacon.positionY * pixelsPerMeter)
                     )
                 }
             }
-            .frame(width: 350, height: 400)
+            .frame(width: 350, height: 500)
             .background(Color.white)
-            // .clipped() entfernt, damit Achsen sichtbar sind
             .padding()
             
             // --- LISTE ---
             List(beaconManager.beacons) { beacon in
                 HStack {
-                    // Farbiger Status-Punkt
                     Circle()
                         .fill(colorForDistance(beacon.distance))
                         .frame(width: 10, height: 10)
                     
-                    Text(beacon.name).bold()
+                    VStack(alignment: .leading) {
+                        Text(beacon.name).bold()
+                        Text("x:\(Int(beacon.positionX)) y:\(Int(beacon.positionY))")
+                            .font(.caption2).foregroundColor(.gray)
+                    }
+                    
                     Spacer()
                     
                     if beacon.distance > 0 {
-                        VStack(alignment: .trailing) {
-                            Text(String(format: "%.2f m", beacon.distance))
-                                .foregroundColor(.blue)
-                                .bold()
-                            Text("\(beacon.rssi) dBm")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
+                        Text(String(format: "%.2f m", beacon.distance))
+                            .foregroundColor(.blue)
+                            .bold()
                     } else {
-                        Text("Suche...").foregroundColor(.gray)
+                        Text("Suche...")
+                            .foregroundColor(.gray)
+                            .font(.caption)
                     }
                 }
             }
         }
     }
     
-    // Hilfsfunktion für Farben
     func colorForDistance(_ dist: Double) -> Color {
         if dist <= 0 { return .gray }
-        if dist < 1.5 { return .green }
-        if dist < 4.0 { return .orange }
-        return .red
+        if dist < 2.0 { return .green }
+        return .orange
+    }
+}
+
+// MARK: - Subview für Regale (Behebt den Compiler Fehler)
+struct ShelfView: View {
+    let element: LayoutElement
+    let pixelsPerMeter: Double
+    
+    var body: some View {
+        // Berechnungen hier drin machen, damit der Main-Body sauber bleibt
+        let width = CGFloat((element.width ?? 1) * pixelsPerMeter)
+        let height = CGFloat((element.height ?? 1) * pixelsPerMeter)
+        
+        // SwiftUI .position setzt den MITTELPUNKT.
+        // Deine Daten sind aber Oben-Links. Wir müssen also die Hälfte der Größe addieren.
+        let xPos = CGFloat(element.x * pixelsPerMeter) + (width / 2)
+        let yPos = CGFloat(element.y * pixelsPerMeter) + (height / 2)
+        
+        Rectangle()
+            .fill(Color(hex: element.color ?? "#CCCCCC"))
+            .overlay(
+                Text(element.label ?? "")
+                    .font(.system(size: 8))
+                    .foregroundColor(.black.opacity(0.6))
+            )
+            .frame(width: width, height: height)
+            .position(x: xPos, y: yPos)
     }
 }
 
@@ -86,55 +115,37 @@ struct BeaconMapItem: View {
     let beacon: IndooroBeacon
     let pixelsPerMeter: Double
     
-    // Farb-Logik
     var statusColor: Color {
-        if beacon.distance <= 0 { return .gray.opacity(0.3) } // Inaktiv
-        
-        if beacon.distance < 1.5 { return .green }      // Nah
-        if beacon.distance < 4.0 { return .orange }     // Mittel
-        return .red                                     // Fern
+        if beacon.distance <= 0 { return .gray.opacity(0.3) }
+        if beacon.distance < 2.0 { return .green }
+        return .orange
     }
     
     var body: some View {
         ZStack {
-            // Radius-Ring (Der "Radar"-Kreis)
-            // Wird nur gezeichnet, wenn Beacon aktiv ist
             if beacon.distance > 0 {
                 Circle()
-                    .stroke(statusColor.opacity(0.4), lineWidth: 2) // Dünner Ring
-                    .background(Circle().fill(statusColor.opacity(0.1))) // Leichte Füllung
+                    .stroke(statusColor.opacity(0.4), lineWidth: 1)
+                    .background(Circle().fill(statusColor.opacity(0.1)))
                     .frame(
-                        width: CGFloat(beacon.distance * pixelsPerMeter * 2), // Durchmesser = Radius * 2
+                        width: CGFloat(beacon.distance * pixelsPerMeter * 2),
                         height: CGFloat(beacon.distance * pixelsPerMeter * 2)
                     )
-                    .allowsHitTesting(false) // Klicks gehen durch
             }
             
-            // Das eigentliche Icon
-            VStack(spacing: 0) {
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.system(size: 20))
-                    .foregroundColor(statusColor)
-                    .background(
-                        Circle()
-                            .fill(Color.white) // Weißer Hintergrund
-                            .frame(width: 30, height: 30)
-                            .shadow(radius: 2)
-                    )
-                
-                Text(beacon.name)
-                    .font(.caption2)
-                    .bold()
-                    .padding(2)
-                    .background(Color.white.opacity(0.8))
-                    .cornerRadius(4)
-                    .offset(y: 4)
-            }
+            Image(systemName: "antenna.radiowaves.left.and.right")
+                .foregroundColor(statusColor)
+                .background(Circle().fill(.white))
+                .shadow(radius: 1)
+            
+            Text(beacon.name)
+                .font(.system(size: 8))
+                .offset(y: 12)
         }
     }
 }
 
-// MARK: - Achsenbeschriftung
+// MARK: - Achsen
 struct MapAxes: View {
     let pixelsPerMeter: Double
     let width: CGFloat
@@ -142,47 +153,76 @@ struct MapAxes: View {
     
     var body: some View {
         ZStack {
-            // X-Achse (Unten)
-            ForEach(0..<6) { meter in
+            // X-Achse
+            ForEach(0..<15) { meter in
                 let xPos = CGFloat(Double(meter) * pixelsPerMeter)
                 if xPos <= width {
-                    Text("\(meter)m")
-                        .font(.system(size: 10))
+                    Text("\(meter)")
+                        .font(.system(size: 8))
                         .foregroundColor(.gray)
-                        .position(x: xPos, y: height + 15) // Unter den Rand
+                        .position(x: xPos, y: -10)
                 }
             }
-            
-            // Y-Achse (Links)
-            ForEach(0..<6) { meter in
-                let yPos = height - CGFloat(Double(meter) * pixelsPerMeter)
-                if yPos >= 0 {
-                    Text("\(meter)m")
-                        .font(.system(size: 10))
+            // Y-Achse
+            ForEach(0..<20) { meter in
+                let yPos = CGFloat(Double(meter) * pixelsPerMeter)
+                if yPos <= height {
+                    Text("\(meter)")
+                        .font(.system(size: 8))
                         .foregroundColor(.gray)
-                        .position(x: -15, y: yPos) // Links vom Rand
+                        .position(x: -10, y: yPos)
                 }
             }
         }
     }
 }
 
-// Gitterlinien
+// MARK: - Gitter
 struct GridLines: View {
     let step: Double
+    let width: CGFloat
+    let height: CGFloat
     var body: some View {
         Path { path in
-            // Vertikal
-            for i in 0..<10 {
+            for i in 0..<15 {
                 let pos = CGFloat(Double(i) * step)
                 path.move(to: CGPoint(x: pos, y: 0))
-                path.addLine(to: CGPoint(x: pos, y: 400))
-                // Horizontal
+                path.addLine(to: CGPoint(x: pos, y: height))
+            }
+            for i in 0..<20 {
+                let pos = CGFloat(Double(i) * step)
                 path.move(to: CGPoint(x: 0, y: pos))
-                path.addLine(to: CGPoint(x: 350, y: pos))
+                path.addLine(to: CGPoint(x: width, y: pos))
             }
         }
         .stroke(Color.gray.opacity(0.2))
+    }
+}
+
+// MARK: - Helper für Hex-Farben
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
     }
 }
 
