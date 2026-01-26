@@ -17,7 +17,6 @@ public class PdfImportService {
         String text = extractText(file);
 
         if (text == null || text.trim().isEmpty()) {
-            // PDF enthält keinen echten Text (Scan / Bild)
             return List.of();
         }
 
@@ -28,7 +27,6 @@ public class PdfImportService {
         try (PDDocument document = PDDocument.load(file)) {
             PDFTextStripper stripper = new PDFTextStripper();
 
-            // Sehr wichtig für Tabellen & Spalten
             stripper.setSortByPosition(true);
 
             return stripper.getText(document);
@@ -44,9 +42,6 @@ public class PdfImportService {
             line = line.trim();
             if (line.isEmpty()) continue;
 
-            // Beispiel-Formate:
-            // Produktname;R01-A
-            // Produktname - R01-A
             String name = null;
             String layout = null;
 
