@@ -3,7 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject var beaconManager = BeaconManager()
     
-    // Maßstab: ca 23 Pixel pro Meter
+    // Maßstab: ca 23 Pixel pro Meter (angepasst an Screen-Breite / 15m Ladenbreite)
     let pixelsPerMeter: Double = 23.0
     
     var body: some View {
@@ -13,25 +13,39 @@ struct ContentView: View {
                 .bold()
                 .padding(.top)
             
-            // --- KARTE ---
+            // --- KOPFZEILE: STATUS ---
+            if let pos = beaconManager.userPosition {
+                Text("📍 Position: \(String(format: "%.1f", pos.x))m / \(String(format: "%.1f", pos.y))m")
+                    .font(.headline)
+                    .foregroundColor(.blue)
+                    .padding(.bottom, 5)
+            } else {
+                Text("📡 Suche Position... (Brauche 3 Signale)")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                    .padding(.bottom, 5)
+            }
+            
+            // --- DIE KARTE (Koordinatenursprung: Oben Links) ---
             ZStack(alignment: .topLeading) {
                 
-                // 1. Hintergrund & Gitter
+                // 1. Hintergrund & Rahmen
                 Rectangle()
                     .fill(Color.gray.opacity(0.1))
                     .border(Color.black, width: 2)
                 
+                // 2. Gitterlinien
                 GridLines(step: pixelsPerMeter, width: 350, height: 500)
                 
-                // 2. REGALE ZEICHNEN (Ausgelagert in Subview!)
+                // 3. REGALE (Ausgelagert in Subview gegen Compiler-Fehler)
                 ForEach(beaconManager.shelves) { element in
                     ShelfView(element: element, pixelsPerMeter: pixelsPerMeter)
                 }
                 
-                // 3. Achsenbeschriftung
+                // 4. ACHSENBESCHRIFTUNG
                 MapAxes(pixelsPerMeter: pixelsPerMeter, width: 350, height: 500)
                 
-                // 4. BEACONS ZEICHNEN
+                // 5. BEACONS (Fest installiert)
                 ForEach(beaconManager.beacons) { beacon in
                     BeaconMapItem(
                         beacon: beacon,
@@ -42,14 +56,26 @@ struct ContentView: View {
                         y: CGFloat(beacon.positionY * pixelsPerMeter)
                     )
                 }
+                
+                // 6. USER POSITION (Der bewegliche blaue Punkt - U40)
+                if let pos = beaconManager.userPosition {
+                    UserLocationMarker()
+                        .position(
+                            x: CGFloat(pos.x * pixelsPerMeter),
+                            y: CGFloat(pos.y * pixelsPerMeter)
+                        )
+                        .animation(.easeInOut(duration: 0.5), value: pos) // Weiche Bewegung
+                }
             }
-            .frame(width: 350, height: 500)
+            .frame(width: 350, height: 500) // Feste Größe der Map
             .background(Color.white)
+            .clipped() // Wichtig, damit der Punkt nicht aus dem Rahmen wandert
             .padding()
             
-            // --- LISTE ---
+            // --- LISTE DER BEACONS ---
             List(beaconManager.beacons) { beacon in
                 HStack {
+                    // Kleiner Status-Punkt
                     Circle()
                         .fill(colorForDistance(beacon.distance))
                         .frame(width: 10, height: 10)
@@ -63,9 +89,14 @@ struct ContentView: View {
                     Spacer()
                     
                     if beacon.distance > 0 {
-                        Text(String(format: "%.2f m", beacon.distance))
-                            .foregroundColor(.blue)
-                            .bold()
+                        VStack(alignment: .trailing) {
+                            Text(String(format: "%.2f m", beacon.distance))
+                                .foregroundColor(.blue)
+                                .bold()
+                            Text("\(beacon.rssi) dBm")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
                     } else {
                         Text("Suche...")
                             .foregroundColor(.gray)
@@ -73,9 +104,11 @@ struct ContentView: View {
                     }
                 }
             }
+            .listStyle(.plain)
         }
     }
     
+    // Hilfsfunktion für Listen-Farben
     func colorForDistance(_ dist: Double) -> Color {
         if dist <= 0 { return .gray }
         if dist < 2.0 { return .green }
@@ -83,18 +116,19 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Subview für Regale (Behebt den Compiler Fehler)
+// MARK: - SUBVIEWS (Wichtig für Performance & Compiler)
+
+// 1. Regal-View
 struct ShelfView: View {
     let element: LayoutElement
     let pixelsPerMeter: Double
     
     var body: some View {
-        // Berechnungen hier drin machen, damit der Main-Body sauber bleibt
+        // Größe berechnen
         let width = CGFloat((element.width ?? 1) * pixelsPerMeter)
         let height = CGFloat((element.height ?? 1) * pixelsPerMeter)
         
-        // SwiftUI .position setzt den MITTELPUNKT.
-        // Deine Daten sind aber Oben-Links. Wir müssen also die Hälfte der Größe addieren.
+        // Position berechnen (SwiftUI positioniert die Mitte, JSON ist aber Oben-Links)
         let xPos = CGFloat(element.x * pixelsPerMeter) + (width / 2)
         let yPos = CGFloat(element.y * pixelsPerMeter) + (height / 2)
         
@@ -104,13 +138,14 @@ struct ShelfView: View {
                 Text(element.label ?? "")
                     .font(.system(size: 8))
                     .foregroundColor(.black.opacity(0.6))
+                    .padding(2)
             )
             .frame(width: width, height: height)
             .position(x: xPos, y: yPos)
     }
 }
 
-// MARK: - Beacon Map Icon
+// 2. Beacon-View
 struct BeaconMapItem: View {
     let beacon: IndooroBeacon
     let pixelsPerMeter: Double
@@ -123,29 +158,55 @@ struct BeaconMapItem: View {
     
     var body: some View {
         ZStack {
-            if beacon.distance > 0 {
+            // Optional: Radius-Ring zeichnen (visualisiert die Reichweite)
+            if beacon.distance > 0 && beacon.distance < 10 {
                 Circle()
-                    .stroke(statusColor.opacity(0.4), lineWidth: 1)
-                    .background(Circle().fill(statusColor.opacity(0.1)))
+                    .stroke(statusColor.opacity(0.3), lineWidth: 1)
                     .frame(
                         width: CGFloat(beacon.distance * pixelsPerMeter * 2),
                         height: CGFloat(beacon.distance * pixelsPerMeter * 2)
                     )
             }
             
+            // Das Icon selbst
             Image(systemName: "antenna.radiowaves.left.and.right")
+                .font(.system(size: 14))
                 .foregroundColor(statusColor)
-                .background(Circle().fill(.white))
+                .background(Circle().fill(.white).frame(width: 20, height: 20))
                 .shadow(radius: 1)
             
             Text(beacon.name)
-                .font(.system(size: 8))
+                .font(.system(size: 7))
                 .offset(y: 12)
         }
     }
 }
 
-// MARK: - Achsen
+// 3. User Marker (Blauer Punkt)
+struct UserLocationMarker: View {
+    var body: some View {
+        ZStack {
+            // Pulsierender Schein
+            Circle()
+                .fill(Color.blue.opacity(0.3))
+                .frame(width: 24, height: 24)
+            
+            // Harter Kern
+            Circle()
+                .fill(Color.blue)
+                .frame(width: 12, height: 12)
+                .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                .shadow(radius: 2)
+            
+            Text("ICH")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundColor(.blue)
+                .offset(y: -14)
+        }
+    }
+}
+
+// 4. Achsen
 struct MapAxes: View {
     let pixelsPerMeter: Double
     let width: CGFloat
@@ -153,7 +214,7 @@ struct MapAxes: View {
     
     var body: some View {
         ZStack {
-            // X-Achse
+            // X-Achse (Oben)
             ForEach(0..<15) { meter in
                 let xPos = CGFloat(Double(meter) * pixelsPerMeter)
                 if xPos <= width {
@@ -163,7 +224,7 @@ struct MapAxes: View {
                         .position(x: xPos, y: -10)
                 }
             }
-            // Y-Achse
+            // Y-Achse (Links)
             ForEach(0..<20) { meter in
                 let yPos = CGFloat(Double(meter) * pixelsPerMeter)
                 if yPos <= height {
@@ -175,20 +236,23 @@ struct MapAxes: View {
             }
         }
     }
-}
+    }
 
-// MARK: - Gitter
+// 5. Gitterlinien
 struct GridLines: View {
     let step: Double
     let width: CGFloat
     let height: CGFloat
+    
     var body: some View {
         Path { path in
+            // Vertikal
             for i in 0..<15 {
                 let pos = CGFloat(Double(i) * step)
                 path.move(to: CGPoint(x: pos, y: 0))
                 path.addLine(to: CGPoint(x: pos, y: height))
             }
+            // Horizontal
             for i in 0..<20 {
                 let pos = CGFloat(Double(i) * step)
                 path.move(to: CGPoint(x: 0, y: pos))
@@ -199,7 +263,7 @@ struct GridLines: View {
     }
 }
 
-// MARK: - Helper für Hex-Farben
+// 6. Hex-Color Extension
 extension Color {
     init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
