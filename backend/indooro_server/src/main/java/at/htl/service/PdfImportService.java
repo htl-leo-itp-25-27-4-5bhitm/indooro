@@ -1,117 +1,184 @@
 package at.htl.service;
 
-import at.htl.model.Product;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
-import org.jboss.logging.Logger;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.nio.file.Files;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @ApplicationScoped
 public class PdfImportService {
 
-    private static final Logger LOG = Logger.getLogger(PdfImportService.class);
+    /**
+     * ImportItem = das, was wir aus dem PDF zuverlässig extrahieren können.
+     */
+    public record ImportItem(
+            String category,
+            String meter,
+            String pos,        // "B4-P2"
+            Integer level,     // 4
+            Integer position,  // 2
+            String name,
+            String layoutCode  // "800/2/4/2"
+    ) {}
 
-    // Regex für Codes (Regalformat ODER 7-stellige Artikelnummern)
-    private static final Pattern CODE_PATTERN = Pattern.compile("(\\d+/\\d+/\\d+/\\d+|\\b\\d{7}\\b)");
+    // Header: nicht zeilen-gebunden! (kein ^ und $)
+    private static final Pattern HEADER_ANYWHERE =
+            Pattern.compile("BELEGPLAN:\\s*KATEGORIE\\s+(\\d+)\\s*-\\s*METER\\s+(\\d+)", Pattern.CASE_INSENSITIVE);
 
-    public List<Product> parsePdf(File pdfFile) throws IOException {
-        List<Product> products = new ArrayList<>();
+    // Eintrag: POS + Name (irgendwie dazwischen) + LayoutCode
+    // DOTALL erlaubt, dass "Name" über Zeilen läuft.
+    private static final Pattern ITEM_ANYWHERE =
+            Pattern.compile("(B(\\d+)-P(\\d+))\\s+(.+?)\\s+((\\d+)/(\\d+)/(\\d+)/(\\d+))", Pattern.DOTALL);
 
-        try (PDDocument document = Loader.loadPDF(pdfFile)) {
+    /**
+     * Für deinen REST-Upload: File -> ImportItems
+     */
+    public List<ImportItem> parsePdf(File pdfFile) throws IOException {
+        if (pdfFile == null || !pdfFile.exists()) return List.of();
+        byte[] pdfBytes = Files.readAllBytes(pdfFile.toPath());
+        return importFromPdf(pdfBytes);
+    }
+
+    public List<ImportItem> importFromPdf(byte[] pdfBytes) throws IOException {
+        String text = extractText(pdfBytes);
+        return parseExtractedText(text);
+    }
+
+    public String importFromPdfAsJson(byte[] pdfBytes) throws IOException {
+        List<ImportItem> items = importFromPdf(pdfBytes);
+        ObjectMapper om = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+        return om.writeValueAsString(items);
+    }
+
+    /**
+     * Debug-Helfer: zeigt dir genau den Text, den PDFBox sieht (nicht pdftotext).
+     * Damit kannst du sofort vergleichen, warum der Parser evtl. 0 liefert.
+     */
+    public String extractTextForDebug(File pdfFile) throws IOException {
+        byte[] pdfBytes = Files.readAllBytes(pdfFile.toPath());
+        return extractText(pdfBytes);
+    }
+
+    // ---------------- intern ----------------
+
+    private String extractText(byte[] pdfBytes) throws IOException {
+        if (pdfBytes == null || pdfBytes.length == 0) return "";
+
+        try (PDDocument doc = Loader.loadPDF(pdfBytes)) {
             PDFTextStripper stripper = new PDFTextStripper();
+
+            // Wichtig: hilft oft bei Tabellen/2-Spalten Layouts
             stripper.setSortByPosition(true);
 
-            String text = stripper.getText(document);
-            String[] lines = text.split("\\r?\\n");
+            // konsistente Line Separators
+            stripper.setLineSeparator("\n");
 
-            String currentSection = "ALT_Bestand";
-
-            for (String line : lines) {
-                String cleanLine = line.trim();
-                if (cleanLine.length() < 5) continue;
-
-                String upperLine = cleanLine.toUpperCase();
-
-                // Müll-Filter
-                if (upperLine.contains("BELEGPLAN") || upperLine.contains("SEITE")) continue;
-
-                // Sektions-Erkennung (ändert Status, läuft aber weiter)
-                if (upperLine.contains("NEU IM SORTIMENT") || upperLine.contains("NEU:")) {
-                    currentSection = "NEU_Bestand";
-                } else if (upperLine.contains("SORTIMENT") && (upperLine.contains("AUS") || upperLine.contains("US ") || upperLine.contains("ALT"))) {
-                    currentSection = "ALT_Bestand";
-                }
-
-                // CODE SUCHEN
-                Matcher matcher = CODE_PATTERN.matcher(cleanLine);
-                if (matcher.find()) {
-                    String code = matcher.group(1);
-
-                    // Strategie: Name steht oft DAHINTER bei dieser Art von Liste
-                    String textBefore = cleanLine.substring(0, matcher.start()).trim();
-                    String textAfter = cleanLine.substring(matcher.end()).trim();
-
-                    // Bereinigung von Datum und Müll
-                    textBefore = cleanText(textBefore);
-                    textAfter = cleanText(textAfter);
-
-                    String productName = "Unbekannt";
-
-                    // ENTSCHEIDUNG: Wo steht der Name?
-                    // Wenn "textBefore" nach einer Überschrift aussieht ("Neu im Sortiment"),
-                    // dann muss der Name im "textAfter" stehen!
-                    boolean beforeIsHeader = textBefore.toUpperCase().contains("SORTIMENT") || textBefore.toUpperCase().contains("NEU:");
-
-                    if (!textAfter.isEmpty() && beforeIsHeader) {
-                        productName = textAfter; // Nimm den Text DANACH (z.B. Koawach)
-                    } else if (!textBefore.isEmpty() && !beforeIsHeader) {
-                        productName = textBefore; // Nimm den Text DAVOR (Klassisch)
-                    } else if (!textAfter.isEmpty()) {
-                        productName = textAfter; // Fallback: Besser Text danach als gar nix
-                    } else {
-                        // Notfall: Wenn gar kein Name da ist, nehmen wir den bereinigten Header als Hinweis
-                        productName = textBefore.isEmpty() ? "Artikel (" + currentSection + ")" : textBefore;
-                    }
-
-                    Product p = new Product();
-                    p.setId(Math.abs((code + productName + currentSection).hashCode()));
-                    p.setName(productName);
-                    p.setLayoutCode(code);
-                    p.setPrice(0.0);
-
-                    // Status für CSV anhängen
-                    if ("NEU_Bestand".equals(currentSection)) {
-                        p.setName(productName + " [NEU]");
-                    }
-
-                    products.add(p);
-                    LOG.info("-> TREFFER: " + code + " | Name: " + productName);
-                }
-            }
-        } catch (IOException e) {
-            LOG.error("Fehler beim Lesen des PDFs", e);
-            throw e;
+            return stripper.getText(doc);
         }
-        return products;
     }
 
-    // Hilfsmethode zum Putzen
-    private String cleanText(String input) {
-        if (input == null) return "";
-        // Entfernt "t-------l", "Neu im Sortiment:", Datum "02-12-2025" und Sonderzeichen am Rand
-        String cleaned = input.replaceAll("(?i)(neu im sortiment|aus dem sortiment|us dem sortiment|t[-]+l)", "")
-                .replaceAll("\\d{2}-\\d{2}-\\d{4}", "") // Datum weg
-                .replaceAll("[:]", "") // Doppelpunkte weg
-                .trim();
-        // Entfernt führende/nachfolgende Sonderzeichen
-        return cleaned.replaceAll("^[^a-zA-Z0-9]+|[^a-zA-Z0-9)]+$", "").trim();
+    /**
+     * Robust:
+     * 1) Split in Blöcke pro Header "BELEGPLAN: KATEGORIE X - METER Y"
+     * 2) pro Block: finde alle Items via Regex, egal wie Zeilen umbrechen
+     */
+    private List<ImportItem> parseExtractedText(String text) {
+        if (text == null || text.isBlank()) return List.of();
+
+        // normalize whitespace ein wenig (macht Regex stabiler)
+        String normalized = text
+                .replace("\r", "\n")
+                .replaceAll("[ \\t\\f\\u00A0]+", " ")      // multiple spaces -> one
+                .replaceAll("\\n{2,}", "\n");              // multiple newlines -> one
+
+        // Header-Funde mit Start-Indizes
+        List<HeaderHit> headers = new ArrayList<>();
+        Matcher mh = HEADER_ANYWHERE.matcher(normalized);
+        while (mh.find()) {
+            headers.add(new HeaderHit(mh.start(), mh.group(1), mh.group(2)));
+        }
+
+        // Falls keine Header gefunden werden, versuchen wir trotzdem global zu matchen (category/meter unknown)
+        if (headers.isEmpty()) {
+            return parseItemsInBlock(normalized, "?", "?");
+        }
+
+        // Blöcke schneiden: Header i bis Header i+1
+        List<ImportItem> out = new ArrayList<>();
+        for (int i = 0; i < headers.size(); i++) {
+            HeaderHit h = headers.get(i);
+            int start = h.start;
+            int end = (i + 1 < headers.size()) ? headers.get(i + 1).start : normalized.length();
+
+            String block = normalized.substring(start, end);
+            out.addAll(parseItemsInBlock(block, h.category, h.meter));
+        }
+
+        // optional: Duplikate entfernen (kommt manchmal vor, wenn Visualisierung + Liste beide matchen)
+        // Key = layoutCode ist stabil
+        Map<String, ImportItem> dedup = new LinkedHashMap<>();
+        for (ImportItem it : out) {
+            if (it.layoutCode() != null && !it.layoutCode().isBlank()) {
+                dedup.putIfAbsent(it.layoutCode(), it);
+            }
+        }
+
+        return new ArrayList<>(dedup.values());
     }
+
+    private List<ImportItem> parseItemsInBlock(String block, String category, String meter) {
+        List<ImportItem> items = new ArrayList<>();
+
+        Matcher mi = ITEM_ANYWHERE.matcher(block);
+        while (mi.find()) {
+            String pos = mi.group(1);
+            int level = Integer.parseInt(mi.group(2));
+            int position = Integer.parseInt(mi.group(3));
+
+            String name = mi.group(4);
+            String layoutCode = mi.group(5);
+
+            name = cleanupName(name);
+
+            // Filter: Tabellenüberschriften raus
+            if (isGarbageName(name)) continue;
+
+            items.add(new ImportItem(category, meter, pos, level, position, name, layoutCode));
+        }
+
+        return items;
+    }
+
+    private String cleanupName(String name) {
+        if (name == null) return "";
+        // Name kann durch PDFBox Zeilenumbrüche enthalten -> glätten
+        return name
+                .replace("\n", " ")
+                .replaceAll("\\s{2,}", " ")
+                .trim();
+    }
+
+    private boolean isGarbageName(String name) {
+        if (name == null) return true;
+        String n = name.trim().toUpperCase(Locale.ROOT);
+
+        return n.isEmpty()
+                || n.equals("POS")
+                || n.equals("ARTIKELNAME")
+                || n.equals("CODE")
+                || n.equals("VISUALISIERUNG")
+                || n.equals("BESTÜCKUNGSLISTE")
+                || n.startsWith("ERSTELLT:");
+    }
+
+    private record HeaderHit(int start, String category, String meter) {}
 }

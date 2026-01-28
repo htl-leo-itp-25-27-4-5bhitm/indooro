@@ -1,7 +1,5 @@
 package at.htl.resource;
 
-import at.htl.model.Product;
-import at.htl.service.OpenSearchService;
 import at.htl.service.PdfImportService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
@@ -22,16 +20,13 @@ public class ImportResource {
     @Inject
     PdfImportService pdfImportService;
 
-    @Inject
-    OpenSearchService openSearchService;
-
     /**
-     * PDF rein -> Produkte in DB speichern -> CSV raus
+     * PDF rein -> ImportItems -> CSV raus
      */
     @POST
     @Path("/pdf-to-csv")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
-    @Produces(MediaType.TEXT_PLAIN) // Wir geben Text (CSV) zurück
+    @Produces(MediaType.TEXT_PLAIN)
     public Response convertPdfToCsv(@RestForm("file") File file) {
 
         if (file == null || !file.exists()) {
@@ -41,30 +36,24 @@ public class ImportResource {
         }
 
         try {
-            // 1. PDF Parsen (nutzt deinen bestehenden Service)
-            List<Product> products = pdfImportService.parsePdf(file);
+            List<PdfImportService.ImportItem> items = pdfImportService.parsePdf(file);
 
-            // 2. WOW-EFFEKT: Produkte direkt in OpenSearch indexieren
-            if (!products.isEmpty()) {
-                // Hier werden alle gefundenen Produkte sofort in die Datenbank geladen
-                openSearchService.indexProducts(products);
-            }
-
-            // 3. CSV String zusammenbauen
             StringBuilder csv = new StringBuilder();
+            csv.append("Produktname;Regalcode;Kategorie;Meter;Pos\n");
 
-            // Header
-            csv.append("Produktname;Regalcode\n");
-
-            // Zeilen
-            for (Product p : products) {
-                csv.append(p.getName())
+            for (PdfImportService.ImportItem it : items) {
+                csv.append(safe(it.name()))
                         .append(";")
-                        .append(p.getLayoutCode())
+                        .append(safe(it.layoutCode()))
+                        .append(";")
+                        .append(safe(it.category()))
+                        .append(";")
+                        .append(safe(it.meter()))
+                        .append(";")
+                        .append(safe(it.pos()))
                         .append("\n");
             }
 
-            // 4. Als Datei-Download zurückgeben
             return Response.ok(csv.toString())
                     .header("Content-Disposition", "attachment; filename=\"regalplan_export.csv\"")
                     .build();
@@ -74,5 +63,36 @@ public class ImportResource {
                     .entity("Fehler beim Verarbeiten: " + e.getMessage())
                     .build();
         }
+    }
+
+    /**
+     * PDF rein -> ImportItems -> JSON raus
+     */
+    @POST
+    @Path("/pdf-to-json")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response convertPdfToJson(@RestForm("file") File file) {
+
+        if (file == null || !file.exists()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("Keine Datei hochgeladen")
+                    .build();
+        }
+
+        try {
+            List<PdfImportService.ImportItem> items = pdfImportService.parsePdf(file);
+            return Response.ok(items).build();
+
+        } catch (IOException e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity("Fehler beim Verarbeiten: " + e.getMessage())
+                    .build();
+        }
+    }
+
+    private static String safe(String s) {
+        if (s == null) return "";
+        return s.replace("\n", " ").replace("\r", " ").trim();
     }
 }

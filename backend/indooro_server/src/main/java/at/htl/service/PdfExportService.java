@@ -2,16 +2,20 @@ package at.htl.service;
 
 import at.htl.model.Product;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.text.PDFTextStripper;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -22,11 +26,16 @@ public class PdfExportService {
     // Hilfsklasse zum Parsen des Codes (310/1/6/1)
     private record ShelfPosition(String categoryId, String meterId, int level, int position) {}
 
+    /**
+     * Erstellt ein PDF (mit echtem, extrahierbarem Text – kein OCR nötig).
+     */
     public byte[] generatePdf(List<Product> products) throws IOException {
+        List<Product> safeProducts = products == null ? List.of() : products;
+
         try (PDDocument document = new PDDocument()) {
 
             // 1. Gruppieren nach KATEGORIE
-            Map<String, List<Product>> productsByCategory = products.stream()
+            Map<String, List<Product>> productsByCategory = safeProducts.stream()
                     .collect(Collectors.groupingBy(p -> parseCode(p.getLayoutCode()).categoryId()));
 
             // Sortieren (310, 420...)
@@ -59,6 +68,68 @@ public class PdfExportService {
         }
     }
 
+    // -------------------- OHNE OCR: Text extrahieren / Console-Output --------------------
+
+    /**
+     * Extrahiert den echten Text aus einem PDF (ohne OCR) mittels PDFTextStripper.
+     * PDFBox 3.x: PDDocument.load(...) gibt es nicht mehr -> Loader.loadPDF(...)
+     */
+    public String extractText(byte[] pdfBytes) throws IOException {
+        if (pdfBytes == null || pdfBytes.length == 0) return "";
+
+        try (PDDocument doc = Loader.loadPDF(pdfBytes)) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            return stripper.getText(doc);
+        }
+    }
+
+    /**
+     * Sprint-Review/Demo Helper: schreibt den extrahierten Text auf die Konsole.
+     * (NICHT die rohen PDF-Bytes!)
+     */
+    public void printExtractedTextToConsole(byte[] pdfBytes) throws IOException {
+        System.out.println(extractText(pdfBytes));
+    }
+
+    /**
+     * Quick-Check: enthält das PDF extrahierbaren Text?
+     * Wenn false -> häufig Scan/Bild-PDF (dann bräuchte man OCR, falls Text benötigt wird).
+     */
+    public boolean hasExtractableText(byte[] pdfBytes) throws IOException {
+        String text = extractText(pdfBytes);
+        return text != null && !text.trim().isEmpty();
+    }
+
+    /**
+     * Debug/Proof Helper: Dump der dekomprimierten Page Content Streams auf Konsole.
+     * PDFBox 3.x: page.getContents() liefert InputStream (nicht PDStream).
+     *
+     * Erwartung: Das ist Operator-Syntax (BT/Tf/Tj/ET), nicht "fertiger Text".
+     */
+    public void dumpDecompressedPageContentStreamsToConsole(byte[] pdfBytes) throws IOException {
+        if (pdfBytes == null || pdfBytes.length == 0) return;
+
+        try (PDDocument doc = Loader.loadPDF(pdfBytes)) {
+            int pageIndex = 0;
+            for (PDPage page : doc.getPages()) {
+                pageIndex++;
+                System.out.println("=== Page " + pageIndex + " Content Stream (decompressed) ===");
+
+                try (InputStream is = page.getContents()) {
+                    if (is == null) {
+                        System.out.println("(no page contents)");
+                        continue;
+                    }
+                    byte[] bytes = is.readAllBytes();
+                    // Content Stream ist i.d.R. PDF-Operatoren + String-Literale; ISO-8859-1 ist hier ok fürs Debugging
+                    System.out.println(new String(bytes, StandardCharsets.ISO_8859_1));
+                }
+            }
+        }
+    }
+
+    // -------------------- PDF Layout --------------------
+
     private void createPageForMeter(PDDocument doc, String categoryId, String meterId, List<Product> products) throws IOException {
         // Querformat (Landscape) für mehr Platz
         PDPage page = new PDPage(new PDRectangle(PDRectangle.A4.getHeight(), PDRectangle.A4.getWidth()));
@@ -73,13 +144,13 @@ public class PdfExportService {
             float margin = 40;
             float spacing = 40;
 
-            // Linker Bereich (Grafik): ca. 50% der Breite
+            // Linker Bereich (Grafik): ca. 55% der Breite
             float graphicX = margin;
-            float graphicWidth = (pageWidth - (2 * margin) - spacing) * 0.55f; // 55% für Grafik
+            float graphicWidth = (pageWidth - (2 * margin) - spacing) * 0.55f;
 
             // Rechter Bereich (Liste): Rest
             float listX = graphicX + graphicWidth + spacing;
-            float listWidth = (pageWidth - (2 * margin) - spacing) * 0.45f; // 45% für Liste
+            float listWidth = (pageWidth - (2 * margin) - spacing) * 0.45f;
 
             float startY = 500; // Start unter dem Header
 
@@ -117,7 +188,8 @@ public class PdfExportService {
             // Label links (Boden Nr)
             content.beginText();
             content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 10);
-            content.newLineAtOffset(x - 25, currentY + (shelfHeight/2));
+            content.setNonStrokingColor(Color.BLACK);
+            content.newLineAtOffset(x - 25, currentY + (shelfHeight / 2));
             content.showText("B" + level);
             content.endText();
 
@@ -147,14 +219,15 @@ public class PdfExportService {
 
                     // Name (gekürzt)
                     content.newLineAtOffset(pX + 3, currentY + shelfHeight - 12);
-                    String shortName = p.getName().length() > 12 ? p.getName().substring(0, 10) + ".." : p.getName();
+                    String nameVal = String.valueOf(p.getName());
+                    String shortName = nameVal.length() > 12 ? nameVal.substring(0, 10) + ".." : nameVal;
                     content.showText(shortName);
 
                     // Code
                     content.newLineAtOffset(0, -12);
                     content.setFont(new PDType1Font(Standard14Fonts.FontName.COURIER), 7);
                     content.setNonStrokingColor(Color.BLUE);
-                    content.showText(p.getLayoutCode());
+                    content.showText(String.valueOf(p.getLayoutCode()));
 
                     content.endText();
                 }
@@ -178,6 +251,7 @@ public class PdfExportService {
         float currentY = y;
         float rowHeight = 18;
 
+        content.setStrokingColor(Color.BLACK);
         content.setLineWidth(1f);
         content.moveTo(x, currentY + 5);
         content.lineTo(x + width, currentY + 5);
@@ -185,6 +259,7 @@ public class PdfExportService {
 
         content.beginText();
         content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 9);
+        content.setNonStrokingColor(Color.BLACK);
         content.newLineAtOffset(x, currentY + 10);
         content.showText("POS");
         content.newLineAtOffset(40, 0);
@@ -200,8 +275,6 @@ public class PdfExportService {
                 .toList();
 
         // Liste drucken
-        content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 9);
-
         for (Product p : sortedList) {
             currentY -= rowHeight;
             ShelfPosition pos = parseCode(p.getLayoutCode());
@@ -215,6 +288,7 @@ public class PdfExportService {
 
             content.beginText();
             content.setNonStrokingColor(Color.BLACK);
+            content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 9);
 
             // Spalte 1: Position (Boden/Pos)
             content.newLineAtOffset(x, currentY + 3);
@@ -222,15 +296,14 @@ public class PdfExportService {
 
             // Spalte 2: Name (Kürzen wenn zu lang für Zeile)
             content.newLineAtOffset(40, 0);
-            String name = p.getName();
+            String name = String.valueOf(p.getName());
             if (name.length() > 35) name = name.substring(0, 32) + "...";
             content.showText(name);
 
             // Spalte 3: Code
             content.newLineAtOffset(220, 0);
             content.setFont(new PDType1Font(Standard14Fonts.FontName.COURIER), 9);
-            content.showText(p.getLayoutCode());
-            content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 9); // Reset Font
+            content.showText(String.valueOf(p.getLayoutCode()));
 
             content.endText();
         }
@@ -246,6 +319,7 @@ public class PdfExportService {
 
         content.beginText();
         content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 10);
+        content.setNonStrokingColor(Color.BLACK);
         content.newLineAtOffset(40, 545);
         content.showText("Erstellt: " + LocalDate.now());
         content.endText();
