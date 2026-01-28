@@ -1,5 +1,6 @@
 package at.htl.service;
 
+import at.htl.model.Product;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -17,31 +18,25 @@ import java.util.regex.Pattern;
 @ApplicationScoped
 public class PdfImportService {
 
-    /**
-     * ImportItem = das, was wir aus dem PDF zuverlässig extrahieren können.
-     */
     public record ImportItem(
+            Integer id,
             String category,
             String meter,
-            String pos,        // "B4-P2"
-            Integer level,     // 4
-            Integer position,  // 2
+            String pos,
+            Integer level,
+            Integer position,
             String name,
-            String layoutCode  // "800/2/4/2"
+            String layoutCode
     ) {}
 
-    // Header: nicht zeilen-gebunden! (kein ^ und $)
+    // Header (überall im Text)
     private static final Pattern HEADER_ANYWHERE =
             Pattern.compile("BELEGPLAN:\\s*KATEGORIE\\s+(\\d+)\\s*-\\s*METER\\s+(\\d+)", Pattern.CASE_INSENSITIVE);
 
-    // Eintrag: POS + Name (irgendwie dazwischen) + LayoutCode
-    // DOTALL erlaubt, dass "Name" über Zeilen läuft.
+    // Item: POS + ID + Name + LayoutCode (zeilenunabhängig, DOTALL)
     private static final Pattern ITEM_ANYWHERE =
-            Pattern.compile("(B(\\d+)-P(\\d+))\\s+(.+?)\\s+((\\d+)/(\\d+)/(\\d+)/(\\d+))", Pattern.DOTALL);
+            Pattern.compile("(B(\\d+)-P(\\d+))\\s+(\\d+)\\s+(.+?)\\s+((\\d+)/(\\d+)/(\\d+)/(\\d+))", Pattern.DOTALL);
 
-    /**
-     * Für deinen REST-Upload: File -> ImportItems
-     */
     public List<ImportItem> parsePdf(File pdfFile) throws IOException {
         if (pdfFile == null || !pdfFile.exists()) return List.of();
         byte[] pdfBytes = Files.readAllBytes(pdfFile.toPath());
@@ -60,79 +55,58 @@ public class PdfImportService {
     }
 
     /**
-     * Debug-Helfer: zeigt dir genau den Text, den PDFBox sieht (nicht pdftotext).
-     * Damit kannst du sofort vergleichen, warum der Parser evtl. 0 liefert.
+     * Wenn du direkt wieder Product-Objekte willst:
+     * price bleibt null (steht nicht im PDF), aber id/name/layoutCode sind drin.
      */
-    public String extractTextForDebug(File pdfFile) throws IOException {
-        byte[] pdfBytes = Files.readAllBytes(pdfFile.toPath());
-        return extractText(pdfBytes);
+    public List<Product> importProductsFromPdf(byte[] pdfBytes) throws IOException {
+        List<ImportItem> items = importFromPdf(pdfBytes);
+        return items.stream()
+                .map(it -> new Product(it.id(), it.name(), null, it.layoutCode()))
+                .toList();
     }
 
     // ---------------- intern ----------------
 
     private String extractText(byte[] pdfBytes) throws IOException {
         if (pdfBytes == null || pdfBytes.length == 0) return "";
-
         try (PDDocument doc = Loader.loadPDF(pdfBytes)) {
             PDFTextStripper stripper = new PDFTextStripper();
-
-            // Wichtig: hilft oft bei Tabellen/2-Spalten Layouts
             stripper.setSortByPosition(true);
-
-            // konsistente Line Separators
             stripper.setLineSeparator("\n");
-
             return stripper.getText(doc);
         }
     }
 
-    /**
-     * Robust:
-     * 1) Split in Blöcke pro Header "BELEGPLAN: KATEGORIE X - METER Y"
-     * 2) pro Block: finde alle Items via Regex, egal wie Zeilen umbrechen
-     */
     private List<ImportItem> parseExtractedText(String text) {
         if (text == null || text.isBlank()) return List.of();
 
-        // normalize whitespace ein wenig (macht Regex stabiler)
         String normalized = text
                 .replace("\r", "\n")
-                .replaceAll("[ \\t\\f\\u00A0]+", " ")      // multiple spaces -> one
-                .replaceAll("\\n{2,}", "\n");              // multiple newlines -> one
+                .replaceAll("[ \\t\\f\\u00A0]+", " ")
+                .replaceAll("\\n{2,}", "\n");
 
-        // Header-Funde mit Start-Indizes
         List<HeaderHit> headers = new ArrayList<>();
         Matcher mh = HEADER_ANYWHERE.matcher(normalized);
         while (mh.find()) {
             headers.add(new HeaderHit(mh.start(), mh.group(1), mh.group(2)));
         }
 
-        // Falls keine Header gefunden werden, versuchen wir trotzdem global zu matchen (category/meter unknown)
+        // Falls kein Header gefunden wird: trotzdem global parsen
         if (headers.isEmpty()) {
-            return parseItemsInBlock(normalized, "?", "?");
+            return dedupByLayout(parseItemsInBlock(normalized, "?", "?"));
         }
 
-        // Blöcke schneiden: Header i bis Header i+1
         List<ImportItem> out = new ArrayList<>();
         for (int i = 0; i < headers.size(); i++) {
             HeaderHit h = headers.get(i);
             int start = h.start;
             int end = (i + 1 < headers.size()) ? headers.get(i + 1).start : normalized.length();
-
             String block = normalized.substring(start, end);
+
             out.addAll(parseItemsInBlock(block, h.category, h.meter));
         }
 
-        // optional: Duplikate entfernen (kommt manchmal vor, wenn Visualisierung + Liste beide matchen)
-        // Key = layoutCode ist stabil
-        Map<String, ImportItem> dedup = new LinkedHashMap<>();
-        for (ImportItem it : out) {
-            if (it.layoutCode() != null && !it.layoutCode().isBlank()) {
-                dedup.putIfAbsent(it.layoutCode(), it);
-            }
-        }
-
-        return new ArrayList<>(dedup.values());
+        return dedupByLayout(out);
     }
 
     private List<ImportItem> parseItemsInBlock(String block, String category, String meter) {
@@ -144,27 +118,37 @@ public class PdfImportService {
             int level = Integer.parseInt(mi.group(2));
             int position = Integer.parseInt(mi.group(3));
 
-            String name = mi.group(4);
-            String layoutCode = mi.group(5);
+            Integer id;
+            try {
+                id = Integer.parseInt(mi.group(4));
+            } catch (Exception e) {
+                id = null;
+            }
 
-            name = cleanupName(name);
+            String name = cleanupName(mi.group(5));
+            String layoutCode = mi.group(6);
 
-            // Filter: Tabellenüberschriften raus
             if (isGarbageName(name)) continue;
 
-            items.add(new ImportItem(category, meter, pos, level, position, name, layoutCode));
+            items.add(new ImportItem(id, category, meter, pos, level, position, name, layoutCode));
         }
 
         return items;
     }
 
+    private List<ImportItem> dedupByLayout(List<ImportItem> items) {
+        Map<String, ImportItem> map = new LinkedHashMap<>();
+        for (ImportItem it : items) {
+            if (it.layoutCode() != null && !it.layoutCode().isBlank()) {
+                map.putIfAbsent(it.layoutCode(), it);
+            }
+        }
+        return new ArrayList<>(map.values());
+    }
+
     private String cleanupName(String name) {
         if (name == null) return "";
-        // Name kann durch PDFBox Zeilenumbrüche enthalten -> glätten
-        return name
-                .replace("\n", " ")
-                .replaceAll("\\s{2,}", " ")
-                .trim();
+        return name.replace("\n", " ").replaceAll("\\s{2,}", " ").trim();
     }
 
     private boolean isGarbageName(String name) {
@@ -173,6 +157,7 @@ public class PdfImportService {
 
         return n.isEmpty()
                 || n.equals("POS")
+                || n.equals("ID")
                 || n.equals("ARTIKELNAME")
                 || n.equals("CODE")
                 || n.equals("VISUALISIERUNG")
