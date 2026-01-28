@@ -63,7 +63,7 @@ body {
 }
 
 .logo:hover .logo-icon {
-    transform: rotate(360deg) scale(1.1);
+    transform: scale(1.1);
 }
 
 .logo {
@@ -282,7 +282,10 @@ nav ul li a:hover {
 .btn.secondary {
     background-color: var(--secondary-color);
     color: white;
+    border: 2px solid transparent;
     box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+    transform-origin: center;
+    box-sizing: border-box;
 }
 
 .btn.secondary:hover {
@@ -427,7 +430,7 @@ nav ul li a:hover {
 }
 
 .step-card:hover .step-number {
-    transform: rotate(360deg) scale(1.1);
+    transform: scale(1.1);
 }
 
 /* Technologie Sektion */
@@ -546,12 +549,6 @@ nav ul li a:hover {
     background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
     border-left: 5px solid var(--primary-color);
     box-shadow: 0 5px 20px rgba(76, 175, 80, 0.2);
-}
-
-.status-box.no-scope {
-    background: linear-gradient(135deg, #ffebee, #ffcdd2);
-    border-left: 5px solid #E57373;
-    box-shadow: 0 5px 20px rgba(229, 115, 115, 0.2);
 }
 
 .status-box ul {
