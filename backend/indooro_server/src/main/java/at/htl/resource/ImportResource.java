@@ -20,54 +20,12 @@ public class ImportResource {
     @Inject
     PdfImportService pdfImportService;
 
-    /**
-     * PDF rein -> ImportItems -> CSV raus
-     */
-    @POST
-    @Path("/pdf-to-csv")
-    @Consumes(MediaType.MULTIPART_FORM_DATA)
-    @Produces(MediaType.TEXT_PLAIN)
-    public Response convertPdfToCsv(@RestForm("file") File file) {
+    public record ProductJson(
+            Integer id,
+            String name,
+            String layoutCode
+    ) {}
 
-        if (file == null || !file.exists()) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity("Keine Datei hochgeladen")
-                    .build();
-        }
-
-        try {
-            List<PdfImportService.ImportItem> items = pdfImportService.parsePdf(file);
-
-            StringBuilder csv = new StringBuilder();
-            csv.append("Produktname;Regalcode;Kategorie;Meter;Pos\n");
-
-            for (PdfImportService.ImportItem it : items) {
-                csv.append(safe(it.name()))
-                        .append(";")
-                        .append(safe(it.layoutCode()))
-                        .append(";")
-                        .append(safe(it.category()))
-                        .append(";")
-                        .append(safe(it.meter()))
-                        .append(";")
-                        .append(safe(it.pos()))
-                        .append("\n");
-            }
-
-            return Response.ok(csv.toString())
-                    .header("Content-Disposition", "attachment; filename=\"regalplan_export.csv\"")
-                    .build();
-
-        } catch (IOException e) {
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity("Fehler beim Verarbeiten: " + e.getMessage())
-                    .build();
-        }
-    }
-
-    /**
-     * PDF rein -> ImportItems -> JSON raus
-     */
     @POST
     @Path("/pdf-to-json")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
@@ -82,17 +40,21 @@ public class ImportResource {
 
         try {
             List<PdfImportService.ImportItem> items = pdfImportService.parsePdf(file);
-            return Response.ok(items).build();
+
+            List<ProductJson> out = items.stream()
+                    .map(it -> new ProductJson(
+                            it.id(),
+                            it.name(),
+                            it.layoutCode()
+                    ))
+                    .toList();
+
+            return Response.ok(out).build();
 
         } catch (IOException e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity("Fehler beim Verarbeiten: " + e.getMessage())
                     .build();
         }
-    }
-
-    private static String safe(String s) {
-        if (s == null) return "";
-        return s.replace("\n", " ").replace("\r", " ").trim();
     }
 }

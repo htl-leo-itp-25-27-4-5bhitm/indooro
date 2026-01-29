@@ -1,591 +1,296 @@
 [
   {
     "id": 8020,
-    "category": "800",
-    "meter": "1",
-    "pos": "B8-P1",
-    "level": 8,
-    "position": 1,
     "name": "Dr. Oetker Backpulver 10er ...",
     "layoutCode": "800/1/8/1"
   },
   {
     "id": 8021,
-    "category": "800",
-    "meter": "1",
-    "pos": "B8-P2",
-    "level": 8,
-    "position": 2,
     "name": "Dr. Oetker Vanillezucker 10...",
     "layoutCode": "800/1/8/2"
   },
   {
     "id": 8022,
-    "category": "800",
-    "meter": "1",
-    "pos": "B8-P3",
-    "level": 8,
-    "position": 3,
     "name": "S-BUDGET Trockenhefe",
     "layoutCode": "800/1/8/3"
   },
   {
     "id": 8018,
-    "category": "800",
-    "meter": "1",
-    "pos": "B7-P1",
-    "level": 7,
-    "position": 1,
     "name": "SPAR Natur*pur Bio-Zimt gem...",
     "layoutCode": "800/1/7/1"
   },
   {
     "id": 8019,
-    "category": "800",
-    "meter": "1",
-    "pos": "B7-P2",
-    "level": 7,
-    "position": 2,
     "name": "Kotanyi Vanilleschote Bourb...",
     "layoutCode": "800/1/7/2"
   },
   {
     "id": 8017,
-    "category": "800",
-    "meter": "1",
-    "pos": "B6-P2",
-    "level": 6,
-    "position": 2,
     "name": "SPAR Premium Chiliflocken M...",
     "layoutCode": "800/1/6/2"
   },
   {
     "id": 8014,
-    "category": "800",
-    "meter": "1",
-    "pos": "B5-P1",
-    "level": 5,
-    "position": 1,
     "name": "S-BUDGET Paprika Edelsüß",
     "layoutCode": "800/1/5/1"
   },
   {
     "id": 8015,
-    "category": "800",
-    "meter": "1",
-    "pos": "B5-P2",
-    "level": 5,
-    "position": 2,
     "name": "S-BUDGET Oregano Gerebelt",
     "layoutCode": "800/1/5/2"
   },
   {
     "id": 8016,
-    "category": "800",
-    "meter": "1",
-    "pos": "B5-P3",
-    "level": 5,
-    "position": 3,
     "name": "S-BUDGET Basilikum Gerebelt",
     "layoutCode": "800/1/5/3"
   },
   {
     "id": 8008,
-    "category": "800",
-    "meter": "1",
-    "pos": "B4-P1",
-    "level": 4,
-    "position": 1,
     "name": "Kotanyi Paprika Edelsüß Spe...",
     "layoutCode": "800/1/4/1"
   },
   {
     "id": 8009,
-    "category": "800",
-    "meter": "1",
-    "pos": "B4-P2",
-    "level": 4,
-    "position": 2,
     "name": "Kotanyi Oregano Gerebelt",
     "layoutCode": "800/1/4/2"
   },
   {
     "id": 8010,
-    "category": "800",
-    "meter": "1",
-    "pos": "B4-P3",
-    "level": 4,
-    "position": 3,
     "name": "Kotanyi Basilikum",
     "layoutCode": "800/1/4/3"
   },
   {
     "id": 8011,
-    "category": "800",
-    "meter": "1",
-    "pos": "B4-P4",
-    "level": 4,
-    "position": 4,
     "name": "Kotanyi Majoran",
     "layoutCode": "800/1/4/4"
   },
   {
     "id": 8012,
-    "category": "800",
-    "meter": "1",
-    "pos": "B4-P5",
-    "level": 4,
-    "position": 5,
     "name": "Kotanyi Thymian",
     "layoutCode": "800/1/4/5"
   },
   {
     "id": 8013,
-    "category": "800",
-    "meter": "1",
-    "pos": "B4-P6",
-    "level": 4,
-    "position": 6,
     "name": "Kotanyi Rosmarin",
     "layoutCode": "800/1/4/6"
   },
   {
     "id": 8006,
-    "category": "800",
-    "meter": "1",
-    "pos": "B3-P1",
-    "level": 3,
-    "position": 1,
     "name": "Maggi Würze Flüssig Großfla...",
     "layoutCode": "800/1/3/1"
   },
   {
     "id": 8007,
-    "category": "800",
-    "meter": "1",
-    "pos": "B3-P2",
-    "level": 3,
-    "position": 2,
     "name": "Knorr Aromat Streuwürze Dose",
     "layoutCode": "800/1/3/2"
   },
   {
     "id": 8003,
-    "category": "800",
-    "meter": "1",
-    "pos": "B2-P1",
-    "level": 2,
-    "position": 1,
     "name": "Kotanyi Pfeffer Schwarz Gan...",
     "layoutCode": "800/1/2/1"
   },
   {
     "id": 8004,
-    "category": "800",
-    "meter": "1",
-    "pos": "B2-P2",
-    "level": 2,
-    "position": 2,
     "name": "Kotanyi Pfeffer Bunt Mühle",
     "layoutCode": "800/1/2/2"
   },
   {
     "id": 8005,
-    "category": "800",
-    "meter": "1",
-    "pos": "B2-P3",
-    "level": 2,
-    "position": 3,
     "name": "S-BUDGET Pfeffer Schwarz Ge...",
     "layoutCode": "800/1/2/3"
   },
   {
     "id": 8001,
-    "category": "800",
-    "meter": "1",
-    "pos": "B1-P1",
-    "level": 1,
-    "position": 1,
     "name": "S-BUDGET Tafelsalz Jodiert ...",
     "layoutCode": "800/1/1/1"
   },
   {
     "id": 8002,
-    "category": "800",
-    "meter": "1",
-    "pos": "B1-P2",
-    "level": 1,
-    "position": 2,
     "name": "Bad Ischler Kristallsalz 500g",
     "layoutCode": "800/1/1/2"
   },
   {
     "id": 8109,
-    "category": "800",
-    "meter": "2",
-    "pos": "B5-P1",
-    "level": 5,
-    "position": 1,
     "name": "SPAR Premium Aceto Balsamic...",
     "layoutCode": "800/2/5/1"
   },
   {
     "id": 8110,
-    "category": "800",
-    "meter": "2",
-    "pos": "B5-P2",
-    "level": 5,
-    "position": 2,
     "name": "Kühne Essig Kräuter",
     "layoutCode": "800/2/5/2"
   },
   {
     "id": 8106,
-    "category": "800",
-    "meter": "2",
-    "pos": "B4-P1",
-    "level": 4,
-    "position": 1,
     "name": "Heinz Tomaten Ketchup Squeeze",
     "layoutCode": "800/2/4/1"
   },
   {
     "id": 8107,
-    "category": "800",
-    "meter": "2",
-    "pos": "B4-P2",
-    "level": 4,
-    "position": 2,
     "name": "Felix Ketchup Mild 1kg",
     "layoutCode": "800/2/4/2"
   },
   {
     "id": 8108,
-    "category": "800",
-    "meter": "2",
-    "pos": "B4-P3",
-    "level": 4,
-    "position": 3,
     "name": "S-BUDGET Ketchup Mild",
     "layoutCode": "800/2/4/3"
   },
   {
     "id": 8104,
-    "category": "800",
-    "meter": "2",
-    "pos": "B3-P1",
-    "level": 3,
-    "position": 1,
     "name": "Kunner Mayonnaise 80% Tube",
     "layoutCode": "800/2/3/1"
   },
   {
     "id": 8105,
-    "category": "800",
-    "meter": "2",
-    "pos": "B3-P2",
-    "level": 3,
-    "position": 2,
     "name": "Hellmanns Real Mayonnaise Glas",
     "layoutCode": "800/2/3/2"
   },
   {
     "id": 8101,
-    "category": "800",
-    "meter": "2",
-    "pos": "B1-P1",
-    "level": 1,
-    "position": 1,
     "name": "Bertolli Olivenöl Extra Ver...",
     "layoutCode": "800/2/1/1"
   },
   {
     "id": 8102,
-    "category": "800",
-    "meter": "2",
-    "pos": "B1-P2",
-    "level": 1,
-    "position": 2,
     "name": "SPAR Premium Sonnenblumenöl 1L",
     "layoutCode": "800/2/1/2"
   },
   {
     "id": 8103,
-    "category": "800",
-    "meter": "2",
-    "pos": "B1-P3",
-    "level": 1,
-    "position": 3,
     "name": "S-BUDGET Rapsöl 1L",
     "layoutCode": "800/2/1/3"
   },
   {
     "id": 9008,
-    "category": "900",
-    "meter": "1",
-    "pos": "B4-P1",
-    "level": 4,
-    "position": 1,
     "name": "Aptamil Folgemilch 2",
     "layoutCode": "900/1/4/1"
   },
   {
     "id": 9009,
-    "category": "900",
-    "meter": "1",
-    "pos": "B4-P2",
-    "level": 4,
-    "position": 2,
     "name": "Beba Pre Anfangsmilch",
     "layoutCode": "900/1/4/2"
   },
   {
     "id": 9005,
-    "category": "900",
-    "meter": "1",
-    "pos": "B3-P1",
-    "level": 3,
-    "position": 1,
     "name": "Hipp Bio-Gläschen Karotte",
     "layoutCode": "900/1/3/1"
   },
   {
     "id": 9006,
-    "category": "900",
-    "meter": "1",
-    "pos": "B3-P2",
-    "level": 3,
-    "position": 2,
     "name": "Hipp Bio-Gläschen Spaghetti...",
     "layoutCode": "900/1/3/2"
   },
   {
     "id": 9007,
-    "category": "900",
-    "meter": "1",
-    "pos": "B3-P3",
-    "level": 3,
-    "position": 3,
     "name": "Alete Obstbrei Pfirsich",
     "layoutCode": "900/1/3/3"
   },
   {
     "id": 9003,
-    "category": "900",
-    "meter": "1",
-    "pos": "B2-P1",
-    "level": 2,
-    "position": 1,
     "name": "S-BUDGET Baby Feuchttücher ...",
     "layoutCode": "900/1/2/1"
   },
   {
     "id": 9004,
-    "category": "900",
-    "meter": "1",
-    "pos": "B2-P2",
-    "level": 2,
-    "position": 2,
     "name": "Penaten Baby Creme Dose",
     "layoutCode": "900/1/2/2"
   },
   {
     "id": 9001,
-    "category": "900",
-    "meter": "1",
-    "pos": "B1-P1",
-    "level": 1,
-    "position": 1,
     "name": "Pampers Baby-Dry Windeln Gr...",
     "layoutCode": "900/1/1/1"
   },
   {
     "id": 9002,
-    "category": "900",
-    "meter": "1",
-    "pos": "B1-P2",
-    "level": 1,
-    "position": 2,
     "name": "Pampers Premium Protection ...",
     "layoutCode": "900/1/1/2"
   },
   {
     "id": 9108,
-    "category": "900",
-    "meter": "2",
-    "pos": "B4-P1",
-    "level": 4,
-    "position": 1,
     "name": "Pedigree Hundenahrung Rind ...",
     "layoutCode": "900/2/4/1"
   },
   {
     "id": 9109,
-    "category": "900",
-    "meter": "2",
-    "pos": "B4-P3",
-    "level": 4,
-    "position": 3,
     "name": "Rinti Kennerfleisch",
     "layoutCode": "900/2/4/3"
   },
   {
     "id": 9106,
-    "category": "900",
-    "meter": "2",
-    "pos": "B3-P1",
-    "level": 3,
-    "position": 1,
     "name": "Catsan Hygiene Streu 20L",
     "layoutCode": "900/2/3/1"
   },
   {
     "id": 9107,
-    "category": "900",
-    "meter": "2",
-    "pos": "B3-P2",
-    "level": 3,
-    "position": 2,
     "name": "S-BUDGET Katzenstreu Klumpend",
     "layoutCode": "900/2/3/2"
   },
   {
     "id": 9104,
-    "category": "900",
-    "meter": "2",
-    "pos": "B2-P1",
-    "level": 2,
-    "position": 1,
     "name": "Sheba Schälchen Lachs",
     "layoutCode": "900/2/2/1"
   },
   {
     "id": 9105,
-    "category": "900",
-    "meter": "2",
-    "pos": "B2-P2",
-    "level": 2,
-    "position": 2,
     "name": "Gourmet Gold Mousse",
     "layoutCode": "900/2/2/2"
   },
   {
     "id": 9101,
-    "category": "900",
-    "meter": "2",
-    "pos": "B1-P1",
-    "level": 1,
-    "position": 1,
     "name": "Whiskas Katzenfutter Gelee ...",
     "layoutCode": "900/2/1/1"
   },
   {
     "id": 9102,
-    "category": "900",
-    "meter": "2",
-    "pos": "B1-P2",
-    "level": 1,
-    "position": 2,
     "name": "Felix So gut wie es aussieh...",
     "layoutCode": "900/2/1/2"
   },
   {
     "id": 9103,
-    "category": "900",
-    "meter": "2",
-    "pos": "B1-P3",
-    "level": 1,
-    "position": 3,
     "name": "S-BUDGET Katzenfutter Dose ...",
     "layoutCode": "900/2/1/3"
   },
   {
     "id": 9208,
-    "category": "900",
-    "meter": "3",
-    "pos": "B4-P1",
-    "level": 4,
-    "position": 1,
     "name": "Durex Gefühlsecht 10er",
     "layoutCode": "900/3/4/1"
   },
   {
     "id": 9209,
-    "category": "900",
-    "meter": "3",
-    "pos": "B4-P2",
-    "level": 4,
-    "position": 2,
     "name": "Billy Boy Mix",
     "layoutCode": "900/3/4/2"
   },
   {
     "id": 9206,
-    "category": "900",
-    "meter": "3",
-    "pos": "B3-P1",
-    "level": 3,
-    "position": 1,
     "name": "Hansaplast Pflaster Classic",
     "layoutCode": "900/3/3/1"
   },
   {
     "id": 9207,
-    "category": "900",
-    "meter": "3",
-    "pos": "B3-P2",
-    "level": 3,
-    "position": 2,
     "name": "S-BUDGET Pflasterstrips",
     "layoutCode": "900/3/3/2"
   },
   {
     "id": 9203,
-    "category": "900",
-    "meter": "3",
-    "pos": "B2-P1",
-    "level": 2,
-    "position": 1,
     "name": "Labello Classic",
     "layoutCode": "900/3/2/1"
   },
   {
     "id": 9204,
-    "category": "900",
-    "meter": "3",
-    "pos": "B2-P2",
-    "level": 2,
-    "position": 2,
     "name": "Carmex Lippenbalsam",
     "layoutCode": "900/3/2/2"
   },
   {
     "id": 9205,
-    "category": "900",
-    "meter": "3",
-    "pos": "B2-P4",
-    "level": 2,
-    "position": 4,
     "name": "Neutrogena Handcreme",
     "layoutCode": "900/3/2/4"
   },
   {
     "id": 9201,
-    "category": "900",
-    "meter": "3",
-    "pos": "B1-P1",
-    "level": 1,
-    "position": 1,
     "name": "Nivea Creme Dose Blau 150ml",
     "layoutCode": "900/3/1/1"
   },
   {
     "id": 9202,
-    "category": "900",
-    "meter": "3",
-    "pos": "B1-P2",
-    "level": 1,
-    "position": 2,
     "name": "Bebe Zartcreme",
     "layoutCode": "900/3/1/2"
   }
