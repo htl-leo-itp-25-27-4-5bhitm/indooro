@@ -20,7 +20,7 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     private let startTime = Date()
     
     // Konfiguration
-    let pathLossExp = 3.0 // Etwas höher für Innenräume
+    let pathLossExp = 4.0 // Etwas höher für Innenräume
     private let defaultTxPower = -59.0
     
     override init() {
