@@ -1,7 +1,5 @@
 package at.htl.resource;
 
-import at.htl.model.Product;
-import at.htl.service.OpenSearchService;
 import at.htl.service.PdfImportService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
@@ -22,17 +20,17 @@ public class ImportResource {
     @Inject
     PdfImportService pdfImportService;
 
-    @Inject
-    OpenSearchService openSearchService;
+    public record ProductJson(
+            Integer id,
+            String name,
+            String layoutCode
+    ) {}
 
-    /**
-     * PDF rein -> Produkte in DB speichern -> CSV raus
-     */
     @POST
-    @Path("/pdf-to-csv")
+    @Path("/pdf-to-json")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
-    @Produces(MediaType.TEXT_PLAIN) // Wir geben Text (CSV) zurück
-    public Response convertPdfToCsv(@RestForm("file") File file) {
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response convertPdfToJson(@RestForm("file") File file) {
 
         if (file == null || !file.exists()) {
             return Response.status(Response.Status.BAD_REQUEST)
@@ -41,33 +39,17 @@ public class ImportResource {
         }
 
         try {
-            // 1. PDF Parsen (nutzt deinen bestehenden Service)
-            List<Product> products = pdfImportService.parsePdf(file);
+            List<PdfImportService.ImportItem> items = pdfImportService.parsePdf(file);
 
-            // 2. WOW-EFFEKT: Produkte direkt in OpenSearch indexieren
-            if (!products.isEmpty()) {
-                // Hier werden alle gefundenen Produkte sofort in die Datenbank geladen
-                openSearchService.indexProducts(products);
-            }
+            List<ProductJson> out = items.stream()
+                    .map(it -> new ProductJson(
+                            it.id(),
+                            it.name(),
+                            it.layoutCode()
+                    ))
+                    .toList();
 
-            // 3. CSV String zusammenbauen
-            StringBuilder csv = new StringBuilder();
-
-            // Header
-            csv.append("Produktname;Regalcode\n");
-
-            // Zeilen
-            for (Product p : products) {
-                csv.append(p.getName())
-                        .append(";")
-                        .append(p.getLayoutCode())
-                        .append("\n");
-            }
-
-            // 4. Als Datei-Download zurückgeben
-            return Response.ok(csv.toString())
-                    .header("Content-Disposition", "attachment; filename=\"regalplan_export.csv\"")
-                    .build();
+            return Response.ok(out).build();
 
         } catch (IOException e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)

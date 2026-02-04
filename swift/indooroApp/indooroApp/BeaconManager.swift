@@ -1,13 +1,17 @@
 import Foundation
 import CoreBluetooth
 import Combine
+import CoreGraphics // Wichtig für CGPoint
 
 class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     
     @Published var beacons: [IndooroBeacon] = []
-    @Published var shelves: [LayoutElement] = [] // NEU: Liste der Regale
+    @Published var shelves: [LayoutElement] = []
     @Published var gridWidth: Double = 15.0
     @Published var gridHeight: Double = 20.0
+    
+    // NEU: Die berechnete User-Position (Nil wenn nicht genug Beacons da sind)
+    @Published var userPosition: CGPoint? = nil
     
     private var centralManager: CBCentralManager?
     private var rssiBuffer: [String: [Int]] = [:]
@@ -16,16 +20,13 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     private let startTime = Date()
     
     // Konfiguration
-    let pathLossExp = 2.0
+    let pathLossExp = 4.0 // Etwas höher für Innenräume
     private let defaultTxPower = -59.0
     
     override init() {
         super.init()
-        
-        // 1. Laden des Layouts (Beacons + Regale)
         loadLayoutFromJSON()
         
-        // 2. Filter initialisieren
         for beacon in beacons {
             kalmanFilters[beacon.name] = KalmanFilter(processNoise: 0.05, measurementNoise: 2.0)
         }
@@ -34,77 +35,97 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
         startUpdateTimer()
     }
     
+    // ... (loadLayoutFromJSON bleibt unverändert) ...
     private func loadLayoutFromJSON() {
-        guard let url = Bundle.main.url(forResource: "layout", withExtension: "json") else {
-            print("⚠️ layout.json nicht gefunden!")
-            return
-        }
-        
+        guard let url = Bundle.main.url(forResource: "layout", withExtension: "json") else { return }
         do {
             let data = try Data(contentsOf: url)
             let layout = try JSONDecoder().decode(LayoutData.self, from: data)
-            
-            // Grid Größe übernehmen
             self.gridWidth = layout.gridSize.width
             self.gridHeight = layout.gridSize.height
-            
-            // 1. Regale filtern (Alles was kein Beacon ist)
             self.shelves = layout.elements.filter { $0.type != "beacon" }
-            
-            // 2. Beacons filtern und konvertieren
             self.beacons = layout.elements
                 .filter { $0.type == "beacon" }
                 .compactMap { element in
                     guard let name = element.beaconId else { return nil }
-                    return IndooroBeacon(
-                        id: String(element.id),
-                        name: name,
-                        positionX: element.x,
-                        positionY: element.y
-                    )
+                    return IndooroBeacon(id: String(element.id), name: name, positionX: element.x, positionY: element.y)
                 }
-            
-            print("✅ Layout geladen: \(beacons.count) Beacons, \(shelves.count) Regale.")
-            
-        } catch {
-            print("❌ JSON Fehler: \(error)")
-        }
+        } catch { print("❌ JSON Fehler: \(error)") }
     }
     
     func startUpdateTimer() {
         updateTimer?.invalidate()
-        // Alle 2 Sekunden aktualisieren (wie gewünscht)
-        updateTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        updateTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.processBufferAndCalculate()
         }
     }
     
     func processBufferAndCalculate() {
-         // Warmup Phase (erste 2 Sekunden nichts tun)
-         if Date().timeIntervalSince(startTime) < 2.0 { return }
-         
-         for (name, values) in rssiBuffer {
-             guard !values.isEmpty else { continue }
-             
-             // Median-Filter Logik
-             let sortedValues = values.sorted()
-             let filteredValues: [Int]
-             if sortedValues.count >= 10 {
-                 let removeCount = sortedValues.count / 5
-                 filteredValues = Array(sortedValues.dropFirst(removeCount).dropLast(removeCount))
-             } else {
-                 filteredValues = sortedValues
-             }
-             
-             let averageRssi = Double(filteredValues.reduce(0, +)) / Double(filteredValues.count)
-             
-             // Distanz & Kalman
-             let rawDistance = calculateDistance(rssi: averageRssi, txPower: defaultTxPower)
-             let smoothedDistance = kalmanFilters[name]?.filter(rawDistance) ?? rawDistance
-             
-             updateBeaconUI(name: name, rssi: Int(averageRssi), distance: smoothedDistance)
-         }
-         rssiBuffer.removeAll()
+        if Date().timeIntervalSince(startTime) < 2.0 { return }
+        
+        // 1. Beacons aktualisieren
+        for (name, values) in rssiBuffer {
+            guard !values.isEmpty else { continue }
+            
+            let sortedValues = values.sorted()
+            let filteredValues: [Int]
+            // Einfacher Median-Filter
+            if sortedValues.count >= 3 {
+                filteredValues = Array(sortedValues.dropFirst().dropLast())
+            } else {
+                filteredValues = sortedValues
+            }
+            
+            let averageRssi = Double(filteredValues.reduce(0, +)) / Double(filteredValues.count)
+            let rawDistance = calculateDistance(rssi: averageRssi, txPower: defaultTxPower)
+            let smoothedDistance = kalmanFilters[name]?.filter(rawDistance) ?? rawDistance
+            
+            updateBeaconUI(name: name, rssi: Int(averageRssi), distance: smoothedDistance)
+        }
+        rssiBuffer.removeAll()
+        
+        // 2. NEU: Position berechnen (Trilateration)
+        calculateLocation()
+    }
+    
+    // --- NEU: ALGORITHMUS FÜR USER STORY #40 ---
+    private func calculateLocation() {
+        // Wir nehmen nur Beacons, die ein Signal haben und nicht unendlich weit weg sind
+        let activeBeacons = beacons.filter { $0.distance > 0.1 && $0.distance < 20.0 }
+        
+        // Wir brauchen mindestens 3 Beacons für eine stabile Trilateration
+        guard activeBeacons.count >= 3 else {
+            // Optional: Fallback auf 2 Beacons (Mittelpunkt) oder 1 (direkt drauf) möglich
+            return
+        }
+        
+        // Sortieren: Die 3 nächsten Beacons sind am wichtigsten
+        let top3 = activeBeacons.sorted { $0.distance < $1.distance }.prefix(3)
+        
+        var totalWeight: Double = 0
+        var sumX: Double = 0
+        var sumY: Double = 0
+        
+        for beacon in top3 {
+            // Der Trick: Das Gewicht ist 1 / (Distanz ^ 2).
+            // Bedeutet: Ein Beacon der 1m weg ist, zählt 4x so viel wie einer der 2m weg ist.
+            // Das "zieht" den Punkt magisch zur richtigen Stelle.
+            let weight = 1.0 / pow(beacon.distance, 2)
+            
+            sumX += beacon.positionX * weight
+            sumY += beacon.positionY * weight
+            totalWeight += weight
+        }
+        
+        if totalWeight > 0 {
+            let userX = sumX / totalWeight
+            let userY = sumY / totalWeight
+            
+            // UI Update
+            DispatchQueue.main.async {
+                self.userPosition = CGPoint(x: userX, y: userY)
+            }
+        }
     }
     
     private func updateBeaconUI(name: String, rssi: Int, distance: Double) {
