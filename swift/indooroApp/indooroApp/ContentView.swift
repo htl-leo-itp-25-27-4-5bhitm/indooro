@@ -3,130 +3,243 @@ import SwiftUI
 struct ContentView: View {
     @StateObject var beaconManager = BeaconManager()
     
-    // Maßstab: 25 Pixel pro Meter (Kannst du anpassen, wenn du weiter rein/raus zoomen willst)
+    // --- SUCHE STATES ---
+    @State private var searchText = ""
+    @State private var targetProduct: Product? = nil // Das aktuell gesuchte Produkt
+    
+    // Maßstab: 25 Pixel pro Meter
     let pixelsPerMeter: Double = 25.0
     
     var body: some View {
         NavigationView {
-            VStack {
-                // --- KOPFZEILE ---
-                VStack(spacing: 5) {
-                    Text("Indooro Map")
-                        .font(.largeTitle)
-                        .bold()
+            ZStack(alignment: .top) {
+                
+                // === HAUPT-LAYOUT (Karte & Header) ===
+                VStack(spacing: 0) {
                     
-                    if let pos = beaconManager.userPosition {
-                        Text("📍 Position: \(String(format: "%.1f", pos.x))m / \(String(format: "%.1f", pos.y))m")
-                            .font(.headline)
-                            .foregroundColor(.blue)
-                    } else {
-                        Text("📡 Suche Position... (Brauche 3 Signale)")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                    }
-                }
-                .padding(.top)
-                
-                // --- SCROLLBARE KARTE ---
-                ScrollView([.horizontal, .vertical], showsIndicators: true) {
-                    ZStack(alignment: .topLeading) {
+                    // 1. KOPFZEILE
+                    VStack(spacing: 5) {
+                        Text("Indooro Map")
+                            .font(.largeTitle)
+                            .bold()
                         
-                        // 1. Hintergrund (Dynamische Größe!)
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .border(Color.black, width: 2)
-                            .frame(
-                                width: CGFloat(beaconManager.gridWidth * pixelsPerMeter),
-                                height: CGFloat(beaconManager.gridHeight * pixelsPerMeter)
-                            )
-                        
-                        // 2. Gitterlinien
-                        GridLines(
-                            step: pixelsPerMeter,
-                            width: CGFloat(beaconManager.gridWidth * pixelsPerMeter),
-                            height: CGFloat(beaconManager.gridHeight * pixelsPerMeter),
-                            gridCountX: Int(beaconManager.gridWidth),
-                            gridCountY: Int(beaconManager.gridHeight)
-                        )
-                        
-                        // 3. REGALE
-                        ForEach(beaconManager.shelves) { element in
-                            ShelfView(element: element, pixelsPerMeter: pixelsPerMeter)
-                        }
-                        
-                        // 4. ACHSEN
-                        MapAxes(
-                            pixelsPerMeter: pixelsPerMeter,
-                            gridWidth: Int(beaconManager.gridWidth),
-                            gridHeight: Int(beaconManager.gridHeight)
-                        )
-                        
-                        // 5. BEACONS
-                        ForEach(beaconManager.beacons) { beacon in
-                            BeaconMapItem(
-                                beacon: beacon,
-                                pixelsPerMeter: pixelsPerMeter
-                            )
-                            .position(
-                                x: CGFloat(beacon.positionX * pixelsPerMeter),
-                                y: CGFloat(beacon.positionY * pixelsPerMeter)
-                            )
-                        }
-                        
-                        // 6. USER POSITION
+                        // Status: User Position
                         if let pos = beaconManager.userPosition {
-                            UserLocationMarker()
-                                .position(
-                                    x: CGFloat(pos.x * pixelsPerMeter),
-                                    y: CGFloat(pos.y * pixelsPerMeter)
-                                )
-                                .animation(.easeInOut(duration: 0.5), value: pos)
+                            Text("📍 Position: \(String(format: "%.1f", pos.x))m / \(String(format: "%.1f", pos.y))m")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                        } else {
+                            Text("📡 Suche Position... (Brauche 3 Signale)")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        
+                        // ANZEIGE: ZIEL-PRODUKT (Grüne Box)
+                        if let target = targetProduct {
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text("Ziel: \(target.name)")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                    Text("Regal-Code: \(target.layoutCode)")
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.9))
+                                }
+                                
+                                Spacer()
+                                
+                                Button(action: {
+                                    withAnimation { targetProduct = nil } // Ziel löschen
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.white)
+                                        .font(.title2)
+                                }
+                            }
+                            .padding()
+                            .background(Color.green)
+                            .cornerRadius(10)
+                            .padding(.horizontal)
+                            .padding(.top, 5)
+                            .transition(.move(edge: .top).combined(with: .opacity))
                         }
                     }
-                    .frame(
-                        width: CGFloat(beaconManager.gridWidth * pixelsPerMeter),
-                        height: CGFloat(beaconManager.gridHeight * pixelsPerMeter)
-                    )
-                    .padding() // Etwas Abstand zum Rand
-                }
-                
-                // --- LISTE ---
-                List(beaconManager.beacons) { beacon in
-                    HStack {
-                        Circle()
-                            .fill(colorForDistance(beacon.distance))
-                            .frame(width: 10, height: 10)
-                        
-                        VStack(alignment: .leading) {
-                            Text(beacon.name).bold()
-                            Text("x:\(Int(beacon.positionX)) y:\(Int(beacon.positionY))")
-                                .font(.caption2).foregroundColor(.gray)
+                    .padding(.top)
+                    .padding(.bottom, 10)
+                    .background(Color.white)
+                    .zIndex(1) // Sicherstellen, dass Header über der Map liegt
+                    
+                    // 2. SCROLLBARE KARTE
+                    ScrollView([.horizontal, .vertical], showsIndicators: true) {
+                        ZStack(alignment: .topLeading) {
+                            
+                            // A) Hintergrund
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.1))
+                                .border(Color.black, width: 2)
+                                .frame(
+                                    width: CGFloat(beaconManager.gridWidth * pixelsPerMeter),
+                                    height: CGFloat(beaconManager.gridHeight * pixelsPerMeter)
+                                )
+                            
+                            // B) Gitterlinien
+                            GridLines(
+                                step: pixelsPerMeter,
+                                width: CGFloat(beaconManager.gridWidth * pixelsPerMeter),
+                                height: CGFloat(beaconManager.gridHeight * pixelsPerMeter),
+                                gridCountX: Int(beaconManager.gridWidth),
+                                gridCountY: Int(beaconManager.gridHeight)
+                            )
+                            
+                            // C) Regale
+                            ForEach(beaconManager.shelves) { element in
+                                ShelfView(element: element, pixelsPerMeter: pixelsPerMeter)
+                            }
+                            
+                            // D) ZIEL-MARKER (Roter Pin auf dem richtigen Regal)
+                            if let target = targetProduct {
+                                // Logik: Finde das Regal, dessen Kategorie zum Produkt passt
+                                // Produkt Code z.B. "310/1/..." -> Kategorie "310"
+                                let shelfCategory = target.layoutCode.components(separatedBy: "/").first ?? ""
+                                
+                                if let targetShelf = beaconManager.shelves.first(where: { $0.color != nil && ($0.label?.contains(shelfCategory) ?? false) || ($0.type == "shelf" && target.layoutCode.starts(with: "310")) }) ?? beaconManager.shelves.first(where: {
+                                    // Fallback: Wir suchen ein Regal, das grob zur ID passt (vereinfacht)
+                                    // In einer echten App würde man 'category' im JSON sauber mappen.
+                                    // Hier ein Hack für die Demo: Wenn Code 310 ist, nimm Obstregal
+                                    if target.layoutCode.starts(with: "310") && $0.label == "Obst & Gemüse" { return true }
+                                    if target.layoutCode.starts(with: "470") && $0.label == "Snacks & Süßwaren" { return true }
+                                    return false
+                                }) {
+                                    TargetMapMarker()
+                                        .position(
+                                            x: CGFloat(targetShelf.x * pixelsPerMeter + ((targetShelf.width ?? 1) * pixelsPerMeter / 2)),
+                                            y: CGFloat(targetShelf.y * pixelsPerMeter + ((targetShelf.height ?? 1) * pixelsPerMeter / 2))
+                                        )
+                                        .zIndex(100) // Ganz oben
+                                }
+                            }
+                            
+                            // E) Achsenbeschriftung
+                            MapAxes(
+                                pixelsPerMeter: pixelsPerMeter,
+                                gridWidth: Int(beaconManager.gridWidth),
+                                gridHeight: Int(beaconManager.gridHeight)
+                            )
+                            
+                            // F) Beacons
+                            ForEach(beaconManager.beacons) { beacon in
+                                BeaconMapItem(
+                                    beacon: beacon,
+                                    pixelsPerMeter: pixelsPerMeter
+                                )
+                                .position(
+                                    x: CGFloat(beacon.positionX * pixelsPerMeter),
+                                    y: CGFloat(beacon.positionY * pixelsPerMeter)
+                                )
+                            }
+                            
+                            // G) User Position (Blauer Punkt)
+                            if let pos = beaconManager.userPosition {
+                                UserLocationMarker()
+                                    .position(
+                                        x: CGFloat(pos.x * pixelsPerMeter),
+                                        y: CGFloat(pos.y * pixelsPerMeter)
+                                    )
+                                    .animation(.easeInOut(duration: 0.5), value: pos)
+                            }
                         }
+                        .frame(
+                            width: CGFloat(beaconManager.gridWidth * pixelsPerMeter),
+                            height: CGFloat(beaconManager.gridHeight * pixelsPerMeter)
+                        )
+                        .padding()
+                    }
+                }
+                .blur(radius: beaconManager.searchResults.isEmpty ? 0 : 3) // Weichzeichnen wenn Suche aktiv
+                
+                // === SUCHE OVERLAY ===
+                VStack(spacing: 0) {
+                    // Suchleiste
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.gray)
                         
-                        Spacer()
+                        TextField("Produkt suchen...", text: $searchText)
+                            .textFieldStyle(PlainTextFieldStyle())
+                            .autocapitalization(.none)
+                            .disableAutocorrection(true)
+                            .onChange(of: searchText) { newValue in
+                                if newValue.count > 2 {
+                                    beaconManager.searchProducts(query: newValue)
+                                } else {
+                                    beaconManager.clearSearch()
+                                }
+                            }
                         
-                        if beacon.distance > 0 {
-                            VStack(alignment: .trailing) {
-                                Text(String(format: "%.2f m", beacon.distance))
-                                    .foregroundColor(.blue)
-                                    .bold()
-                                Text("\(beacon.rssi) dBm")
-                                    .font(.caption)
+                        if !searchText.isEmpty {
+                            Button(action: {
+                                searchText = ""
+                                beaconManager.clearSearch()
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
                                     .foregroundColor(.gray)
                             }
-                        } else {
-                            Text("Suche...")
-                                .foregroundColor(.gray)
-                                .font(.caption)
                         }
                     }
+                    .padding()
+                    .background(Color.white)
+                    .cornerRadius(12)
+                    .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 5)
+                    .padding(.horizontal)
+                    .padding(.top, 10)
+                    
+                    // Ergebnis Liste
+                    if !beaconManager.searchResults.isEmpty {
+                        List(beaconManager.searchResults, id: \.self) { product in // id: \.self fixt den Crash!
+                            Button(action: {
+                                // AKTION BEI KLICK
+                                withAnimation {
+                                    targetProduct = product // Ziel setzen
+                                    searchText = ""         // Text leeren
+                                    beaconManager.clearSearch() // Liste leeren
+                                }
+                                // Tastatur schließen
+                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                            }) {
+                                VStack(alignment: .leading) {
+                                    Text(product.name)
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+                                    HStack {
+                                        Text(String(format: "%.2f €", product.price))
+                                            .font(.subheadline)
+                                            .foregroundColor(.green)
+                                        Spacer()
+                                        Text("Code: \(product.layoutCode)")
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                        .frame(maxHeight: 300)
+                        .cornerRadius(12)
+                        .shadow(radius: 5)
+                        .padding(.horizontal)
+                        .padding(.top, 5)
+                        .listStyle(.plain)
+                        .background(Color.clear)
+                    }
+                    
+                    Spacer()
                 }
-                .listStyle(.plain)
-                .frame(height: 200) // Liste begrenzen, damit Map mehr Platz hat
             }
+            .navigationBarHidden(true)
         }
     }
     
+    // Hilfsfunktion für Farben
     func colorForDistance(_ dist: Double) -> Color {
         if dist <= 0 { return .gray }
         if dist < 2.0 { return .green }
@@ -134,8 +247,11 @@ struct ContentView: View {
     }
 }
 
-// MARK: - SUBVIEWS
+// ==========================================
+// MARK: - SUBVIEWS (Alle Helper Views)
+// ==========================================
 
+// 1. REGAL VIEW
 struct ShelfView: View {
     let element: LayoutElement
     let pixelsPerMeter: Double
@@ -143,6 +259,8 @@ struct ShelfView: View {
     var body: some View {
         let width = CGFloat((element.width ?? 1) * pixelsPerMeter)
         let height = CGFloat((element.height ?? 1) * pixelsPerMeter)
+        
+        // Position berechnen (Mitte vs Oben-Links Anpassung)
         let xPos = CGFloat(element.x * pixelsPerMeter) + (width / 2)
         let yPos = CGFloat(element.y * pixelsPerMeter) + (height / 2)
         
@@ -153,12 +271,14 @@ struct ShelfView: View {
                     .font(.system(size: 8))
                     .foregroundColor(.black.opacity(0.6))
                     .padding(2)
+                    .lineLimit(1)
             )
             .frame(width: width, height: height)
             .position(x: xPos, y: yPos)
     }
 }
 
+// 2. BEACON VIEW
 struct BeaconMapItem: View {
     let beacon: IndooroBeacon
     let pixelsPerMeter: Double
@@ -171,6 +291,7 @@ struct BeaconMapItem: View {
     
     var body: some View {
         ZStack {
+            // Radar-Kreis (nur wenn Signal da ist)
             if beacon.distance > 0 && beacon.distance < 10 {
                 Circle()
                     .stroke(statusColor.opacity(0.3), lineWidth: 1)
@@ -179,6 +300,8 @@ struct BeaconMapItem: View {
                         height: CGFloat(beacon.distance * pixelsPerMeter * 2)
                     )
             }
+            
+            // Icon
             Image(systemName: "antenna.radiowaves.left.and.right")
                 .font(.system(size: 14))
                 .foregroundColor(statusColor)
@@ -192,26 +315,66 @@ struct BeaconMapItem: View {
     }
 }
 
+// 3. USER MARKER (Blauer Punkt)
 struct UserLocationMarker: View {
+    @State private var isPulsing = false
+    
     var body: some View {
         ZStack {
+            // Pulsierender äußerer Kreis
             Circle()
                 .fill(Color.blue.opacity(0.3))
-                .frame(width: 24, height: 24)
+                .frame(width: 40, height: 40)
+                .scaleEffect(isPulsing ? 1.2 : 0.8)
+                .opacity(isPulsing ? 0.0 : 0.5)
+                .onAppear {
+                    withAnimation(Animation.easeInOut(duration: 1.5).repeatForever(autoreverses: false)) {
+                        isPulsing = true
+                    }
+                }
+            
+            // Fester Kern
             Circle()
                 .fill(Color.blue)
-                .frame(width: 12, height: 12)
+                .frame(width: 15, height: 15)
                 .overlay(Circle().stroke(Color.white, lineWidth: 2))
                 .shadow(radius: 2)
+            
             Text("ICH")
                 .font(.system(size: 8, weight: .bold))
                 .foregroundColor(.blue)
-                .offset(y: -14)
+                .offset(y: -16)
         }
     }
 }
 
-// Dynamische Gitterlinien
+// 4. ZIEL MARKER (Roter Pin für Produkte) - NEU
+struct TargetMapMarker: View {
+    @State private var bounce = false
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            Image(systemName: "mappin.circle.fill")
+                .font(.system(size: 30))
+                .foregroundColor(.red)
+                .background(Circle().fill(.white))
+                .shadow(radius: 3)
+            
+            Image(systemName: "arrowtriangle.down.fill")
+                .font(.system(size: 10))
+                .foregroundColor(.red)
+                .offset(y: -5)
+        }
+        .offset(y: bounce ? -10 : 0)
+        .onAppear {
+            withAnimation(Animation.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                bounce = true
+            }
+        }
+    }
+}
+
+// 5. GITTERLINIEN
 struct GridLines: View {
     let step: Double
     let width: CGFloat
@@ -221,24 +384,24 @@ struct GridLines: View {
     
     var body: some View {
         Path { path in
-            // Vertikal
+            // Vertikale Linien
             for i in 0...gridCountX {
                 let pos = CGFloat(Double(i) * step)
                 path.move(to: CGPoint(x: pos, y: 0))
                 path.addLine(to: CGPoint(x: pos, y: height))
             }
-            // Horizontal
+            // Horizontale Linien
             for i in 0...gridCountY {
                 let pos = CGFloat(Double(i) * step)
                 path.move(to: CGPoint(x: 0, y: pos))
                 path.addLine(to: CGPoint(x: width, y: pos))
             }
         }
-        .stroke(Color.gray.opacity(0.2))
+        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
     }
 }
 
-// Dynamische Achsen
+// 6. ACHSENBESCHRIFTUNG
 struct MapAxes: View {
     let pixelsPerMeter: Double
     let gridWidth: Int
@@ -248,25 +411,29 @@ struct MapAxes: View {
         ZStack {
             // X-Achse
             ForEach(0...gridWidth, id: \.self) { meter in
-                let xPos = CGFloat(Double(meter) * pixelsPerMeter)
-                Text("\(meter)")
-                    .font(.system(size: 8))
-                    .foregroundColor(.gray)
-                    .position(x: xPos, y: -10)
+                if meter % 2 == 0 { // Nur jeden 2. Meter anzeigen damit es nicht zu voll wird
+                    let xPos = CGFloat(Double(meter) * pixelsPerMeter)
+                    Text("\(meter)")
+                        .font(.system(size: 8))
+                        .foregroundColor(.gray)
+                        .position(x: xPos, y: -10)
+                }
             }
             // Y-Achse
             ForEach(0...gridHeight, id: \.self) { meter in
-                let yPos = CGFloat(Double(meter) * pixelsPerMeter)
-                Text("\(meter)")
-                    .font(.system(size: 8))
-                    .foregroundColor(.gray)
-                    .position(x: -10, y: yPos)
+                if meter % 2 == 0 {
+                    let yPos = CGFloat(Double(meter) * pixelsPerMeter)
+                    Text("\(meter)")
+                        .font(.system(size: 8))
+                        .foregroundColor(.gray)
+                        .position(x: -10, y: yPos)
+                }
             }
         }
     }
 }
 
-// Hex Color Extension (bleibt gleich)
+// 7. FARB EXTENSION (Hex Support)
 extension Color {
     init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
@@ -274,11 +441,11 @@ extension Color {
         Scanner(string: hex).scanHexInt64(&int)
         let a, r, g, b: UInt64
         switch hex.count {
-        case 3:
+        case 3: // RGB (12-bit)
             (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6:
+        case 6: // RGB (24-bit)
             (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8:
+        case 8: // ARGB (32-bit)
             (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
         default:
             (a, r, g, b) = (1, 1, 1, 0)
@@ -293,6 +460,7 @@ extension Color {
     }
 }
 
+// Preview für Canvas
 #Preview {
     ContentView()
 }

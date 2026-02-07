@@ -1,18 +1,27 @@
 import Foundation
 import CoreBluetooth
 import Combine
-import CoreGraphics // Wichtig für CGPoint
+import CoreGraphics
 
 class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     
+    // --- DATEN ---
     @Published var beacons: [IndooroBeacon] = []
     @Published var shelves: [LayoutElement] = []
     @Published var gridWidth: Double = 15.0
     @Published var gridHeight: Double = 20.0
     
-    // NEU: Die berechnete User-Position (Nil wenn nicht genug Beacons da sind)
+    // Position des Nutzers
     @Published var userPosition: CGPoint? = nil
     
+    // Suche
+    @Published var searchResults: [Product] = []
+    @Published var isSearching: Bool = false
+    
+    // API URL (Für Simulator: localhost)
+    private let apiBase = "http://localhost:8080/api"
+    
+    // Internes
     private var centralManager: CBCentralManager?
     private var rssiBuffer: [String: [Int]] = [:]
     private var kalmanFilters: [String: KalmanFilter] = [:]
@@ -20,13 +29,14 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     private let startTime = Date()
     
     // Konfiguration
-    let pathLossExp = 4.0 // Etwas höher für Innenräume
+    let pathLossExp = 4.0
     private let defaultTxPower = -59.0
     
     override init() {
         super.init()
         loadLayoutFromJSON()
         
+        // Filter initialisieren
         for beacon in beacons {
             kalmanFilters[beacon.name] = KalmanFilter(processNoise: 0.05, measurementNoise: 2.0)
         }
@@ -35,7 +45,47 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
         startUpdateTimer()
     }
     
-    // ... (loadLayoutFromJSON bleibt unverändert) ...
+    // --- SUCH FUNKTION ---
+    func searchProducts(query: String) {
+        guard !query.isEmpty else {
+            self.searchResults = []
+            return
+        }
+        
+        self.isSearching = true
+        let urlString = "\(apiBase)/products/search?q=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")&size=50"
+        
+        guard let url = URL(string: urlString) else { return }
+        print("🔍 Suche nach: \(query)")
+        
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                self?.isSearching = false
+                
+                if let error = error {
+                    print("❌ Fehler bei Suche: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let data = data else { return }
+                
+                do {
+                    // Dekodieren der externen Product Klasse
+                    let products = try JSONDecoder().decode([Product].self, from: data)
+                    self?.searchResults = products
+                    print("✅ \(products.count) Produkte gefunden")
+                } catch {
+                    print("❌ JSON Fehler: \(error)")
+                }
+            }
+        }.resume()
+    }
+    
+    func clearSearch() {
+        self.searchResults = []
+    }
+    
+    // --- LAYOUT LADEN ---
     private func loadLayoutFromJSON() {
         guard let url = Bundle.main.url(forResource: "layout", withExtension: "json") else { return }
         do {
@@ -53,6 +103,7 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
         } catch { print("❌ JSON Fehler: \(error)") }
     }
     
+    // --- POSITIONIERUNG ---
     func startUpdateTimer() {
         updateTimer?.invalidate()
         updateTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
@@ -63,13 +114,11 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     func processBufferAndCalculate() {
         if Date().timeIntervalSince(startTime) < 2.0 { return }
         
-        // 1. Beacons aktualisieren
         for (name, values) in rssiBuffer {
             guard !values.isEmpty else { continue }
             
             let sortedValues = values.sorted()
             let filteredValues: [Int]
-            // Einfacher Median-Filter
             if sortedValues.count >= 3 {
                 filteredValues = Array(sortedValues.dropFirst().dropLast())
             } else {
@@ -83,35 +132,20 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
             updateBeaconUI(name: name, rssi: Int(averageRssi), distance: smoothedDistance)
         }
         rssiBuffer.removeAll()
-        
-        // 2. NEU: Position berechnen (Trilateration)
         calculateLocation()
     }
     
-    // --- NEU: ALGORITHMUS FÜR USER STORY #40 ---
     private func calculateLocation() {
-        // Wir nehmen nur Beacons, die ein Signal haben und nicht unendlich weit weg sind
         let activeBeacons = beacons.filter { $0.distance > 0.1 && $0.distance < 20.0 }
+        guard activeBeacons.count >= 3 else { return }
         
-        // Wir brauchen mindestens 3 Beacons für eine stabile Trilateration
-        guard activeBeacons.count >= 3 else {
-            // Optional: Fallback auf 2 Beacons (Mittelpunkt) oder 1 (direkt drauf) möglich
-            return
-        }
-        
-        // Sortieren: Die 3 nächsten Beacons sind am wichtigsten
         let top3 = activeBeacons.sorted { $0.distance < $1.distance }.prefix(3)
-        
         var totalWeight: Double = 0
         var sumX: Double = 0
         var sumY: Double = 0
         
         for beacon in top3 {
-            // Der Trick: Das Gewicht ist 1 / (Distanz ^ 2).
-            // Bedeutet: Ein Beacon der 1m weg ist, zählt 4x so viel wie einer der 2m weg ist.
-            // Das "zieht" den Punkt magisch zur richtigen Stelle.
             let weight = 1.0 / pow(beacon.distance, 2)
-            
             sumX += beacon.positionX * weight
             sumY += beacon.positionY * weight
             totalWeight += weight
@@ -121,7 +155,6 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
             let userX = sumX / totalWeight
             let userY = sumY / totalWeight
             
-            // UI Update
             DispatchQueue.main.async {
                 self.userPosition = CGPoint(x: userX, y: userY)
             }
@@ -142,6 +175,7 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
         return pow(10.0, exponent)
     }
     
+    // --- BLUETOOTH DELEGATE ---
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
         let name = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? peripheral.name ?? "Unknown"
         if name.contains("Indooro") {
