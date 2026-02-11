@@ -6,6 +6,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.opensearch._types.FieldValue;
+import org.opensearch.client.opensearch._types.query_dsl.Operator;
 import org.opensearch.client.opensearch._types.query_dsl.Query;
 import org.opensearch.client.opensearch.core.*;
 import org.opensearch.client.opensearch.core.search.Hit;
@@ -30,27 +32,54 @@ public class OpenSearchService {
     /**
      * Sucht Produkte anhand eines Suchbegriffs
      */
-    public List<Product> searchProducts(String query, Integer size) throws IOException {
-        final Integer finalSize = (size == null) ? 10 : size;
 
-        SearchRequest searchRequest = SearchRequest.of(s -> s
-                .index(indexName)
-                .query(q -> q
-                        .multiMatch(m -> m
-                                .query(query)
-                                .fields("name^2", "layoutCode")
-                                .fuzziness("AUTO")
-                        )
-                )
-                .size(finalSize)
-        );
+public List<Product> searchProducts(String query, Integer size) throws IOException {
+    final Integer finalSize = (size == null) ? 10 : size;
+    final String q = query.trim();
 
-        SearchResponse<Product> response = client.search(searchRequest, Product.class);
+    SearchRequest searchRequest = SearchRequest.of(s -> s
+            .index(indexName)
+            .size(finalSize)
+            .query(qry -> qry.bool(b -> b
+                    // 1) Exakter Name (z.B. "Nutella") => maximaler Boost
+                    .should(sh -> sh.term(t -> t
+                            .field("name.keyword")
+                            .value(v -> v.stringValue(q))
+                            .boost(10f)
+                    ))
+                    // 2) Phrase Match (z.B. "Milch 1L") => sehr wichtig
+                    .should(sh -> sh.matchPhrase(mp -> mp
+                            .field("name")
+                            .query(q)
+                            .boost(4f)
+                    ))
+                    // 3) Fuzzy Match für Tippfehler ("Nutela", "Milsch")
+                    .should(sh -> sh.match(m -> m
+                            .field("name")
+                            .query(FieldValue.of(q))
+                            .fuzziness("AUTO")
+                            .prefixLength(1)      // lässt 1. Buchstaben stabil, hilft gegen Chaos
+                            .maxExpansions(50)    // mehr Kandidaten bei Tippfehlern
+                            .operator(Operator.And)
+                            .boost(2f)
+                    ))
+                    // 4) layoutCode exakt (falls jemand danach sucht)
+                    .should(sh -> sh.term(t -> t
+                            .field("layoutCode")
+                            .value(v -> v.stringValue(q))
+                            .boost(6f)
+                    ))
+                    .minimumShouldMatch("1")
+            ))
+    );
 
-        return response.hits().hits().stream()
-                .map(Hit::source)
-                .collect(Collectors.toList());
-    }
+    SearchResponse<Product> response = client.search(searchRequest, Product.class);
+
+    return response.hits().hits().stream()
+            .map(Hit::source)
+            .filter(p -> p != null)
+            .collect(Collectors.toList());
+}
 
     /**
      * Holt ein Produkt anhand der ID
@@ -138,21 +167,24 @@ public class OpenSearchService {
      * Erstellt den Index mit Mapping
      */
     public void createIndex() throws IOException {
-        try {
-            client.indices().create(c -> c
-                    .index(indexName)
-                    .mappings(m -> m
-                            .properties("id", p -> p.integer(i -> i))
-                            .properties("name", p -> p.text(t -> t.analyzer("standard")))
-                            .properties("price", p -> p.double_(d -> d))
-                            .properties("layoutCode", p -> p.keyword(k -> k))
-                    )
-            );
-            LOG.info("Index " + indexName + " created successfully");
-        } catch (Exception e) {
-            LOG.warn("Index might already exist: " + e.getMessage());
-        }
+    try {
+        client.indices().create(c -> c
+                .index(indexName)
+                .mappings(m -> m
+                        .properties("id", p -> p.integer(i -> i))
+                        .properties("name", p -> p.text(t -> t
+                                .analyzer("standard")
+                                .fields("keyword", f -> f.keyword(k -> k.ignoreAbove(256)))
+                        ))
+                        .properties("price", p -> p.double_(d -> d))
+                        .properties("layoutCode", p -> p.keyword(k -> k))
+                )
+        );
+        LOG.info("Index " + indexName + " created successfully");
+    } catch (Exception e) {
+        LOG.warn("Index might already exist: " + e.getMessage());
     }
+}
 
     /**
      * Löscht den Index
