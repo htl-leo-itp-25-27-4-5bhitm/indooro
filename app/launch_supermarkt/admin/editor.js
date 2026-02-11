@@ -474,6 +474,8 @@ function renderBeaconElement(el) {
 /* ----- Render Regular Element ----- */
 function renderRegularElement(el) {
   const cat = el.category ? PRODUCT_CATEGORIES.find(c => c.id === el.category) : null;
+  // Meter anzeigen falls vorhanden
+  const meterText = el.meter ? `Meter ${el.meter}` : '';
   const elementType = ELEMENT_TYPES.find(t => t.id === el.type) || ELEMENT_TYPES[0];
   
   // Check for collisions
@@ -519,9 +521,17 @@ function renderRegularElement(el) {
     inner.innerHTML = `<div class="text-lg">${icon}</div>`;
   } else {
     inner.innerHTML = `
-      <div class="font-bold text-[11px] mb-0.5 px-1.5 py-0.5 bg-white bg-opacity-70 rounded">${elementType.name}</div>
+      <div class="font-bold text-[11px] mb-0.5 px-1.5 py-0.5 bg-white bg-opacity-70 rounded">
+        ${elementType.name}
+      </div>
+
       <div class="text-lg">${icon}</div>
+
       <div class="text-[10px] leading-tight">${el.label}</div>
+
+      <div class="text-[9px] text-gray-700 font-semibold">
+        ${meterText}
+      </div>
     `;
   }
   div.appendChild(inner);
@@ -655,9 +665,18 @@ window.addEventListener('mouseup', (e) => {
     renderCanvas();
   }
 
+  const wasDragging = isDragging;
+
   isDrawing = false;
   drawStart = null;
   isDragging = false;
+
+  // Nur wenn wirklich gezogen wurde:
+  if (wasDragging) {
+    recalcMeters();
+    renderCanvas();
+    renderProperties();
+  }
 });
 
 /* clicking outside canvas should stop dragging/drawing */
@@ -1041,7 +1060,25 @@ function applyTemplate(t) {
 
 /* ----- Export / Import ----- */
 function exportLayout() {
-  const data = { shopName: shopNameInput.value || 'Mein_Supermarkt', gridSize, elements, exportDate: new Date().toISOString() };
+  recalcMeters(); // Meter aktualisieren
+
+  const exportElements = elements.map(el => {
+    if (el.category !== null) {
+      return {
+        ...el,
+        category: `${el.category}/${el.meter}`
+      };
+    }
+    return el;
+  });
+
+  const data = {
+    shopName: shopNameInput.value || 'Mein_Supermarkt',
+    gridSize,
+    elements: exportElements,
+    exportDate: new Date().toISOString()
+  };
+
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1063,6 +1100,18 @@ function importLayout(e) {
       gridWidthInput.value = gridSize.width;
       gridHeightInput.value = gridSize.height;
       elements = data.elements || [];
+
+      // category zurück splitten: "310/2" → category="310", meter=2
+      elements.forEach(el => {
+        if (el.category && el.category.includes("/")) {
+          const [cat, meter] = el.category.split("/");
+          el.category = cat;
+          el.meter = parseInt(meter);
+        }
+      });
+
+      recalcMeters();
+
       selectedElement = null;
       renderProperties();
       renderCanvas();
@@ -1078,6 +1127,42 @@ function importLayout(e) {
 function findElementById(id) {
   return elements.find(e => e.id === id);
 }
+
+function recalcMeters() {
+  // 1. Alle Elemente mit Kategorie holen (Regale, Kühlung, etc.)
+  const categorized = elements.filter(el => el.category !== null);
+
+  // 2. Gruppieren nach Kategorie
+  const groups = {};
+  categorized.forEach(el => {
+    if (!groups[el.category]) {
+      groups[el.category] = [];
+    }
+    groups[el.category].push(el);
+  });
+
+  // 3. Für jede Kategorie: nach X sortieren und Meter vergeben
+  Object.keys(groups).forEach(category => {
+    const group = groups[category];
+
+    // Sortierung: linker Rand (x kleinster Wert = Meter 1)
+    group.sort((a, b) => a.x - b.x);
+
+    // Meter setzen
+    group.forEach((el, index) => {
+      el.meter = index + 1;
+    });
+  });
+
+  // 4. Elemente-Array updaten
+  elements = elements.map(el => {
+    if (el.category === null) return el;
+
+    // Meter aus Gruppe übernehmen
+    return el;
+  });
+}
+
 
 /* ----- Kickoff ----- */
 initUI();
