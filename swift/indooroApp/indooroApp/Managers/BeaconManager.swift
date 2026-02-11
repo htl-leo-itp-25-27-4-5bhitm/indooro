@@ -11,8 +11,10 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     @Published var gridWidth: Double = 15.0
     @Published var gridHeight: Double = 20.0
     
-    // Position des Nutzers
+    // Position & Navigation
     @Published var userPosition: CGPoint? = nil
+    @Published var navigationPath: [CGPoint] = []   // Der berechnete Weg (Blaue Linie)
+    @Published var targetPosition: CGPoint? = nil   // Wo wollen wir hin? (Roter Pin)
     
     // Suche
     @Published var searchResults: [Product] = []
@@ -45,7 +47,86 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
         startUpdateTimer()
     }
     
-    // --- SUCH FUNKTION ---
+    // --- NAVIGATION LOGIK (NEU) ---
+    
+    // 1. Ziel setzen basierend auf Produkt
+    func setTargetProduct(_ product: Product?) {
+        guard let product = product else {
+            // Ziel löschen
+            DispatchQueue.main.async {
+                self.targetPosition = nil
+                self.navigationPath = []
+            }
+            return
+        }
+        
+        // LayoutCode parsen (z.B. "310/1/1/1" -> Kategorie "310")
+        let shelfCategory = product.layoutCode.components(separatedBy: "/").first ?? ""
+        
+        // Passendes Regal finden
+        // HINWEIS: Da LayoutElement evtl. keine 'category' Property hat, nutzen wir Labels als Fallback
+        if let shelf = shelves.first(where: { element in
+            // Mapping von ID zu Label (basierend auf deiner layout.json)
+            if shelfCategory == "310" && element.label == "Obst & Gemüse" { return true }
+            if shelfCategory == "420" && element.label == "Konserven & Saucen" { return true }
+            if shelfCategory == "430" && element.label == "Teigwaren & Nudeln" { return true }
+            if shelfCategory == "440" && element.label == "Müsli & Frühstück" { return true }
+            if shelfCategory == "450" && element.label == "Öle & Essig" { return true }
+            if shelfCategory == "470" && element.label == "Snacks & Süßwaren" { return true }
+            if shelfCategory == "510" && (element.label?.contains("Getränke") ?? false) { return true }
+            if shelfCategory == "520" && element.label == "Molkereiprodukte" { return true }
+            if shelfCategory == "525" && element.label?.contains("Käse") == true { return true }
+            if shelfCategory == "530" && element.label == "Tiefkühlprodukte" { return true }
+            if shelfCategory == "610" && element.label == "Haushalt & Reinigung" { return true }
+            if shelfCategory == "640" && element.label?.contains("Körperpflege") == true { return true }
+            
+            return false
+        }) {
+            // Ziel ist die Mitte des Regals
+            let tx = shelf.x + (shelf.width ?? 1) / 2
+            let ty = shelf.y + (shelf.height ?? 1) / 2
+            
+            DispatchQueue.main.async {
+                self.targetPosition = CGPoint(x: tx, y: ty)
+                self.updateNavigationPath() // Pfad sofort berechnen
+            }
+        } else {
+            print("⚠️ Kein Regal gefunden für Kategorie \(shelfCategory)")
+        }
+    }
+    
+    // 2. Pfad neu berechnen
+    private func updateNavigationPath() {
+            // Prüfen ob Start und Ziel da sind
+            guard let start = userPosition else {
+                print("⚠️ Pfad-Update abgebrochen: Keine User-Position (Bitte auf Karte tippen!)")
+                return
+            }
+            guard let end = targetPosition else {
+                print("⚠️ Pfad-Update abgebrochen: Kein Ziel")
+                return
+            }
+            
+            print("🔄 Berechne Weg von \(start) nach \(end)...")
+            
+            DispatchQueue.global(qos: .userInitiated).async {
+                let path = Pathfinder.findPath(
+                    start: start,
+                    end: end,
+                    gridWidth: Int(self.gridWidth),
+                    gridHeight: Int(self.gridHeight),
+                    obstacles: self.shelves
+                )
+                
+                DispatchQueue.main.async {
+                    self.navigationPath = path
+                    print("🏁 Pfad aktualisiert: \(path.count) Schritte")
+                }
+            }
+        }
+    
+    // --- SUCHE ---
+    
     func searchProducts(query: String) {
         guard !query.isEmpty else {
             self.searchResults = []
@@ -70,7 +151,6 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
                 guard let data = data else { return }
                 
                 do {
-                    // Dekodieren der externen Product Klasse
                     let products = try JSONDecoder().decode([Product].self, from: data)
                     self?.searchResults = products
                     print("✅ \(products.count) Produkte gefunden")
@@ -85,25 +165,8 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
         self.searchResults = []
     }
     
-    // --- LAYOUT LADEN ---
-    private func loadLayoutFromJSON() {
-        guard let url = Bundle.main.url(forResource: "layout", withExtension: "json") else { return }
-        do {
-            let data = try Data(contentsOf: url)
-            let layout = try JSONDecoder().decode(LayoutData.self, from: data)
-            self.gridWidth = layout.gridSize.width
-            self.gridHeight = layout.gridSize.height
-            self.shelves = layout.elements.filter { $0.type != "beacon" }
-            self.beacons = layout.elements
-                .filter { $0.type == "beacon" }
-                .compactMap { element in
-                    guard let name = element.beaconId else { return nil }
-                    return IndooroBeacon(id: String(element.id), name: name, positionX: element.x, positionY: element.y)
-                }
-        } catch { print("❌ JSON Fehler: \(error)") }
-    }
+    // --- POSITIONIERUNG & BLE ---
     
-    // --- POSITIONIERUNG ---
     func startUpdateTimer() {
         updateTimer?.invalidate()
         updateTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
@@ -114,6 +177,7 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     func processBufferAndCalculate() {
         if Date().timeIntervalSince(startTime) < 2.0 { return }
         
+        // 1. RSSI Werte glätten
         for (name, values) in rssiBuffer {
             guard !values.isEmpty else { continue }
             
@@ -132,6 +196,8 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
             updateBeaconUI(name: name, rssi: Int(averageRssi), distance: smoothedDistance)
         }
         rssiBuffer.removeAll()
+        
+        // 2. Position berechnen
         calculateLocation()
     }
     
@@ -157,8 +223,32 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
             
             DispatchQueue.main.async {
                 self.userPosition = CGPoint(x: userX, y: userY)
+                
+                // WICHTIG: Wenn wir ein Ziel haben, Pfad aktualisieren!
+                if self.targetPosition != nil {
+                    self.updateNavigationPath()
+                }
             }
         }
+    }
+    
+    // --- HELPER ---
+    
+    private func loadLayoutFromJSON() {
+        guard let url = Bundle.main.url(forResource: "layout", withExtension: "json") else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            let layout = try JSONDecoder().decode(LayoutData.self, from: data)
+            self.gridWidth = layout.gridSize.width
+            self.gridHeight = layout.gridSize.height
+            self.shelves = layout.elements.filter { $0.type != "beacon" }
+            self.beacons = layout.elements
+                .filter { $0.type == "beacon" }
+                .compactMap { element in
+                    guard let name = element.beaconId else { return nil }
+                    return IndooroBeacon(id: String(element.id), name: name, positionX: element.x, positionY: element.y)
+                }
+        } catch { print("❌ JSON Fehler beim Layout: \(error)") }
     }
     
     private func updateBeaconUI(name: String, rssi: Int, distance: Double) {
@@ -175,7 +265,8 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
         return pow(10.0, exponent)
     }
     
-    // --- BLUETOOTH DELEGATE ---
+    // --- DELEGATE ---
+    
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
         let name = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? peripheral.name ?? "Unknown"
         if name.contains("Indooro") {

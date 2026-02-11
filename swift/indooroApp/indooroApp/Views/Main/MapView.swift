@@ -9,7 +9,7 @@ struct MapView: View {
         ScrollView([.horizontal, .vertical], showsIndicators: true) {
             ZStack(alignment: .topLeading) {
                 
-                // A) Hintergrund
+                // 1. Hintergrund
                 Rectangle()
                     .fill(Color.gray.opacity(0.1))
                     .border(Color.black, width: 2)
@@ -18,7 +18,7 @@ struct MapView: View {
                         height: CGFloat(beaconManager.gridHeight * pixelsPerMeter)
                     )
                 
-                // B) Gitterlinien
+                // 2. Gitterlinien
                 GridLines(
                     step: pixelsPerMeter,
                     width: CGFloat(beaconManager.gridWidth * pixelsPerMeter),
@@ -27,54 +27,57 @@ struct MapView: View {
                     gridCountY: Int(beaconManager.gridHeight)
                 )
                 
-                // C) Regale
+                // 3. PFAD LINIE (Zuerst zeichnen, damit sie unter den Regalen liegt)
+                if !beaconManager.navigationPath.isEmpty {
+                    Path { path in
+                        if let first = beaconManager.navigationPath.first {
+                            path.move(to: CGPoint(
+                                x: first.x * pixelsPerMeter,
+                                y: first.y * pixelsPerMeter
+                            ))
+                        }
+                        for point in beaconManager.navigationPath.dropFirst() {
+                            path.addLine(to: CGPoint(
+                                x: point.x * pixelsPerMeter,
+                                y: point.y * pixelsPerMeter
+                            ))
+                        }
+                    }
+                    .stroke(Color.blue, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                }
+                
+                // 4. Regale
                 ForEach(beaconManager.shelves) { element in
                     ShelfView(element: element, pixelsPerMeter: pixelsPerMeter)
                 }
                 
-                // D) ZIEL-MARKER (Roter Pin auf dem richtigen Regal)
-                if let target = targetProduct {
-                    // Logik: Finde das Regal, dessen Kategorie zum Produkt passt
-                    // Produkt Code z.B. "310/1/..." -> Kategorie "310"
-                    let shelfCategory = target.layoutCode.components(separatedBy: "/").first ?? ""
-                    
-                    if let targetShelf = beaconManager.shelves.first(where: { $0.color != nil && ($0.label?.contains(shelfCategory) ?? false) || ($0.type == "shelf" && target.layoutCode.starts(with: "310")) }) ?? beaconManager.shelves.first(where: {
-                        // Fallback: Wir suchen ein Regal, das grob zur ID passt (vereinfacht)
-                        // In einer echten App würde man 'category' im JSON sauber mappen.
-                        // Hier ein Hack für die Demo: Wenn Code 310 ist, nimm Obstregal
-                        if target.layoutCode.starts(with: "310") && $0.label == "Obst & Gemüse" { return true }
-                        if target.layoutCode.starts(with: "470") && $0.label == "Snacks & Süßwaren" { return true }
-                        return false
-                    }) {
-                        TargetMapMarker()
-                            .position(
-                                x: CGFloat(targetShelf.x * pixelsPerMeter + ((targetShelf.width ?? 1) * pixelsPerMeter / 2)),
-                                y: CGFloat(targetShelf.y * pixelsPerMeter + ((targetShelf.height ?? 1) * pixelsPerMeter / 2))
-                            )
-                            .zIndex(100) // Ganz oben
-                    }
+                // 5. Ziel-Marker (Roter Pin)
+                if let targetPos = beaconManager.targetPosition {
+                    TargetMapMarker()
+                        .position(
+                            x: CGFloat(targetPos.x * pixelsPerMeter),
+                            y: CGFloat(targetPos.y * pixelsPerMeter)
+                        )
+                        .zIndex(100)
                 }
                 
-                // E) Achsenbeschriftung
+                // 6. Achsen
                 MapAxes(
                     pixelsPerMeter: pixelsPerMeter,
                     gridWidth: Int(beaconManager.gridWidth),
                     gridHeight: Int(beaconManager.gridHeight)
                 )
                 
-                // F) Beacons
+                // 7. Beacons
                 ForEach(beaconManager.beacons) { beacon in
-                    BeaconMapItem(
-                        beacon: beacon,
-                        pixelsPerMeter: pixelsPerMeter
-                    )
-                    .position(
-                        x: CGFloat(beacon.positionX * pixelsPerMeter),
-                        y: CGFloat(beacon.positionY * pixelsPerMeter)
-                    )
+                    BeaconMapItem(beacon: beacon, pixelsPerMeter: pixelsPerMeter)
+                        .position(
+                            x: CGFloat(beacon.positionX * pixelsPerMeter),
+                            y: CGFloat(beacon.positionY * pixelsPerMeter)
+                        )
                 }
                 
-                // G) User Position (Blauer Punkt)
+                // 8. User Position (Blauer Punkt)
                 if let pos = beaconManager.userPosition {
                     UserLocationMarker()
                         .position(
@@ -83,6 +86,34 @@ struct MapView: View {
                         )
                         .animation(.easeInOut(duration: 0.5), value: pos)
                 }
+                
+                // --- DEBUG FEATURE: TIPPEN ZUM BEWEGEN ---
+                // Ein unsichtbarer Layer über allem, der Klicks abfängt
+                Color.white.opacity(0.001) // Fast transparent, aber klickbar
+                    .frame(
+                        width: CGFloat(beaconManager.gridWidth * pixelsPerMeter),
+                        height: CGFloat(beaconManager.gridHeight * pixelsPerMeter)
+                    )
+                    .onTapGesture { location in
+                        // location ist in Pixeln -> Umrechnen in Meter
+                        let xMeter = Double(location.x) / pixelsPerMeter
+                        let yMeter = Double(location.y) / pixelsPerMeter
+                        
+                        print("📍 Debug: Setze Position auf x:\(xMeter) y:\(yMeter)")
+                        
+                        // User Position manuell setzen
+                        beaconManager.userPosition = CGPoint(x: xMeter, y: yMeter)
+                        
+                        // Wenn ein Ziel aktiv ist, Route sofort neu berechnen!
+                        // Dazu rufen wir den Pathfinder indirekt über den Manager auf
+                        if beaconManager.targetPosition != nil {
+                            // Kleiner Hack: Wir simulieren, dass ein Ziel gesetzt wurde,
+                            // damit der Manager den Pfad updated.
+                            // Sauberer wäre eine public updatePath() methode im Manager,
+                            // aber das reicht für den Test.
+                            beaconManager.setTargetProduct(targetProduct)
+                        }
+                    }
             }
             .frame(
                 width: CGFloat(beaconManager.gridWidth * pixelsPerMeter),

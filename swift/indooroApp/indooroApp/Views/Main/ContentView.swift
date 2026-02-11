@@ -14,39 +14,47 @@ struct ContentView: View {
         NavigationView {
             ZStack(alignment: .top) {
                 
-                // === HAUPT-LAYOUT (Header & Karte) ===
+                // === HAUPT-LAYOUT ===
                 VStack(spacing: 0) {
                     
-                    // 1. KOPFZEILE (Nutzt HeaderView.swift)
+                    // 1. Header
                     HeaderView(
                         userPosition: beaconManager.userPosition,
                         targetProduct: targetProduct,
-                        onClearTarget: { withAnimation { targetProduct = nil } }
+                        onClearTarget: {
+                            withAnimation {
+                                targetProduct = nil
+                                beaconManager.setTargetProduct(nil) // Pfad löschen
+                            }
+                        }
                     )
-                    .zIndex(1) // Header muss über der Map liegen
+                    .zIndex(1)
                     
-                    // 2. SCROLLBARE KARTE (Nutzt MapView.swift)
+                    // 2. Map
                     MapView(
                         beaconManager: beaconManager,
                         pixelsPerMeter: pixelsPerMeter,
                         targetProduct: targetProduct
                     )
                 }
-                .blur(radius: beaconManager.searchResults.isEmpty ? 0 : 3) // Hintergrund weichzeichnen bei Suche
+                .blur(radius: beaconManager.searchResults.isEmpty ? 0 : 3)
                 
-                // === SUCHE OVERLAY (Nutzt SearchOverlayView.swift) ===
+                // === SUCHE ===
                 VStack {
-                    // Hier übergeben wir den ganzen Manager und Bindings ($)
                     SearchOverlayView(
                         beaconManager: beaconManager,
                         searchText: $searchText,
                         targetProduct: $targetProduct
                     )
                     
-                    Spacer() // Drückt die Suche nach oben
+                    Spacer()
                 }
             }
             .navigationBarHidden(true)
+            // WICHTIG: Reagieren auf Änderungen des Ziel-Produkts
+            .onChange(of: targetProduct) { newProduct in
+                beaconManager.setTargetProduct(newProduct)
+            }
         }
     }
 }
