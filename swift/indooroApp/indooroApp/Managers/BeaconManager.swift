@@ -56,7 +56,7 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
         let urlString = "\(apiBase)/products/search?q=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")&size=50"
         
         guard let url = URL(string: urlString) else { return }
-        print("🔍 Suche nach: \(query)")
+        print("🔎 Suche nach: \(query)")
         
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             DispatchQueue.main.async {

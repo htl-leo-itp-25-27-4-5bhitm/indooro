@@ -5,7 +5,6 @@
 //  Created by Erik Bergmair on 07.02.26.
 //
 
-
 import Foundation
 
 struct Product: Codable, Identifiable, Hashable {

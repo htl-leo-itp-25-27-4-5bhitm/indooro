@@ -11,7 +11,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		6795B3DC2F37D7AC00B890CD /* Exceptions for "indooroApp" folder in "indooroApp" target */ = {
+		67A12B222F3C82AA00F4959F /* Exceptions for "indooroApp" folder in "indooroApp" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -24,7 +24,7 @@
 		6776726D2F0E50DB00242147 /* indooroApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				6795B3DC2F37D7AC00B890CD /* Exceptions for "indooroApp" folder in "indooroApp" target */,
+				67A12B222F3C82AA00F4959F /* Exceptions for "indooroApp" folder in "indooroApp" target */,
 			);
 			path = indooroApp;
 			sourceTree = "<group>";
