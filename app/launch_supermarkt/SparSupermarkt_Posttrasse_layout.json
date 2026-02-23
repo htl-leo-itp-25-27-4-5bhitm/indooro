@@ -86,26 +86,26 @@
     {
       "id": 1770804675427,
       "type": "shelf",
-      "category": "525/2",
+      "category": "525/1",
       "x": 35,
       "y": 40,
       "width": 3,
       "height": 16,
       "label": "Käse & Wurst",
       "color": "#FFE082",
-      "meter": 2
+      "meter": 1
     },
     {
       "id": 1770804681976,
       "type": "shelf",
-      "category": "525/1",
+      "category": "525/2",
       "x": 29,
       "y": 56,
       "width": 9,
       "height": 3,
       "label": "Käse & Wurst",
       "color": "#FFE082",
-      "meter": 1
+      "meter": 2
     },
     {
       "id": 1770804747006,
@@ -206,21 +206,9 @@
     {
       "id": 1770805395280,
       "type": "shelf",
-      "category": "520/2",
-      "x": 28,
-      "y": 16,
-      "width": 3,
-      "height": 5,
-      "label": "Molkereiprodukte",
-      "color": "#BBDEFB",
-      "meter": 2
-    },
-    {
-      "id": 1770805401107,
-      "type": "shelf",
       "category": "520/3",
       "x": 28,
-      "y": 21,
+      "y": 16,
       "width": 3,
       "height": 5,
       "label": "Molkereiprodukte",
@@ -228,28 +216,40 @@
       "meter": 3
     },
     {
+      "id": 1770805401107,
+      "type": "shelf",
+      "category": "520/5",
+      "x": 28,
+      "y": 21,
+      "width": 3,
+      "height": 5,
+      "label": "Molkereiprodukte",
+      "color": "#BBDEFB",
+      "meter": 5
+    },
+    {
       "id": 1770805428499,
       "type": "shelf",
-      "category": "520/4",
+      "category": "520/2",
       "x": 37,
       "y": 11,
       "width": 3,
       "height": 5,
       "label": "Molkereiprodukte",
       "color": "#BBDEFB",
-      "meter": 4
+      "meter": 2
     },
     {
       "id": 1770805435602,
       "type": "shelf",
-      "category": "520/5",
+      "category": "520/4",
       "x": 37,
       "y": 16,
       "width": 3,
       "height": 5,
       "label": "Molkereiprodukte",
       "color": "#BBDEFB",
-      "meter": 5
+      "meter": 4
     },
     {
       "id": 1770805461108,
@@ -312,13 +312,14 @@
     {
       "id": 1770805613797,
       "type": "shelf",
-      "category": null,
+      "category": "425/1",
       "x": 20,
       "y": 11,
       "width": 3,
       "height": 5,
-      "label": "Leer",
-      "color": "#E5E7EB"
+      "label": "Gewürze",
+      "color": "#FF5722",
+      "meter": 1
     },
     {
       "id": 1770805615827,
@@ -419,24 +420,26 @@
     {
       "id": 1770805663693,
       "type": "shelf",
-      "category": null,
+      "category": "350/1",
       "x": 9,
       "y": 11,
       "width": 3,
       "height": 5,
-      "label": "Leer",
-      "color": "#E5E7EB"
+      "label": "Tierfutter",
+      "color": "#8D6E63",
+      "meter": 1
     },
     {
       "id": 1770805666098,
       "type": "shelf",
-      "category": null,
+      "category": "350/2",
       "x": 9,
       "y": 16,
       "width": 3,
       "height": 5,
-      "label": "Leer",
-      "color": "#E5E7EB"
+      "label": "Tierfutter",
+      "color": "#8D6E63",
+      "meter": 2
     },
     {
       "id": 1770805671595,
@@ -485,17 +488,6 @@
       "label": "Alkoholfreie Getränke",
       "color": "#2196F3",
       "meter": 3
-    },
-    {
-      "id": 1770805692426,
-      "type": "shelf",
-      "category": null,
-      "x": 0,
-      "y": 11,
-      "width": 2,
-      "height": 15,
-      "label": "Leer",
-      "color": "#E5E7EB"
     },
     {
       "id": 1770805699867,
@@ -572,35 +564,38 @@
     {
       "id": 1770805972717,
       "type": "shelf",
-      "category": null,
+      "category": "490/1",
       "x": 25,
       "y": 28,
       "width": 3,
       "height": 5,
-      "label": "Leer",
-      "color": "#E5E7EB"
+      "label": "Kaffee und Tee",
+      "color": "#6D4C41",
+      "meter": 1
     },
     {
       "id": 1770805975421,
       "type": "shelf",
-      "category": null,
+      "category": "490/2",
       "x": 25,
       "y": 33,
       "width": 3,
       "height": 5,
-      "label": "Leer",
-      "color": "#E5E7EB"
+      "label": "Kaffee und Tee",
+      "color": "#6D4C41",
+      "meter": 2
     },
     {
       "id": 1770806022271,
       "type": "shelf",
-      "category": null,
+      "category": "640/4",
       "x": 17,
       "y": 28,
       "width": 3,
       "height": 5,
-      "label": "Leer",
-      "color": "#E5E7EB"
+      "label": "Körperpflege & Hygiene",
+      "color": "#00BCD4",
+      "meter": 4
     },
     {
       "id": 1770806029583,
@@ -639,16 +634,52 @@
       "meter": 1
     },
     {
-      "id": 1770806096185,
+      "id": 1771840003141,
+      "type": "shelf",
+      "category": "515/1",
+      "x": 0,
+      "y": 11,
+      "width": 2,
+      "height": 5,
+      "label": "Alkoholische Getränke",
+      "color": "#9C27B0",
+      "meter": 1
+    },
+    {
+      "id": 1771840004462,
+      "type": "shelf",
+      "category": "515/2",
+      "x": 0,
+      "y": 16,
+      "width": 2,
+      "height": 5,
+      "label": "Alkoholische Getränke",
+      "color": "#9C27B0",
+      "meter": 2
+    },
+    {
+      "id": 1771840010109,
+      "type": "shelf",
+      "category": "515/3",
+      "x": 0,
+      "y": 21,
+      "width": 2,
+      "height": 5,
+      "label": "Alkoholische Getränke",
+      "color": "#9C27B0",
+      "meter": 3
+    },
+    {
+      "id": 1771840085614,
       "type": "entrance",
       "category": null,
       "x": 0,
       "y": 53,
-      "width": 11,
+      "width": 12,
       "height": 7,
       "label": "Leer",
       "color": "#E5E7EB"
     }
   ],
-  "exportDate": "2026-02-11T10:35:51.599Z"
+  "exportDate": "2026-02-23T09:48:12.708Z"
 }
