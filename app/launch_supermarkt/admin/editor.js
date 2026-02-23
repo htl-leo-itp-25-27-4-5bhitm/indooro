@@ -1129,11 +1129,11 @@ function findElementById(id) {
 }
 
 function recalcMeters() {
-  // 1. Alle Elemente mit Kategorie holen (Regale, Kühlung, etc.)
   const categorized = elements.filter(el => el.category !== null);
 
-  // 2. Gruppieren nach Kategorie
   const groups = {};
+
+  // 1. Nach Kategorie gruppieren
   categorized.forEach(el => {
     if (!groups[el.category]) {
       groups[el.category] = [];
@@ -1141,28 +1141,41 @@ function recalcMeters() {
     groups[el.category].push(el);
   });
 
-  // 3. Für jede Kategorie: nach X sortieren und Meter vergeben
   Object.keys(groups).forEach(category => {
-    const group = groups[category];
+    const categoryElements = groups[category];
 
-    // Sortierung: linker Rand (x kleinster Wert = Meter 1)
-    group.sort((a, b) => a.x - b.x);
+    // 2. Nach Y (Reihe) gruppieren
+    const rows = {};
 
-    // Meter setzen
-    group.forEach((el, index) => {
-      el.meter = index + 1;
+    categoryElements.forEach(el => {
+      const rowKey = el.y; // gleiche Y = gleiche Reihe
+      if (!rows[rowKey]) {
+        rows[rowKey] = [];
+      }
+      rows[rowKey].push(el);
+    });
+
+    // 3. Reihen sortieren (oben → unten)
+    const sortedRowKeys = Object.keys(rows)
+      .map(Number)
+      .sort((a, b) => a - b);
+
+    let globalMeter = 1;
+
+    // 4. Jede Reihe einzeln behandeln
+    sortedRowKeys.forEach(rowY => {
+      const row = rows[rowY];
+
+      // innerhalb der Reihe links → rechts sortieren
+      row.sort((a, b) => a.x - b.x);
+
+      row.forEach(el => {
+        el.meter = globalMeter;
+        globalMeter++;
+      });
     });
   });
-
-  // 4. Elemente-Array updaten
-  elements = elements.map(el => {
-    if (el.category === null) return el;
-
-    // Meter aus Gruppe übernehmen
-    return el;
-  });
 }
-
 
 /* ----- Kickoff ----- */
 initUI();
