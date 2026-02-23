@@ -142,13 +142,17 @@ async function loadCategories() {
 function getCategoryColor(code) {
   const colorMap = {
     310: '#4CAF50', // Obst & Gemüse
+    350: '#8D6E63', // Tierfutter
     420: '#FF9800', // Konserven
+    425: '#FF5722', // Gewürze
     430: '#FFC107', // Teigwaren
     440: '#FFE082', // Müsli
     445: '#FFEB3B', // Backmittel
     450: '#FFF59D', // Öle
     470: '#E91E63', // Snacks
+    490: '#6D4C41', // Kaffee und Tee
     510: '#2196F3', // Getränke
+    515: '#9C27B0', // Alkoholische Getränke
     520: '#BBDEFB', // Molkerei
     525: '#FFE082', // Käse
     530: '#B3E5FC', // Tiefkühl
@@ -160,8 +164,8 @@ function getCategoryColor(code) {
 
 function getCategoryIcon(code) {
   const iconMap = {
-    310: '🥬', 420: '🥫', 430: '🍝', 440: '🥣', 445: '🧁',
-    450: '🫒', 470: '🍿', 510: '🥤', 520: '🥛', 525: '🧀',
+    310: '🥬', 350: '🐶', 420: '🥫', 425: '🌶️', 430: '🍝', 440: '🥣', 445: '🧁',
+    450: '🫒', 470: '🍿', 490: '☕️', 510: '🥤', 515: '🍺', 520: '🥛', 525: '🧀',
     530: '❄️', 610: '🧹', 640: '🧴',
   };
   return iconMap[code] || '📦';
