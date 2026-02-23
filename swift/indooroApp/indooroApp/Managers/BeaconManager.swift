@@ -13,8 +13,8 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     
     // Position & Navigation
     @Published var userPosition: CGPoint? = nil
-    @Published var navigationPath: [CGPoint] = []   // Der berechnete Weg (Blaue Linie)
-    @Published var targetPosition: CGPoint? = nil   // Wo wollen wir hin? (Roter Pin)
+    @Published var navigationPath: [CGPoint] = []   // Pfad (Blaue Linie)
+    @Published var targetPosition: CGPoint? = nil   // Ziel (Roter Pin)
     
     // Suche
     @Published var searchResults: [Product] = []
@@ -47,9 +47,8 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
         startUpdateTimer()
     }
     
-    // --- NAVIGATION LOGIK (NEU) ---
+    // --- NAVIGATION LOGIK (ANGEPASST AN NEUES JSON) ---
     
-    // 1. Ziel setzen basierend auf Produkt
     func setTargetProduct(_ product: Product?) {
         guard let product = product else {
             // Ziel löschen
@@ -60,70 +59,87 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
             return
         }
         
-        // LayoutCode parsen (z.B. "310/1/1/1" -> Kategorie "310")
-        let shelfCategory = product.layoutCode.components(separatedBy: "/").first ?? ""
+        // 1. Produkt-Code zerlegen (z.B. "310/2/1/1")
+        // Format ist meistens: Kategorie/Meter/Ebene/Position
+        let parts = product.layoutCode.components(separatedBy: "/")
         
-        // Passendes Regal finden
-        // HINWEIS: Da LayoutElement evtl. keine 'category' Property hat, nutzen wir Labels als Fallback
+        guard !parts.isEmpty else {
+            print("⚠️ Ungültiger LayoutCode: \(product.layoutCode)")
+            return
+        }
+        
+        let prodCategory = parts[0] // z.B. "310"
+        
+        // Versuchen, den Meter aus dem Produkt-Code zu lesen (Index 1)
+        var prodMeter: Int? = nil
+        if parts.count > 1 {
+            prodMeter = Int(parts[1])
+        }
+        
+        print("🎯 Suche Regal für Kat: \(prodCategory), Meter: \(prodMeter ?? -1)")
+
+        // 2. Passendes Regal im Layout suchen
         if let shelf = shelves.first(where: { element in
-            // Mapping von ID zu Label (basierend auf deiner layout.json)
-            if shelfCategory == "310" && element.label == "Obst & Gemüse" { return true }
-            if shelfCategory == "420" && element.label == "Konserven & Saucen" { return true }
-            if shelfCategory == "430" && element.label == "Teigwaren & Nudeln" { return true }
-            if shelfCategory == "440" && element.label == "Müsli & Frühstück" { return true }
-            if shelfCategory == "450" && element.label == "Öle & Essig" { return true }
-            if shelfCategory == "470" && element.label == "Snacks & Süßwaren" { return true }
-            if shelfCategory == "510" && (element.label?.contains("Getränke") ?? false) { return true }
-            if shelfCategory == "520" && element.label == "Molkereiprodukte" { return true }
-            if shelfCategory == "525" && element.label?.contains("Käse") == true { return true }
-            if shelfCategory == "530" && element.label == "Tiefkühlprodukte" { return true }
-            if shelfCategory == "610" && element.label == "Haushalt & Reinigung" { return true }
-            if shelfCategory == "640" && element.label?.contains("Körperpflege") == true { return true }
+            // Hat das Regal überhaupt eine Kategorie? (Kassen etc. haben oft keine)
+            guard let elCategory = element.category else { return false }
             
-            return false
+            // A) Kategorie-Check
+            // Wir prüfen, ob die Regal-Kategorie mit der Produkt-Kategorie beginnt.
+            // (JSON kann "310/2" sein, Produkt "310". Beides fängt mit "310" an)
+            if !elCategory.starts(with: prodCategory) {
+                return false
+            }
+            
+            // B) Meter-Check (Das ist neu!)
+            if let elMeter = element.meter {
+                // Fall 1: Regal hat einen Meter (z.B. 2).
+                // Dann MUSS das Produkt auch diesen Meter suchen.
+                if let pMeter = prodMeter {
+                    return elMeter == pMeter
+                } else {
+                    // Produkt hat keinen Meter im Code, Regal aber schon -> Passt nicht exakt.
+                    return false
+                }
+            } else {
+                // Fall 2: Regal hat KEINEN Meter (nil).
+                // Das bedeutet, das Regal gilt für die ganze Kategorie (oder Meter ist egal).
+                // Da die Kategorie (A) schon passt, ist das ein Treffer.
+                return true
+            }
         }) {
-            // Ziel ist die Mitte des Regals
+            // 3. Ziel setzen (Mitte des gefundenen Regals)
             let tx = shelf.x + (shelf.width ?? 1) / 2
             let ty = shelf.y + (shelf.height ?? 1) / 2
             
             DispatchQueue.main.async {
                 self.targetPosition = CGPoint(x: tx, y: ty)
                 self.updateNavigationPath() // Pfad sofort berechnen
+                print("✅ Ziel gefunden bei x:\(tx) y:\(ty) (Regal: \(shelf.label ?? "Unbekannt"))")
             }
         } else {
-            print("⚠️ Kein Regal gefunden für Kategorie \(shelfCategory)")
+            print("⚠️ Kein Regal gefunden für \(product.name) (Code: \(product.layoutCode))")
         }
     }
     
-    // 2. Pfad neu berechnen
+    // Pfad neu berechnen
     private func updateNavigationPath() {
-            // Prüfen ob Start und Ziel da sind
-            guard let start = userPosition else {
-                print("⚠️ Pfad-Update abgebrochen: Keine User-Position (Bitte auf Karte tippen!)")
-                return
-            }
-            guard let end = targetPosition else {
-                print("⚠️ Pfad-Update abgebrochen: Kein Ziel")
-                return
-            }
+        guard let start = userPosition, let end = targetPosition else { return }
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            // Ruft den Pathfinder auf (den Code hast du ja schon in Pathfinder.swift)
+            let path = Pathfinder.findPath(
+                start: start,
+                end: end,
+                gridWidth: Int(self.gridWidth),
+                gridHeight: Int(self.gridHeight),
+                obstacles: self.shelves
+            )
             
-            print("🔄 Berechne Weg von \(start) nach \(end)...")
-            
-            DispatchQueue.global(qos: .userInitiated).async {
-                let path = Pathfinder.findPath(
-                    start: start,
-                    end: end,
-                    gridWidth: Int(self.gridWidth),
-                    gridHeight: Int(self.gridHeight),
-                    obstacles: self.shelves
-                )
-                
-                DispatchQueue.main.async {
-                    self.navigationPath = path
-                    print("🏁 Pfad aktualisiert: \(path.count) Schritte")
-                }
+            DispatchQueue.main.async {
+                self.navigationPath = path
             }
         }
+    }
     
     // --- SUCHE ---
     
@@ -224,7 +240,7 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
             DispatchQueue.main.async {
                 self.userPosition = CGPoint(x: userX, y: userY)
                 
-                // WICHTIG: Wenn wir ein Ziel haben, Pfad aktualisieren!
+                // Wenn wir ein Ziel haben, Pfad aktualisieren
                 if self.targetPosition != nil {
                     self.updateNavigationPath()
                 }

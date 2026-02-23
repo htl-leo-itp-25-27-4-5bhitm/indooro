@@ -35,22 +35,19 @@ class Pathfinder {
             }
         }
         
-        // 2. Ziel-Validierung (Der Fix!)
+        // 2. Ziel-Validierung
         var effectiveTarget = targetNode
         
-        // Wenn das Ziel im Regal liegt, suchen wir den nächsten freien Punkt (BFS Suche)
+        // Wenn das Ziel im Regal liegt, suchen wir den nächsten freien Gang
         if blockedCells.contains(targetNode) {
-            print("⚠️ Ziel \(targetNode) liegt im Regal. Suche nächsten freien Gang...")
             if let nearestWalkable = findNearestWalkable(from: targetNode, blocked: blockedCells, w: gridWidth, h: gridHeight) {
-                print("✅ Ausweichziel gefunden: \(nearestWalkable)")
                 effectiveTarget = nearestWalkable
             } else {
-                print("❌ Kein freier Punkt in der Nähe gefunden!")
                 return []
             }
         }
         
-        // 3. A* Algorithmus (Start -> EffectiveTarget)
+        // 3. A* Algorithmus (Erweitert)
         var openSet: Set<GridPoint> = [startNode]
         var cameFrom: [GridPoint: GridPoint] = [:]
         
@@ -61,40 +58,69 @@ class Pathfinder {
         fScore[startNode] = heuristic(from: startNode, to: effectiveTarget)
         
         while !openSet.isEmpty {
-            // Knoten mit niedrigstem fScore finden
             guard let current = openSet.min(by: { (fScore[$0] ?? Double.infinity) < (fScore[$1] ?? Double.infinity) }) else {
                 break
             }
             
             if current == effectiveTarget {
-                // Pfad rekonstruieren
                 var path = reconstructPath(cameFrom: cameFrom, current: current)
-                
-                // OPTISCHER TRICK:
-                // Wenn wir zu einem Ausweichpunkt gelaufen sind, ziehen wir am Ende
-                // noch eine gerade Linie zum echten Ziel (mitten ins Regal),
-                // damit es visuell verbunden aussieht.
+                // Visuelle Verbindung zum echten Zielpunkt
                 if effectiveTarget != targetNode {
                     path.append(end)
                 }
-                
                 return path
             }
             
             openSet.remove(current)
             
-            let neighbors = [
-                GridPoint(x: current.x + 1, y: current.y),
-                GridPoint(x: current.x - 1, y: current.y),
-                GridPoint(x: current.x, y: current.y + 1),
-                GridPoint(x: current.x, y: current.y - 1)
+            // NEU: 8 Richtungen (inkl. Diagonal) mit realistischen Kosten
+            let neighbors: [(point: GridPoint, cost: Double, isDiagonal: Bool)] = [
+                (GridPoint(x: current.x + 1, y: current.y), 1.0, false), // Rechts
+                (GridPoint(x: current.x - 1, y: current.y), 1.0, false), // Links
+                (GridPoint(x: current.x, y: current.y + 1), 1.0, false), // Unten
+                (GridPoint(x: current.x, y: current.y - 1), 1.0, false), // Oben
+                // Diagonalen (Kosten = Wurzel aus 2 = ca. 1.414)
+                (GridPoint(x: current.x + 1, y: current.y + 1), 1.414, true),
+                (GridPoint(x: current.x - 1, y: current.y - 1), 1.414, true),
+                (GridPoint(x: current.x + 1, y: current.y - 1), 1.414, true),
+                (GridPoint(x: current.x - 1, y: current.y + 1), 1.414, true)
             ]
             
-            for neighbor in neighbors {
+            for neighborData in neighbors {
+                let neighbor = neighborData.point
+                let stepCost = neighborData.cost
+                
+                // Im Grid?
                 if neighbor.x < 0 || neighbor.x >= gridWidth || neighbor.y < 0 || neighbor.y >= gridHeight { continue }
+                // Hindernis?
                 if blockedCells.contains(neighbor) { continue }
                 
-                let tentativeGScore = (gScore[current] ?? Double.infinity) + 1.0
+                // VERHINDERE ECKEN-SCHNEIDEN:
+                // Wenn wir uns diagonal bewegen, dürfen die beiden direkt angrenzenden Felder nicht blockiert sein
+                if neighborData.isDiagonal {
+                    let check1 = GridPoint(x: current.x, y: neighbor.y)
+                    let check2 = GridPoint(x: neighbor.x, y: current.y)
+                    if blockedCells.contains(check1) || blockedCells.contains(check2) {
+                        continue // Die "Tür" ist zu schmal, nicht diagonal durch die Wand schneiden!
+                    }
+                }
+                
+                // NEU: STRAFE FÜR ZICK-ZACK (Turn Penalty)
+                // Dies zwingt die Linie dazu, lange gerade Strecken ("10 rüber") zu bevorzugen.
+                var turnPenalty = 0.0
+                if let parent = cameFrom[current] {
+                    let dx1 = current.x - parent.x
+                    let dy1 = current.y - parent.y
+                    let dx2 = neighbor.x - current.x
+                    let dy2 = neighbor.y - current.y
+                    
+                    // Wenn wir nicht in exakt dieselbe Richtung weitergehen, gibt es eine fette Strafe
+                    if dx1 != dx2 || dy1 != dy2 {
+                        turnPenalty = 1.5 // Abbiegen ist "teurer" als ein normaler Schritt
+                    }
+                }
+                
+                let tentativeGScore = (gScore[current] ?? Double.infinity) + stepCost + turnPenalty
                 
                 if tentativeGScore < (gScore[neighbor] ?? Double.infinity) {
                     cameFrom[neighbor] = current
@@ -105,23 +131,25 @@ class Pathfinder {
             }
         }
         
-        print("❌ A* hat keinen Weg gefunden.")
         return []
     }
     
-    // Hilfsfunktion: Sucht spiralförmig nach außen nach dem nächsten freien Punkt
+    // NEU: Euklidische Distanz (Luftlinie) statt Manhattan-Distanz für natürlicheres Verhalten
+    private static func heuristic(from: GridPoint, to: GridPoint) -> Double {
+        let dx = Double(from.x - to.x)
+        let dy = Double(from.y - to.y)
+        return sqrt(dx * dx + dy * dy)
+    }
+    
     private static func findNearestWalkable(from start: GridPoint, blocked: Set<GridPoint>, w: Int, h: Int) -> GridPoint? {
         var queue = [start]
         var visited = Set([start])
         
-        // Wir suchen maximal 10 Schritte weit, um Performance zu sparen
         var loops = 0
-        
-        while !queue.isEmpty && loops < 200 {
+        while !queue.isEmpty && loops < 500 {
             loops += 1
             let current = queue.removeFirst()
             
-            // Wenn dieser Punkt NICHT blockiert ist -> Gefunden!
             if !blocked.contains(current) {
                 return current
             }
@@ -141,10 +169,6 @@ class Pathfinder {
             }
         }
         return nil
-    }
-    
-    private static func heuristic(from: GridPoint, to: GridPoint) -> Double {
-        return Double(abs(from.x - to.x) + abs(from.y - to.y))
     }
     
     private static func reconstructPath(cameFrom: [GridPoint: GridPoint], current: GridPoint) -> [CGPoint] {

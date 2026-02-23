@@ -6,7 +6,8 @@ struct MapView: View {
     let targetProduct: Product?
     
     var body: some View {
-        ScrollView([.horizontal, .vertical], showsIndicators: true) {
+        // Nur vertikal scrollen, Breite ist eingepasst
+        ScrollView([.vertical], showsIndicators: true) {
             ZStack(alignment: .topLeading) {
                 
                 // 1. Hintergrund
@@ -27,23 +28,58 @@ struct MapView: View {
                     gridCountY: Int(beaconManager.gridHeight)
                 )
                 
-                // 3. PFAD LINIE (Zuerst zeichnen, damit sie unter den Regalen liegt)
+                // 3. PFAD LINIE (ULTRA SMOOTH - KANTEN GLÄTTEN)
                 if !beaconManager.navigationPath.isEmpty {
                     Path { path in
-                        if let first = beaconManager.navigationPath.first {
-                            path.move(to: CGPoint(
-                                x: first.x * pixelsPerMeter,
-                                y: first.y * pixelsPerMeter
-                            ))
+                        // Umrechnen der Grid-Punkte in Pixel-Koordinaten
+                        let points = beaconManager.navigationPath.map {
+                            CGPoint(x: $0.x * pixelsPerMeter, y: $0.y * pixelsPerMeter)
                         }
-                        for point in beaconManager.navigationPath.dropFirst() {
-                            path.addLine(to: CGPoint(
-                                x: point.x * pixelsPerMeter,
-                                y: point.y * pixelsPerMeter
-                            ))
+                        
+                        if points.count > 1 {
+                            // Startpunkt
+                            path.move(to: points[0])
+                            
+                            if points.count == 2 {
+                                // Wenn nur 2 Punkte, ist es eine gerade Linie
+                                path.addLine(to: points[1])
+                            } else {
+                                // Der Glättungs-Algorithmus:
+                                // Wir zeichnen Linien/Kurven zwischen den MITTELPUNKTEN der Segmente.
+                                
+                                for i in 1..<points.count {
+                                    let p0 = points[i-1] // Vorheriger Punkt (Ecke)
+                                    let p1 = points[i]   // Aktueller Punkt (Ecke)
+                                    
+                                    // Mittelpunkt zwischen p0 und p1 berechnen
+                                    let midPoint = CGPoint(
+                                        x: (p0.x + p1.x) / 2,
+                                        y: (p0.y + p1.y) / 2
+                                    )
+                                    
+                                    if i == 1 {
+                                        // Vom allerersten Startpunkt eine gerade Linie zum ersten Mittelpunkt
+                                        path.addLine(to: midPoint)
+                                    } else {
+                                        // Der magische Teil: Zeichne eine Kurve vom VORHERIGEN Mittelpunkt
+                                        // zum JETZIGEN Mittelpunkt.
+                                        // Der "scharfe" Eckpunkt (p0) wird als Kontrollpunkt genutzt,
+                                        // der die Linie wie ein Magnet zu sich zieht und so abrundet.
+                                        path.addQuadCurve(to: midPoint, control: p0)
+                                    }
+                                }
+                                
+                                // Am Ende eine gerade Linie vom letzten Mittelpunkt zum echten Endziel
+                                if let last = points.last {
+                                    path.addLine(to: last)
+                                }
+                            }
                         }
                     }
-                    .stroke(Color.blue, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                    // Linie etwas dicker (lineWidth: 5) und blau
+                    .stroke(Color.blue, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+                    // Leichter Schatten, damit es plastischer wirkt
+                    .shadow(color: Color.blue.opacity(0.5), radius: 5, x: 0, y: 0)
                 }
                 
                 // 4. Regale
@@ -61,7 +97,7 @@ struct MapView: View {
                         .zIndex(100)
                 }
                 
-                // 6. Achsen
+                // 6. Achsen (Habe die Zahlen etwas weiter nach außen geschoben)
                 MapAxes(
                     pixelsPerMeter: pixelsPerMeter,
                     gridWidth: Int(beaconManager.gridWidth),
@@ -88,29 +124,16 @@ struct MapView: View {
                 }
                 
                 // --- DEBUG FEATURE: TIPPEN ZUM BEWEGEN ---
-                // Ein unsichtbarer Layer über allem, der Klicks abfängt
-                Color.white.opacity(0.001) // Fast transparent, aber klickbar
+                Color.white.opacity(0.001)
                     .frame(
                         width: CGFloat(beaconManager.gridWidth * pixelsPerMeter),
                         height: CGFloat(beaconManager.gridHeight * pixelsPerMeter)
                     )
                     .onTapGesture { location in
-                        // location ist in Pixeln -> Umrechnen in Meter
                         let xMeter = Double(location.x) / pixelsPerMeter
                         let yMeter = Double(location.y) / pixelsPerMeter
-                        
-                        print("📍 Debug: Setze Position auf x:\(xMeter) y:\(yMeter)")
-                        
-                        // User Position manuell setzen
                         beaconManager.userPosition = CGPoint(x: xMeter, y: yMeter)
-                        
-                        // Wenn ein Ziel aktiv ist, Route sofort neu berechnen!
-                        // Dazu rufen wir den Pathfinder indirekt über den Manager auf
                         if beaconManager.targetPosition != nil {
-                            // Kleiner Hack: Wir simulieren, dass ein Ziel gesetzt wurde,
-                            // damit der Manager den Pfad updated.
-                            // Sauberer wäre eine public updatePath() methode im Manager,
-                            // aber das reicht für den Test.
                             beaconManager.setTargetProduct(targetProduct)
                         }
                     }
@@ -119,7 +142,8 @@ struct MapView: View {
                 width: CGFloat(beaconManager.gridWidth * pixelsPerMeter),
                 height: CGFloat(beaconManager.gridHeight * pixelsPerMeter)
             )
-            .padding()
+            // Padding etwas erhöht, damit die Achsenbeschriftung Platz hat
+            .padding(EdgeInsets(top: 30, leading: 30, bottom: 20, trailing: 20))
         }
     }
 }

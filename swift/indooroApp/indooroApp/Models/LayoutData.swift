@@ -22,4 +22,8 @@ struct LayoutElement: Codable, Identifiable {
     let height: Double?
     let color: String?
     let label: String?
+    
+    // NEU: Kategorie und Meter direkt aus dem JSON
+    let category: String?
+    let meter: Int?
 }

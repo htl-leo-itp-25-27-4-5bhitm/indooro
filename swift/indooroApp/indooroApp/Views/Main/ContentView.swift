@@ -7,51 +7,49 @@ struct ContentView: View {
     @State private var searchText = ""
     @State private var targetProduct: Product? = nil
     
-    // Maßstab: 25 Pixel pro Meter
-    let pixelsPerMeter: Double = 25.0
-    
     var body: some View {
         NavigationView {
-            ZStack(alignment: .top) {
+            // NEU: GeometryReader um die Handybreite zu messen
+            GeometryReader { geo in
                 
-                // === HAUPT-LAYOUT ===
-                VStack(spacing: 0) {
-                    
-                    // 1. Header
-                    HeaderView(
-                        userPosition: beaconManager.userPosition,
-                        targetProduct: targetProduct,
-                        onClearTarget: {
-                            withAnimation {
-                                targetProduct = nil
-                                beaconManager.setTargetProduct(nil) // Pfad löschen
-                            }
-                        }
-                    )
-                    .zIndex(1)
-                    
-                    // 2. Map
-                    MapView(
-                        beaconManager: beaconManager,
-                        pixelsPerMeter: pixelsPerMeter,
-                        targetProduct: targetProduct
-                    )
-                }
-                .blur(radius: beaconManager.searchResults.isEmpty ? 0 : 3)
+                // Wir berechnen den Maßstab dynamisch (Breite des Screens minus 40px Rand)
+                let availableWidth = geo.size.width - 40
+                let pixelsPerMeter = Double(availableWidth) / max(1.0, beaconManager.gridWidth)
                 
-                // === SUCHE ===
-                VStack {
-                    SearchOverlayView(
-                        beaconManager: beaconManager,
-                        searchText: $searchText,
-                        targetProduct: $targetProduct
-                    )
+                ZStack(alignment: .top) {
                     
-                    Spacer()
+                    // === HAUPT-LAYOUT (Header & Karte) ===
+                    VStack(spacing: 0) {
+                        
+                        // 1. KOPFZEILE
+                        HeaderView(
+                            userPosition: beaconManager.userPosition,
+                            targetProduct: targetProduct,
+                            onClearTarget: { withAnimation { targetProduct = nil } }
+                        )
+                        .zIndex(1)
+                        
+                        // 2. KARTE (Jetzt mit dynamischem Maßstab)
+                        MapView(
+                            beaconManager: beaconManager,
+                            pixelsPerMeter: pixelsPerMeter,
+                            targetProduct: targetProduct
+                        )
+                    }
+                    .blur(radius: beaconManager.searchResults.isEmpty ? 0 : 3)
+                    
+                    // === SUCHE OVERLAY ===
+                    VStack {
+                        SearchOverlayView(
+                            beaconManager: beaconManager,
+                            searchText: $searchText,
+                            targetProduct: $targetProduct
+                        )
+                        Spacer()
+                    }
                 }
             }
             .navigationBarHidden(true)
-            // WICHTIG: Reagieren auf Änderungen des Ziel-Produkts
             .onChange(of: targetProduct) { newProduct in
                 beaconManager.setTargetProduct(newProduct)
             }
@@ -59,7 +57,6 @@ struct ContentView: View {
     }
 }
 
-// Preview für Canvas
 #Preview {
     ContentView()
 }
