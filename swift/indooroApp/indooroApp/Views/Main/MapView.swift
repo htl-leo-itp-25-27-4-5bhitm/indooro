@@ -7,13 +7,16 @@ struct MapView: View {
     
     var body: some View {
         // Nur vertikal scrollen, Breite ist eingepasst
-        ScrollView([.vertical], showsIndicators: true) {
+        ScrollView([.vertical], showsIndicators: false) {
             ZStack(alignment: .topLeading) {
                 
                 // 1. Hintergrund
                 Rectangle()
-                    .fill(Color.gray.opacity(0.1))
-                    .border(Color.black, width: 2)
+                    .fill(Color(.systemBackground))
+                    .overlay {
+                        Rectangle()
+                            .stroke(Color.primary.opacity(0.15), lineWidth: 1)
+                    }
                     .frame(
                         width: CGFloat(beaconManager.gridWidth * pixelsPerMeter),
                         height: CGFloat(beaconManager.gridHeight * pixelsPerMeter)
@@ -77,9 +80,9 @@ struct MapView: View {
                         }
                     }
                     // Linie etwas dicker (lineWidth: 5) und blau
-                    .stroke(Color.blue, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
+                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
                     // Leichter Schatten, damit es plastischer wirkt
-                    .shadow(color: Color.blue.opacity(0.5), radius: 5, x: 0, y: 0)
+                    .shadow(color: Color.accentColor.opacity(0.35), radius: 5, x: 0, y: 0)
                 }
                 
                 // 4. Regale

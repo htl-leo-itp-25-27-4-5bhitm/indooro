@@ -20,6 +20,11 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     @Published var searchResults: [Product] = []
     @Published var isSearching: Bool = false
     
+    // Produktliste
+    @Published var allProducts: [Product] = []
+    @Published var isLoadingProducts: Bool = false
+    @Published var productLoadingError: String? = nil
+    
     // API URL (Für Simulator: localhost)
     private let apiBase = "http://localhost:8080/api"
     
@@ -167,7 +172,7 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
                 guard let data = data else { return }
                 
                 do {
-                    let products = try JSONDecoder().decode([Product].self, from: data)
+                    let products = try self?.decodeProducts(from: data) ?? []
                     self?.searchResults = products
                     print("✅ \(products.count) Produkte gefunden")
                 } catch {
@@ -179,6 +184,80 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     
     func clearSearch() {
         self.searchResults = []
+    }
+    
+    func loadAllProducts(forceReload: Bool = false) {
+        guard !isLoadingProducts else { return }
+        if !forceReload, !allProducts.isEmpty { return }
+        
+        isLoadingProducts = true
+        productLoadingError = nil
+        
+        let encodedQuery = "".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let endpoints = [
+            "\(apiBase)/products?size=400",
+            "\(apiBase)/products/search?q=\(encodedQuery)&size=400",
+            "\(apiBase)/products/search?q=a&size=400"
+        ]
+        
+        fetchProducts(from: endpoints, attempt: 0)
+    }
+    
+    // --- PRODUKT API ---
+    
+    private func fetchProducts(from endpoints: [String], attempt: Int) {
+        guard attempt < endpoints.count, let url = URL(string: endpoints[attempt]) else {
+            DispatchQueue.main.async {
+                self.isLoadingProducts = false
+                self.productLoadingError = "Produkte konnten nicht geladen werden."
+            }
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+            guard let self else { return }
+            
+            if let error {
+                print("❌ Produktliste Fehler: \(error.localizedDescription)")
+                self.fetchProducts(from: endpoints, attempt: attempt + 1)
+                return
+            }
+            
+            guard let data else {
+                self.fetchProducts(from: endpoints, attempt: attempt + 1)
+                return
+            }
+            
+            do {
+                let decoded = try self.decodeProducts(from: data)
+                if decoded.isEmpty {
+                    self.fetchProducts(from: endpoints, attempt: attempt + 1)
+                    return
+                }
+                
+                let sorted = Array(Set(decoded)).sorted {
+                    $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                }
+                
+                DispatchQueue.main.async {
+                    self.allProducts = sorted
+                    self.isLoadingProducts = false
+                    self.productLoadingError = nil
+                }
+            } catch {
+                print("❌ Produktliste JSON Fehler: \(error)")
+                self.fetchProducts(from: endpoints, attempt: attempt + 1)
+            }
+        }.resume()
+    }
+    
+    private func decodeProducts(from data: Data) throws -> [Product] {
+        if let direct = try? JSONDecoder().decode([Product].self, from: data) {
+            return direct
+        }
+        
+        let page = try JSONDecoder().decode(PagedProductResponse.self, from: data)
+        return page.content
     }
     
     // --- POSITIONIERUNG & BLE ---
@@ -298,4 +377,8 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
             centralManager?.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
         }
     }
+}
+
+private struct PagedProductResponse: Decodable {
+    let content: [Product]
 }

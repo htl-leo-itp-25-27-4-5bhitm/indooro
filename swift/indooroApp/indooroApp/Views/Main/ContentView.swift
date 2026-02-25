@@ -1,60 +1,48 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject var beaconManager = BeaconManager()
-    
-    // --- STATES ---
-    @State private var searchText = ""
+    @StateObject private var beaconManager = BeaconManager()
     @State private var targetProduct: Product? = nil
-    
+    @State private var selectedTab: AppTab = .map
+
     var body: some View {
-        NavigationView {
-            // NEU: GeometryReader um die Handybreite zu messen
-            GeometryReader { geo in
-                
-                // Wir berechnen den Maßstab dynamisch (Breite des Screens minus 40px Rand)
-                let availableWidth = geo.size.width - 40
-                let pixelsPerMeter = Double(availableWidth) / max(1.0, beaconManager.gridWidth)
-                
-                ZStack(alignment: .top) {
-                    
-                    // === HAUPT-LAYOUT (Header & Karte) ===
-                    VStack(spacing: 0) {
-                        
-                        // 1. KOPFZEILE
-                        HeaderView(
-                            userPosition: beaconManager.userPosition,
-                            targetProduct: targetProduct,
-                            onClearTarget: { withAnimation { targetProduct = nil } }
-                        )
-                        .zIndex(1)
-                        
-                        // 2. KARTE (Jetzt mit dynamischem Maßstab)
-                        MapView(
-                            beaconManager: beaconManager,
-                            pixelsPerMeter: pixelsPerMeter,
-                            targetProduct: targetProduct
-                        )
-                    }
-                    .blur(radius: beaconManager.searchResults.isEmpty ? 0 : 3)
-                    
-                    // === SUCHE OVERLAY ===
-                    VStack {
-                        SearchOverlayView(
-                            beaconManager: beaconManager,
-                            searchText: $searchText,
-                            targetProduct: $targetProduct
-                        )
-                        Spacer()
-                    }
+        TabView(selection: $selectedTab) {
+            MapHomeView(
+                beaconManager: beaconManager,
+                targetProduct: $targetProduct
+            )
+            .tabItem {
+                Label("Karte", systemImage: "map")
+            }
+            .tag(AppTab.map)
+
+            ProductsCategoriesView(beaconManager: beaconManager) { product in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    targetProduct = product
                 }
+                selectedTab = .map
             }
-            .navigationBarHidden(true)
-            .onChange(of: targetProduct) { newProduct in
-                beaconManager.setTargetProduct(newProduct)
+            .tabItem {
+                Label("Produkte", systemImage: "square.grid.2x2")
             }
+            .tag(AppTab.products)
+
+            SettingsInfoView()
+                .tabItem {
+                    Label("Info", systemImage: "gearshape")
+                }
+                .tag(AppTab.settings)
+        }
+        .onChange(of: targetProduct) { _, newProduct in
+            beaconManager.setTargetProduct(newProduct)
         }
     }
+}
+
+private enum AppTab: Hashable {
+    case map
+    case products
+    case settings
 }
 
 #Preview {
