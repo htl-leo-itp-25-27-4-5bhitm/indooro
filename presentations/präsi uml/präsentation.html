@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="de">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>UML – Indooro</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/reset.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/reveal.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/theme/white.min.css">
+
+    <style>
+        .reveal h1,
+        h2,
+        h3 {
+            text-transform: none;
+        }
+
+        .box {
+            background: #f2f2f2;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: left;
+        }
+
+        .small {
+            font-size: 0.7em;
+        }
+
+        table {
+            font-size: 0.6em;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="reveal">
+        <div class="slides">
+
+            <!-- ========================= -->
+            <!-- DECKBLATT -->
+            <!-- ========================= -->
+
+            <section>
+                <h1>UML Modellierung</h1>
+                <h3>Indooro – Indoor Navigation für Supermärkte</h3>
+
+                <p class="small">
+                    HTL – Softwareentwicklung<br>
+                    Lerneinheit (20 Minuten)
+                </p>
+
+                <p class="small">
+                    Team: _______
+                </p>
+            </section>
+
+
+            <!-- ========================= -->
+            <!-- UML ALLGEMEIN -->
+            <!-- ========================= -->
+            <section>
+                <section>
+                    <h2>Was ist UML?</h2>
+
+                    <div class="box">
+                        <ul>
+                            <li>Unified Modeling Language</li>
+                            <li>Standard zur Beschreibung von Software-Systemen</li>
+                            <li>Visuelle Kommunikation zwischen Entwicklern</li>
+                            <li>Unabhängig von Programmiersprache</li>
+                        </ul>
+                    </div>
+                </section>
+
+
+                <section>
+                    <h2>Wozu verwendet man UML?</h2>
+
+                    <ul>
+                        <li>Systeme planen bevor Code entsteht</li>
+                        <li>Komplexität reduzieren</li>
+                        <li>Team-Kommunikation</li>
+                        <li>Dokumentation</li>
+                        <li>Architektur verstehen</li>
+                    </ul>
+                </section>
+
+
+                <section>
+                    <h2>Grenzen von UML</h2>
+
+                    <div class="box">
+                        <ul>
+                            <li>Kein Ersatz für Code</li>
+                            <li>Runtime-Verhalten nur begrenzt sichtbar</li>
+                            <li>Kann schnell zu detailliert werden</li>
+                            <li>Pflegeaufwand</li>
+                        </ul>
+                    </div>
+                </section>
+
+
+                <section>
+                    <h2>Typische UML Fehler</h2>
+
+                    <ul>
+                        <li>Klassen ≠ Objekte</li>
+                        <li>Zu viele Beziehungen</li>
+                        <li>Falsche Vererbung</li>
+                        <li>Diagramm ohne Use-Case Bezug</li>
+                    </ul>
+                </section>
+            </section>
+
+            <!-- ========================= -->
+            <!-- INDOORO ANWENDUNG -->
+            <!-- ========================= -->
+            <section>
+                <section>
+                    <h2>Unser Projekt: Indooro</h2>
+
+                    <div class="box">
+                        <strong>Ziel:</strong><br>
+                        Navigation innerhalb eines Supermarktes
+                        <br><br>
+
+                        Beispiel:
+                        <ul>
+                            <li>Kunde sucht Produkt</li>
+                            <li>Position wird bestimmt</li>
+                            <li>Route wird berechnet</li>
+                            <li>Produkt wird gefunden</li>
+                        </ul>
+                    </div>
+                </section>
+
+
+                <section>
+                    <h2>Warum UML bei Indooro?</h2>
+
+                    <ul>
+                        <li>Backend + App abstimmen</li>
+                        <li>Datenmodell planen</li>
+                        <li>Navigationslogik verstehen</li>
+                        <li>Use Cases ableiten</li>
+                    </ul>
+                </section>
+            </section>
+
+
+
+            <!-- ========================= -->
+            <!-- UML DIAGRAMME -->
+            <!-- ========================= -->
+
+            <section>
+
+                <section>
+                    <h2>Use Case Diagramm</h2>
+
+                    <p class="small">
+                    </p>
+
+                    <img src="usecasediagramm.png" alt="Use-Case-Diagramm"
+                        style="max-height: 65vh; max-width: 100%; object-fit: contain;">                
+                    </section>
+
+                <section>
+                    <h2>Klassendiagramm</h2>
+
+                    <p class="small">
+                    </p>
+
+                    <img src="klassendiagramm.png" alt="Klassendiagramm"
+                        style="max-height: 60vh; max-width: 100%; object-fit: contain;">                
+                    </section>
+
+                <section>
+                    <h2>Objektdiagramm</h2>
+
+                    <p class="small">
+                    </p>
+
+                    <img src="objektdiagramm.png" alt="Objektdiagramm"
+                        style="max-height: 60vh; max-width: 100%; object-fit: contain;">
+                </section>
+
+            </section>
+
+
+            <!-- ========================= -->
+            <!-- TRACEABILITY -->
+            <!-- ========================= -->
+
+            <section>
+                <h2>Traceability</h2>
+
+                <div class="box">
+
+                    <strong>Use Case 1:</strong> Produkt suchen
+                    → Klassen:
+                    <ul>
+                        <li>Product</li>
+                        <li>Shelf</li>
+                        <li>RouteService</li>
+                        <li>UserPosition</li>
+                    </ul>
+
+                    <strong>Use Case 2:</strong> Route berechnen
+                    → Klassen:
+                    <ul>
+                        <li>Beacon</li>
+                        <li>NavigationService</li>
+                        <li>Waypoint</li>
+                        <li>StoreMap</li>
+                    </ul>
+
+                </div>
+            </section>
+
+
+            <!-- ========================= -->
+            <!-- ARTEFAKTE -->
+            <!-- ========================= -->
+
+            <section>
+                <h2>Projekt-Artefakte</h2>
+
+                <ul>
+                    <li>Code-Screenshot</li>
+                    <li>Datenbankschema</li>
+                    <li>UML Tool Screenshot</li>
+                </ul>
+
+                <p class="small">
+                    ➡ Pflicht: 3 Belege aus Projekt / Quelle
+                </p>
+            </section>
+
+
+            <!-- ========================= -->
+            <!-- DIAGRAM REVIEW -->
+            <!-- ========================= -->
+
+            <section>
+                <h2>Diagramm Review</h2>
+
+                <div class="box">
+
+                    <strong>Fehler 1:</strong> Vererbung statt Beziehung
+                    <strong>Vorher:</strong> Beacon → Position
+                    <strong>Nachher:</strong> Beacon hat Position
+
+                    <br><br>
+
+                    <strong>Fehler 2:</strong> Objekt als Klasse
+
+                    <br><br>
+
+                    <strong>Fehler 3:</strong> falsche Abhängigkeit
+
+                </div>
+            </section>
+
+
+            <!-- ========================= -->
+            <!-- KI TEIL -->
+            <!-- ========================= -->
+
+            <section>
+                <h2>KI-resistente Aufgaben</h2>
+
+                <ul>
+                    <li>Diagramm begründen lassen</li>
+                    <li>Live Modellierung</li>
+                    <li>Projektbezug erzwingen</li>
+                    <li>Review & Diskussion</li>
+                </ul>
+            </section>
+
+
+            <section>
+                <h2>KI – Pro & Contra</h2>
+
+                <div class="box">
+                    <strong>Pro</strong>
+                    <ul>
+                        <li>Schnelle Diagrammerstellung</li>
+                        <li>Syntax Hilfe</li>
+                    </ul>
+
+                    <strong>Contra</strong>
+                    <ul>
+                        <li>Logische Fehler</li>
+                        <li>Blindes Übernehmen</li>
+                    </ul>
+                </div>
+            </section>
+
+
+            <section>
+                <h2>Zukunft von UML & KI</h2>
+
+                <ul>
+                    <li>Text → UML automatisch</li>
+                    <li>Skizze → Code</li>
+                    <li>KI als Assistenz</li>
+                    <li>Architektur bleibt menschlich</li>
+                </ul>
+            </section>
+
+
+            <!-- ========================= -->
+            <!-- PROMPTS -->
+            <!-- ========================= -->
+
+            <section>
+                <h2>Verwendete Prompts</h2>
+
+                <table border="1">
+                    <tr>
+                        <th>Ziel</th>
+                        <th>Prompt</th>
+                        <th>Tool</th>
+                        <th>Output</th>
+                        <th>Änderungen</th>
+                        <th>Vertrauen?</th>
+                    </tr>
+
+                    <tr>
+                        <td>Use Case erstellen</td>
+                        <td>...</td>
+                        <td>ChatGPT</td>
+                        <td>...</td>
+                        <td>...</td>
+                        <td>...</td>
+                    </tr>
+
+                    <tr>
+                        <td>Klassendiagramm</td>
+                        <td>...</td>
+                        <td>...</td>
+                        <td>...</td>
+                        <td>...</td>
+                        <td>...</td>
+                    </tr>
+
+                </table>
+
+            </section>
+
+
+            <!-- ========================= -->
+            <!-- LINKS -->
+            <!-- ========================= -->
+
+            <section>
+                <h2>Quellen & Links</h2>
+
+                <ul>
+                    <li>OMG UML Specification</li>
+                    <li>draw.io</li>
+                    <li>PlantUML</li>
+                    <li>Mermaid</li>
+                    <li>Reveal.js</li>
+                </ul>
+            </section>
+
+
+            <!-- ========================= -->
+            <!-- ENDE -->
+            <!-- ========================= -->
+
+            <section>
+                <h2>Quiz</h2>
+
+                <p>
+                    Jetzt überprüft ihr euer UML Wissen 🙂
+                </p>
+            </section>
+
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/reveal.js"></script>
+
+    <script>
+        Reveal.initialize({
+            hash: true,
+            slideNumber: true
+        });
+    </script>
+
+</body>
+
+</html>

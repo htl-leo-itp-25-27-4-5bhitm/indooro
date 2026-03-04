@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="de">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -10,16 +11,35 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/theme/white.min.css" id="theme">
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/plugin/highlight/monokai.min.css">
-    
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/plugin/highlight/monokai.min.css">
+
     <style>
         /* Eigene Anpassungen für bessere Lesbarkeit */
-        .reveal h1, .reveal h2, .reveal h3 { text-transform: none; color: #333; }
-        .reveal pre { width: 100%; font-size: 0.55em; box-shadow: none; }
-        .mermaid { font-size: 0.8em; margin-top: 20px; }
-        .left-align { text-align: left; }
+        .reveal h1,
+        .reveal h2,
+        .reveal h3 {
+            text-transform: none;
+            color: #333;
+        }
+
+        .reveal pre {
+            width: 100%;
+            font-size: 0.55em;
+            box-shadow: none;
+        }
+
+        .mermaid {
+            font-size: 0.8em;
+            margin-top: 20px;
+        }
+
+        .left-align {
+            text-align: left;
+        }
     </style>
 </head>
+
 <body>
     <div class="reveal">
         <div class="slides">
@@ -29,17 +49,22 @@
                 <h3>Indoor-Navigation für den Einzelhandel</h3>
                 <div class="left-align" style="font-size: 0.8em; margin-top: 40px;">
                     <p><strong>UML in unserem Projekt</strong></p>
-                    
+
                 </div>
                 <aside class="notes">
-                    Herzlich willkommen. Wir präsentieren euch heute UML nicht als trockene Theorie, sondern am lebenden Objekt: Unserem Projekt 'Indooro'. Indooro ist ein Navigationssystem für SPAR-Märkte. Technisch setzen wir auf ein modernes Java 21 Quarkus Backend und eine Capacitor App. Die Positionsbestimmung läuft über Bluetooth-Beacons, die im Laden verteilt sind. Um dieses komplexe Zusammenspiel zu planen, war UML unverzichtbar.
+                    Herzlich willkommen. Wir präsentieren euch heute UML nicht als trockene Theorie, sondern am lebenden
+                    Objekt: Unserem Projekt 'Indooro'. Indooro ist ein Navigationssystem für SPAR-Märkte. Technisch
+                    setzen wir auf ein modernes Java 21 Quarkus Backend und eine Capacitor App. Die Positionsbestimmung
+                    läuft über Bluetooth-Beacons, die im Laden verteilt sind. Um dieses komplexe Zusammenspiel zu
+                    planen, war UML unverzichtbar.
                 </aside>
             </section>
 
             <section>
                 <h2>Das Szenario</h2>
                 <p><em>(Der Rote Faden)</em></p>
-                <div style="background: #f0f0f0; padding: 20px; border-radius: 10px; font-size: 0.8em; text-align: left;">
+                <div
+                    style="background: #f0f0f0; padding: 20px; border-radius: 10px; font-size: 0.8em; text-align: left;">
                     <p><strong>Use Case:</strong> Ein Kunde sucht "Milch".</p>
                     <ol>
                         <li>App scannt Beacons (UUID, Signalstärke).</li>
@@ -49,15 +74,19 @@
                     </ol>
                 </div>
                 <aside class="notes">
-                    Damit wir uns nicht in Details verlieren, folgen wir heute einem einzigen Szenario durch alle Diagramme: Ein Kunde steht im Eingangsbereich und sucht 'Milch'. Die App muss wissen, wo der Kunde ist, wo die Milch ist, und wie man hinkommt.
+                    Damit wir uns nicht in Details verlieren, folgen wir heute einem einzigen Szenario durch alle
+                    Diagramme: Ein Kunde steht im Eingangsbereich und sucht 'Milch'. Die App muss wissen, wo der Kunde
+                    ist, wo die Milch ist, und wie man hinkommt.
                 </aside>
             </section>
 
             <section>
                 <h2>Warum UML bei Indooro?</h2>
                 <ul style="font-size: 0.8em;">
-                    <li><strong>Kommunikation:</strong> Schnittstelle zwischen Backend-Devs (Datenmodell) und Mobile-Devs (Anzeige).</li>
-                    <li><strong>Blinde Flecken finden:</strong> Haben wir daran gedacht, dass ein Regal mehrere Produkte hat?</li>
+                    <li><strong>Kommunikation:</strong> Schnittstelle zwischen Backend-Devs (Datenmodell) und
+                        Mobile-Devs (Anzeige).</li>
+                    <li><strong>Blinde Flecken finden:</strong> Haben wir daran gedacht, dass ein Regal mehrere Produkte
+                        hat?</li>
                     <li style="margin-top: 20px;"><strong>Grenzen von UML:</strong>
                         <ul>
                             <li>Physikalische Phänomene (Signalrauschen, Reflexionen).</li>
@@ -66,35 +95,50 @@
                     </li>
                 </ul>
                 <aside class="notes">
-                    Warum überhaupt malen? Weil Backend und Frontend die gleiche Sprache sprechen müssen. Das Klassendiagramm war unser Vertrag. Aber UML hat Grenzen: Wie stark das Bluetooth-Signal schwankt oder wie schön der Button aussieht, modellieren wir hier nicht. Das wäre Over-Engineering.
+                    Warum überhaupt malen? Weil Backend und Frontend die gleiche Sprache sprechen müssen. Das
+                    Klassendiagramm war unser Vertrag. Aber UML hat Grenzen: Wie stark das Bluetooth-Signal schwankt
+                    oder wie schön der Button aussieht, modellieren wir hier nicht. Das wäre Over-Engineering.
                 </aside>
             </section>
 
             <section>
-                <h2>Use-Case-Diagramm</h2>
-                <img src="usecasediagramm.png" alt="Use-Case-Diagramm" style="max-height: 65vh; max-width: 100%; object-fit: contain;">
-                <aside class="notes">
-                    Hier seht ihr unser Use-Case-Diagramm. Der Kunde will Produkte suchen. Wichtig ist die include-Beziehung: Wer eine Route berechnen will, muss zwingend vorher die Position bestimmen. Das passiert im Hintergrund durch das Beacon-System. Der Admin hingegen pflegt das Layout.
-                </aside>
+                <section>
+                    <h2>Use-Case-Diagramm</h2>
+                    <img src="usecasediagramm.png" alt="Use-Case-Diagramm"
+                        style="max-height: 65vh; max-width: 100%; object-fit: contain;">
+                    <aside class="notes">
+                        Hier seht ihr unser Use-Case-Diagramm. Der Kunde will Produkte suchen. Wichtig ist die
+                        include-Beziehung: Wer eine Route berechnen will, muss zwingend vorher die Position bestimmen.
+                        Das passiert im Hintergrund durch das Beacon-System. Der Admin hingegen pflegt das Layout.
+                    </aside>
+                </section>
+
+                <section>
+                    <h2>Klassendiagramm</h2>
+                    <p style="font-size: 0.6em;">Struktur & Datenbank-Vorstufe</p>
+                    <img src="klassendiagramm.png" alt="Klassendiagramm"
+                        style="max-height: 60vh; max-width: 100%; object-fit: contain;">
+                    <aside class="notes">
+                        Das ist das Herzstück. Wir sehen hier die statische Struktur. Ein Shelf enthält mehrere Products
+                        (Komposition). Ein Beacon hat eine feste Position. Eine Route besteht aus vielen Waypoints.
+                        Dieses Diagramm war die Vorlage für unsere Java-Klassen.
+                    </aside>
+                </section>
+
+                <section>
+                    <h2>Objektdiagramm</h2>
+                    <p style="font-size: 0.6em;">Momentaufnahme zur Laufzeit: Kunde vor Regal 4</p>
+                    <img src="objektdiagramm.png" alt="Objektdiagramm"
+                        style="max-height: 60vh; max-width: 100%; object-fit: contain;">
+                    <aside class="notes">
+                        Oft verwechselt: Das Objektdiagramm. Es zeigt einen konkreten Zustand. Hier sehen wir keine
+                        abstrakte Klasse Product, sondern die konkrete Instanz 'milchPackung' mit der ID 'p-101', die
+                        gerade im 'kuehlRegal' liegt. Das hilft uns zu prüfen, ob unser Klassendiagramm in der Realität
+                        Sinn ergibt.
+                    </aside>
+                </section>
             </section>
 
-            <section>
-                <h2>Klassendiagramm</h2>
-                <p style="font-size: 0.6em;">Struktur & Datenbank-Vorstufe</p>
-                <img src="klassendiagramm.png" alt="Klassendiagramm" style="max-height: 60vh; max-width: 100%; object-fit: contain;">
-                <aside class="notes">
-                    Das ist das Herzstück. Wir sehen hier die statische Struktur. Ein Shelf enthält mehrere Products (Komposition). Ein Beacon hat eine feste Position. Eine Route besteht aus vielen Waypoints. Dieses Diagramm war die Vorlage für unsere Java-Klassen.
-                </aside>
-            </section>
-
-            <section>
-                <h2>Objektdiagramm</h2>
-                <p style="font-size: 0.6em;">Momentaufnahme zur Laufzeit: Kunde vor Regal 4</p>
-                <img src="objektdiagramm.png" alt="Objektdiagramm" style="max-height: 60vh; max-width: 100%; object-fit: contain;">
-                <aside class="notes">
-                    Oft verwechselt: Das Objektdiagramm. Es zeigt einen konkreten Zustand. Hier sehen wir keine abstrakte Klasse Product, sondern die konkrete Instanz 'milchPackung' mit der ID 'p-101', die gerade im 'kuehlRegal' liegt. Das hilft uns zu prüfen, ob unser Klassendiagramm in der Realität Sinn ergibt.
-                </aside>
-            </section>
 
             <section>
                 <h2>Traceability</h2>
@@ -102,14 +146,19 @@
                 <div style="font-size: 0.7em; text-align: left; background: #eef; padding: 20px; border-radius: 8px;">
                     <ol>
                         <li><strong>Use Case:</strong> "Produkt suchen" <br><em>↓ wird aufgerufen in ↓</em></li>
-                        <li><strong>Controller (API):</strong> <code>ProductResource.java</code> (Nimmt HTTP GET entgegen)<br><em>↓ delegiert an ↓</em></li>
-                        <li><strong>Service (Logik):</strong> <code>ProductService.java</code> (Sucht in OpenSearch)<br><em>↓ greift zu auf ↓</em></li>
-                        <li><strong>Repository (DB):</strong> <code>ProductRepository.java</code> (Zugriff auf Datenbank)<br><em>↓ liefert zurück ↓</em></li>
+                        <li><strong>Controller (API):</strong> <code>ProductResource.java</code> (Nimmt HTTP GET
+                            entgegen)<br><em>↓ delegiert an ↓</em></li>
+                        <li><strong>Service (Logik):</strong> <code>ProductService.java</code> (Sucht in
+                            OpenSearch)<br><em>↓ greift zu auf ↓</em></li>
+                        <li><strong>Repository (DB):</strong> <code>ProductRepository.java</code> (Zugriff auf
+                            Datenbank)<br><em>↓ liefert zurück ↓</em></li>
                         <li><strong>Model (Daten):</strong> <code>Product.java</code> (Das Datenobjekt)</li>
                     </ol>
                 </div>
                 <aside class="notes">
-                    Traceability bedeutet Nachvollziehbarkeit. Wir können genau sagen, welche Klassen für den Use-Case 'Produkt suchen' nötig sind. Wir brauchen einen Endpoint, die Business-Logik und den Datenzugriff. Fehlt eine dieser Klassen, funktioniert der Use-Case nicht.
+                    Traceability bedeutet Nachvollziehbarkeit. Wir können genau sagen, welche Klassen für den Use-Case
+                    'Produkt suchen' nötig sind. Wir brauchen einen Endpoint, die Business-Logik und den Datenzugriff.
+                    Fehlt eine dieser Klassen, funktioniert der Use-Case nicht.
                 </aside>
             </section>
 
@@ -129,7 +178,8 @@ public class Product extends PanacheEntity {
                     </code></pre>
                     <p style="font-size: 0.5em;"><em>Drücke ↓ für weitere Artefakte</em></p>
                     <aside class="notes">
-                        Hier seht ihr die Umsetzung. Im Java-Code spiegelt die ManyToOne Annotation genau den Pfeil im Klassendiagramm wider.
+                        Hier seht ihr die Umsetzung. Im Java-Code spiegelt die ManyToOne Annotation genau den Pfeil im
+                        Klassendiagramm wider.
                     </aside>
                 </section>
                 <section>
@@ -170,24 +220,31 @@ CREATE TABLE Product (
                 <div style="font-size: 0.65em; text-align: left;">
                     <p><strong>Fehler 1: Vererbung vs. Assoziation</strong></p>
                     <ul>
-                        <li><span style="color:red;">Falsch:</span> <code>Beacon</code> erbt von <code>Position</code>.</li>
-                        <li><span style="color:green;">Richtig:</span> <code>Beacon</code> <em>hat</em> eine <code>Position</code>.</li>
+                        <li><span style="color:red;">Falsch:</span> <code>Beacon</code> erbt von <code>Position</code>.
+                        </li>
+                        <li><span style="color:green;">Richtig:</span> <code>Beacon</code> <em>hat</em> eine
+                            <code>Position</code>.</li>
                     </ul>
                     <hr>
                     <p><strong>Fehler 2: Klassen vs. Objekte</strong></p>
                     <ul>
-                        <li><span style="color:red;">Falsch:</span> Im Klassendiagramm steht eine Klasse namens "Milch".</li>
-                        <li><span style="color:green;">Richtig:</span> Die Klasse heißt <code>Product</code>, das Objekt heißt "Milch".</li>
+                        <li><span style="color:red;">Falsch:</span> Im Klassendiagramm steht eine Klasse namens "Milch".
+                        </li>
+                        <li><span style="color:green;">Richtig:</span> Die Klasse heißt <code>Product</code>, das Objekt
+                            heißt "Milch".</li>
                     </ul>
                     <hr>
                     <p><strong>Fehler 3: Richtung der Abhängigkeit</strong></p>
                     <ul>
                         <li><span style="color:red;">Falsch:</span> <code>Product</code> kennt <code>Route</code>.</li>
-                        <li><span style="color:green;">Richtig:</span> Das Produkt weiß nicht, dass es Teil einer Route ist.</li>
+                        <li><span style="color:green;">Richtig:</span> Das Produkt weiß nicht, dass es Teil einer Route
+                            ist.</li>
                     </ul>
                 </div>
                 <aside class="notes">
-                    Was haben wir beim Lernen falsch gemacht? Anfangs haben wir oft 'ist ein' und 'hat ein' verwechselt. Ein Beacon ist keine Position, er hat eine. Und ganz wichtig: Im Klassendiagramm modellieren wir den Bauplan, nicht den Inhalt.
+                    Was haben wir beim Lernen falsch gemacht? Anfangs haben wir oft 'ist ein' und 'hat ein' verwechselt.
+                    Ein Beacon ist keine Position, er hat eine. Und ganz wichtig: Im Klassendiagramm modellieren wir den
+                    Bauplan, nicht den Inhalt.
                 </aside>
             </section>
 
@@ -196,7 +253,8 @@ CREATE TABLE Product (
                 <div style="font-size: 0.6em; text-align: left;">
                     <p><strong>1. "Prompt-proof" Aufgaben gestalten:</strong></p>
                     <ul>
-                        <li>Weg von "Erstelle ein Diagramm". Hin zu: <strong>Live-Modellierung & Rechtfertigung.</strong></li>
+                        <li>Weg von "Erstelle ein Diagramm". Hin zu: <strong>Live-Modellierung &
+                                Rechtfertigung.</strong></li>
                         <li><em>"Warum hier Komposition und nicht Aggregation?"</em></li>
                     </ul>
                     <p><strong>2. Pro & Contra KI:</strong></p>
@@ -212,7 +270,9 @@ CREATE TABLE Product (
                     </ul>
                 </div>
                 <aside class="notes">
-                    Zum Abschluss: Hätte ich das alles nur mit einem Prompt generieren können? Die Diagramme vielleicht. Aber die Begründung, *warum* wir das bei Indooro so machen, erfordert Verständnis. Die KI nimmt uns die Syntax ab, aber die Semantik und Architektur bleibt unsere Aufgabe.
+                    Zum Abschluss: Hätte ich das alles nur mit einem Prompt generieren können? Die Diagramme vielleicht.
+                    Aber die Begründung, *warum* wir das bei Indooro so machen, erfordert Verständnis. Die KI nimmt uns
+                    die Syntax ab, aber die Semantik und Architektur bleibt unsere Aufgabe.
                 </aside>
             </section>
 
@@ -222,7 +282,7 @@ CREATE TABLE Product (
     <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/plugin/notes/notes.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/plugin/highlight/highlight.min.js"></script>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.4.0/dist/mermaid.min.js"></script>
 
     <script>
@@ -230,15 +290,16 @@ CREATE TABLE Product (
         Reveal.initialize({
             hash: true,
             slideNumber: true,
-            plugins: [ RevealNotes, RevealHighlight ]
+            plugins: [RevealNotes, RevealHighlight]
         });
 
         // Mermaid.js initialisieren
-        mermaid.initialize({ 
+        mermaid.initialize({
             startOnLoad: true,
             theme: 'default',
             securityLevel: 'loose'
         });
     </script>
 </body>
+
 </html>
