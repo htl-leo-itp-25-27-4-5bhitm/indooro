@@ -3,303 +3,385 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Indooro - UML Modellierung</title>
+    <title>UML – Indooro</title>
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reset.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/theme/white.min.css" id="theme">
-
-    <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/plugin/highlight/monokai.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/reset.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/reveal.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/theme/white.min.css">
 
     <style>
-        /* Eigene Anpassungen für bessere Lesbarkeit */
         .reveal h1,
-        .reveal h2,
-        .reveal h3 {
+        h2,
+        h3 {
             text-transform: none;
-            color: #333;
         }
 
-        .reveal pre {
-            width: 100%;
-            font-size: 0.55em;
-            box-shadow: none;
-        }
-
-        .mermaid {
-            font-size: 0.8em;
-            margin-top: 20px;
-        }
-
-        .left-align {
+        .box {
+            background: #f2f2f2;
+            padding: 20px;
+            border-radius: 10px;
             text-align: left;
+        }
+
+        .small {
+            font-size: 0.7em;
+        }
+
+        table {
+            font-size: 0.6em;
         }
     </style>
 </head>
 
 <body>
+
     <div class="reveal">
         <div class="slides">
 
-            <section>
-                <h2>Indooro</h2>
-                <h3>Indoor-Navigation für den Einzelhandel</h3>
-                <div class="left-align" style="font-size: 0.8em; margin-top: 40px;">
-                    <p><strong>UML in unserem Projekt</strong></p>
-
-                </div>
-                <aside class="notes">
-                    Herzlich willkommen. Wir präsentieren euch heute UML nicht als trockene Theorie, sondern am lebenden
-                    Objekt: Unserem Projekt 'Indooro'. Indooro ist ein Navigationssystem für SPAR-Märkte. Technisch
-                    setzen wir auf ein modernes Java 21 Quarkus Backend und eine Capacitor App. Die Positionsbestimmung
-                    läuft über Bluetooth-Beacons, die im Laden verteilt sind. Um dieses komplexe Zusammenspiel zu
-                    planen, war UML unverzichtbar.
-                </aside>
-            </section>
+            <!-- ========================= -->
+            <!-- DECKBLATT -->
+            <!-- ========================= -->
 
             <section>
-                <h2>Das Szenario</h2>
-                <p><em>(Der Rote Faden)</em></p>
-                <div
-                    style="background: #f0f0f0; padding: 20px; border-radius: 10px; font-size: 0.8em; text-align: left;">
-                    <p><strong>Use Case:</strong> Ein Kunde sucht "Milch".</p>
-                    <ol>
-                        <li>App scannt Beacons (UUID, Signalstärke).</li>
-                        <li>App berechnet Position (x, y).</li>
-                        <li>Backend liefert Position der "Milch".</li>
-                        <li>Route wird berechnet und angezeigt.</li>
-                    </ol>
-                </div>
-                <aside class="notes">
-                    Damit wir uns nicht in Details verlieren, folgen wir heute einem einzigen Szenario durch alle
-                    Diagramme: Ein Kunde steht im Eingangsbereich und sucht 'Milch'. Die App muss wissen, wo der Kunde
-                    ist, wo die Milch ist, und wie man hinkommt.
-                </aside>
+                <h1>UML Modellierung</h1>
+                <h3>Indooro – Indoor Navigation für Supermärkte</h3>
+
+                <p class="small">
+                    HTL – Softwareentwicklung<br>
+                    Lerneinheit (20 Minuten)
+                </p>
+
+                <p class="small">
+                    Team: _______
+                </p>
             </section>
 
-            <section>
-                <h2>Warum UML bei Indooro?</h2>
-                <ul style="font-size: 0.8em;">
-                    <li><strong>Kommunikation:</strong> Schnittstelle zwischen Backend-Devs (Datenmodell) und
-                        Mobile-Devs (Anzeige).</li>
-                    <li><strong>Blinde Flecken finden:</strong> Haben wir daran gedacht, dass ein Regal mehrere Produkte
-                        hat?</li>
-                    <li style="margin-top: 20px;"><strong>Grenzen von UML:</strong>
-                        <ul>
-                            <li>Physikalische Phänomene (Signalrauschen, Reflexionen).</li>
-                            <li>UX/UI-Flows (dafür nutzen wir Figma).</li>
-                        </ul>
-                    </li>
-                </ul>
-                <aside class="notes">
-                    Warum überhaupt malen? Weil Backend und Frontend die gleiche Sprache sprechen müssen. Das
-                    Klassendiagramm war unser Vertrag. Aber UML hat Grenzen: Wie stark das Bluetooth-Signal schwankt
-                    oder wie schön der Button aussieht, modellieren wir hier nicht. Das wäre Over-Engineering.
-                </aside>
-            </section>
 
+            <!-- ========================= -->
+            <!-- UML ALLGEMEIN -->
+            <!-- ========================= -->
             <section>
                 <section>
-                    <h2>Use-Case-Diagramm</h2>
+                    <h2>Was ist UML?</h2>
+
+                    <div class="box">
+                        <ul>
+                            <li>Unified Modeling Language</li>
+                            <li>Standard zur Beschreibung von Software-Systemen</li>
+                            <li>Visuelle Kommunikation zwischen Entwicklern</li>
+                            <li>Unabhängig von Programmiersprache</li>
+                        </ul>
+                    </div>
+                </section>
+
+
+                <section>
+                    <h2>Wozu verwendet man UML?</h2>
+
+                    <ul>
+                        <li>Systeme planen bevor Code entsteht</li>
+                        <li>Komplexität reduzieren</li>
+                        <li>Team-Kommunikation</li>
+                        <li>Dokumentation</li>
+                        <li>Architektur verstehen</li>
+                    </ul>
+                </section>
+
+
+                <section>
+                    <h2>Grenzen von UML</h2>
+
+                    <div class="box">
+                        <ul>
+                            <li>Kein Ersatz für Code</li>
+                            <li>Runtime-Verhalten nur begrenzt sichtbar</li>
+                            <li>Kann schnell zu detailliert werden</li>
+                            <li>Pflegeaufwand</li>
+                        </ul>
+                    </div>
+                </section>
+
+
+                <section>
+                    <h2>Typische UML Fehler</h2>
+
+                    <ul>
+                        <li>Klassen ≠ Objekte</li>
+                        <li>Zu viele Beziehungen</li>
+                        <li>Falsche Vererbung</li>
+                        <li>Diagramm ohne Use-Case Bezug</li>
+                    </ul>
+                </section>
+            </section>
+
+            <!-- ========================= -->
+            <!-- INDOORO ANWENDUNG -->
+            <!-- ========================= -->
+            <section>
+                <section>
+                    <h2>Unser Projekt: Indooro</h2>
+
+                    <div class="box">
+                        <strong>Ziel:</strong><br>
+                        Navigation innerhalb eines Supermarktes
+                        <br><br>
+
+                        Ablauf: <br>
+                        <ul>
+                            <li>Kunde sucht Produkt</li>
+                            <li>Position wird bestimmt</li>
+                            <li>Route wird berechnet</li>
+                            <li>Produkt wird gefunden</li>
+                        </ul>
+                    </div>
+                </section>
+
+
+                <section>
+                    <h2>Warum UML bei Indooro?</h2>
+
+                    <ul>
+                        <li>Backend + App abstimmen</li>
+                        <li>Datenmodell planen</li>
+                        <li>Navigationslogik verstehen</li>
+                        <li>Use Cases ableiten</li>
+                    </ul>
+                </section>
+            </section>
+
+
+
+            <!-- ========================= -->
+            <!-- UML DIAGRAMME -->
+            <!-- ========================= -->
+
+            <section>
+
+                <section>
+                    <h2>Use Case Diagramm</h2>
+
+                    <p class="small">
+                    </p>
+
                     <img src="usecasediagramm.png" alt="Use-Case-Diagramm"
                         style="max-height: 65vh; max-width: 100%; object-fit: contain;">
-                    <aside class="notes">
-                        Hier seht ihr unser Use-Case-Diagramm. Der Kunde will Produkte suchen. Wichtig ist die
-                        include-Beziehung: Wer eine Route berechnen will, muss zwingend vorher die Position bestimmen.
-                        Das passiert im Hintergrund durch das Beacon-System. Der Admin hingegen pflegt das Layout.
-                    </aside>
                 </section>
 
                 <section>
                     <h2>Klassendiagramm</h2>
-                    <p style="font-size: 0.6em;">Struktur & Datenbank-Vorstufe</p>
+
+                    <p class="small">
+                    </p>
+
                     <img src="klassendiagramm.png" alt="Klassendiagramm"
                         style="max-height: 60vh; max-width: 100%; object-fit: contain;">
-                    <aside class="notes">
-                        Das ist das Herzstück. Wir sehen hier die statische Struktur. Ein Shelf enthält mehrere Products
-                        (Komposition). Ein Beacon hat eine feste Position. Eine Route besteht aus vielen Waypoints.
-                        Dieses Diagramm war die Vorlage für unsere Java-Klassen.
-                    </aside>
                 </section>
 
                 <section>
                     <h2>Objektdiagramm</h2>
-                    <p style="font-size: 0.6em;">Momentaufnahme zur Laufzeit: Kunde vor Regal 4</p>
+
+                    <p class="small">
+                    </p>
+
                     <img src="objektdiagramm.png" alt="Objektdiagramm"
                         style="max-height: 60vh; max-width: 100%; object-fit: contain;">
-                    <aside class="notes">
-                        Oft verwechselt: Das Objektdiagramm. Es zeigt einen konkreten Zustand. Hier sehen wir keine
-                        abstrakte Klasse Product, sondern die konkrete Instanz 'milchPackung' mit der ID 'p-101', die
-                        gerade im 'kuehlRegal' liegt. Das hilft uns zu prüfen, ob unser Klassendiagramm in der Realität
-                        Sinn ergibt.
-                    </aside>
                 </section>
+
             </section>
 
+
+            <!-- ========================= -->
+            <!-- TRACEABILITY -->
+            <!-- ========================= -->
 
             <section>
                 <h2>Traceability</h2>
-                <p style="font-size: 0.6em;">Vom Kreis zum Code für "Produkt suchen"</p>
-                <div style="font-size: 0.7em; text-align: left; background: #eef; padding: 20px; border-radius: 8px;">
-                    <ol>
-                        <li><strong>Use Case:</strong> "Produkt suchen" <br><em>↓ wird aufgerufen in ↓</em></li>
-                        <li><strong>Controller (API):</strong> <code>ProductResource.java</code> (Nimmt HTTP GET
-                            entgegen)<br><em>↓ delegiert an ↓</em></li>
-                        <li><strong>Service (Logik):</strong> <code>ProductService.java</code> (Sucht in
-                            OpenSearch)<br><em>↓ greift zu auf ↓</em></li>
-                        <li><strong>Repository (DB):</strong> <code>ProductRepository.java</code> (Zugriff auf
-                            Datenbank)<br><em>↓ liefert zurück ↓</em></li>
-                        <li><strong>Model (Daten):</strong> <code>Product.java</code> (Das Datenobjekt)</li>
-                    </ol>
+
+                <div class="box">
+
+                    <strong>Use Case 1:</strong> Produkt suchen
+                    → Klassen:
+                    <ul>
+                        <li>Product</li>
+                        <li>Shelf</li>
+                        <li>RouteService</li>
+                        <li>UserPosition</li>
+                    </ul>
+                    <br><br>
+                    <strong>Use Case 2:</strong> Route berechnen
+                    → Klassen:
+                    <ul>
+                        <li>Beacon</li>
+                        <li>NavigationService</li>
+                        <li>Waypoint</li>
+                        <li>StoreMap</li>
+                    </ul>
+
                 </div>
-                <aside class="notes">
-                    Traceability bedeutet Nachvollziehbarkeit. Wir können genau sagen, welche Klassen für den Use-Case
-                    'Produkt suchen' nötig sind. Wir brauchen einen Endpoint, die Business-Logik und den Datenzugriff.
-                    Fehlt eine dieser Klassen, funktioniert der Use-Case nicht.
-                </aside>
             </section>
 
-            <section>
-                <section>
-                    <h2>Artefakte (Belege)</h2>
-                    <p>1. Java Entity (Quarkus/Hibernate)</p>
-                    <pre><code class="java" data-trim data-noescape>
-@Entity
-public class Product extends PanacheEntity {
-    public String name;
-    public double price;
-    
-    @ManyToOne
-    public Shelf shelf; // Beziehung zum Klassendiagramm
-}
-                    </code></pre>
-                    <p style="font-size: 0.5em;"><em>Drücke ↓ für weitere Artefakte</em></p>
-                    <aside class="notes">
-                        Hier seht ihr die Umsetzung. Im Java-Code spiegelt die ManyToOne Annotation genau den Pfeil im
-                        Klassendiagramm wider.
-                    </aside>
-                </section>
-                <section>
-                    <h2>Artefakte (Belege)</h2>
-                    <p>2. JSON Response (API)</p>
-                    <pre><code class="json" data-trim data-noescape>
-{
-  "shelfId": 4,
-  "section": "Molkerei",
-  "products": [
-    { "id": 101, "name": "Vollmilch", "price": 1.49 }
-  ]
-}
-                    </code></pre>
-                    <aside class="notes">
-                        Das JSON zeigt, wie die Daten formatiert an die Capacitor-App geschickt werden.
-                    </aside>
-                </section>
-                <section>
-                    <h2>Artefakte (Belege)</h2>
-                    <p>3. SQL Schema</p>
-                    <pre><code class="sql" data-trim data-noescape>
-CREATE TABLE Product (
-    id BIGINT PRIMARY KEY,
-    name VARCHAR(255),
-    price DOUBLE,
-    shelf_id BIGINT REFERENCES Shelf(id)
-);
-                    </code></pre>
-                    <aside class="notes">
-                        Und das SQL zeigt, wie sie persistiert werden. Alles ist konsistent über alle Schichten hinweg.
-                    </aside>
-                </section>
-            </section>
+
+            <!-- ========================= -->
+            <!-- ARTEFAKTE -->
+            <!-- ========================= -->
 
             <section>
-                <h2>Typische Fehler</h2>
-                <div style="font-size: 0.65em; text-align: left;">
-                    <p><strong>Fehler 1: Vererbung vs. Assoziation</strong></p>
-                    <ul>
-                        <li><span style="color:red;">Falsch:</span> <code>Beacon</code> erbt von <code>Position</code>.
-                        </li>
-                        <li><span style="color:green;">Richtig:</span> <code>Beacon</code> <em>hat</em> eine
-                            <code>Position</code>.</li>
-                    </ul>
-                    <hr>
-                    <p><strong>Fehler 2: Klassen vs. Objekte</strong></p>
-                    <ul>
-                        <li><span style="color:red;">Falsch:</span> Im Klassendiagramm steht eine Klasse namens "Milch".
-                        </li>
-                        <li><span style="color:green;">Richtig:</span> Die Klasse heißt <code>Product</code>, das Objekt
-                            heißt "Milch".</li>
-                    </ul>
-                    <hr>
-                    <p><strong>Fehler 3: Richtung der Abhängigkeit</strong></p>
-                    <ul>
-                        <li><span style="color:red;">Falsch:</span> <code>Product</code> kennt <code>Route</code>.</li>
-                        <li><span style="color:green;">Richtig:</span> Das Produkt weiß nicht, dass es Teil einer Route
-                            ist.</li>
-                    </ul>
-                </div>
-                <aside class="notes">
-                    Was haben wir beim Lernen falsch gemacht? Anfangs haben wir oft 'ist ein' und 'hat ein' verwechselt.
-                    Ein Beacon ist keine Position, er hat eine. Und ganz wichtig: Im Klassendiagramm modellieren wir den
-                    Bauplan, nicht den Inhalt.
-                </aside>
+                <h2>Projekt-Artefakte</h2>
+
+                <ul>
+                    <li>Code-Screenshot</li>
+                    <li>Datenbankschema</li>
+                    <li>UML Tool Screenshot</li>
+                </ul>
+
+                <p class="small">
+                    ➡ Pflicht: 3 Belege aus Projekt / Quelle
+                </p>
             </section>
 
+
+            <!-- ========================= -->
+            <!-- DIAGRAM REVIEW -->
+            <!-- ========================= -->
+
             <section>
-                <h2>Reflexion: KI im Design</h2>
-                <div style="font-size: 0.6em; text-align: left;">
-                    <p><strong>1. "Prompt-proof" Aufgaben gestalten:</strong></p>
+                <h2>Diagramm Review</h2>
+
+                <div class="box">
+
+                    <strong>Fehler 1:</strong> Vererbung statt Beziehung <br>
+                    <strong>Vorher:</strong> Beacon → Position <br>
+                    <strong>Nachher:</strong> Beacon hat Position
+
+                    <br><br>
+
+                    <strong>Fehler 2:</strong> Objekt als Klasse
+
+                    <br><br>
+
+                    <strong>Fehler 3:</strong> falsche Abhängigkeit
+
+                </div>
+            </section>
+
+
+            <!-- ========================= -->
+            <!-- KI TEIL -->
+            <!-- ========================= -->
+
+            <section>
+                <h2>KI-resistente Aufgaben</h2>
+
+                <ul>
+                    <li>Diagramm begründen lassen</li>
+                    <li>Live Modellierung</li>
+                    <li>Projektbezug erzwingen</li>
+                    <li>Review & Diskussion</li>
+                </ul>
+            </section>
+
+
+            <section>
+                <h2>KI – Pro & Contra</h2>
+
+                <div class="box">
+                    <strong>Pro</strong> <br>
                     <ul>
-                        <li>Weg von "Erstelle ein Diagramm". Hin zu: <strong>Live-Modellierung &
-                                Rechtfertigung.</strong></li>
-                        <li><em>"Warum hier Komposition und nicht Aggregation?"</em></li>
-                    </ul>
-                    <p><strong>2. Pro & Contra KI:</strong></p>
+                        <li>Schnelle Diagrammerstellung</li>
+                        <li>Syntax Hilfe</li>
+                    </ul> <br>
+
+                    <strong>Contra</strong> <br>
                     <ul>
-                        <li><strong>Pro:</strong> Geschwindigkeit (Boilerplate, PlantUML/Mermaid Syntax).</li>
-                        <li><strong>Contra:</strong> "Halluzinationen" in der Logik, "Blind Copying".</li>
-                    </ul>
-                    <p><strong>3. Zukunft von UML & KI:</strong></p>
-                    <ul>
-                        <li><strong>Text-to-UML:</strong> Ist bereits Standard.</li>
-                        <li><strong>Image-to-Code:</strong> Skizze am Whiteboard &rarr; KI generiert Java Klassen.</li>
-                        <li><strong>Aber:</strong> Die <em>Architektur-Entscheidung</em> bleibt beim Menschen.</li>
+                        <li>Logische Fehler</li>
+                        <li>Blindes Übernehmen</li>
                     </ul>
                 </div>
-                <aside class="notes">
-                    Zum Abschluss: Hätte ich das alles nur mit einem Prompt generieren können? Die Diagramme vielleicht.
-                    Aber die Begründung, *warum* wir das bei Indooro so machen, erfordert Verständnis. Die KI nimmt uns
-                    die Syntax ab, aber die Semantik und Architektur bleibt unsere Aufgabe.
-                </aside>
+            </section>
+
+
+            <section>
+                <h2>Zukunft von UML & KI</h2>
+
+                <ul>
+                    <li>Text → UML automatisch</li>
+                    <li>Skizze → Code</li>
+                    <li>KI als Assistenz</li>
+                    <li>Architektur bleibt menschlich</li>
+                </ul>
+            </section>
+
+
+            <!-- ========================= -->
+            <!-- PROMPTS -->
+            <!-- ========================= -->
+
+            <section>
+                <h2>Verwendete Prompts</h2>
+
+                <table border="1">
+                    <tr>
+                        <th>Ziel</th>
+                        <th>Prompt</th>
+                        <th>Tool</th>
+                        <th>Output</th>
+                        <th>Änderungen</th>
+                        <th>Vertrauen?</th>
+                    </tr>
+
+                    <tr>
+                        <td>Use Case erstellen</td>
+                        <td>...</td>
+                        <td>ChatGPT</td>
+                        <td>...</td>
+                        <td>...</td>
+                        <td>...</td>
+                    </tr>
+
+                    <tr>
+                        <td>Klassendiagramm</td>
+                        <td>...</td>
+                        <td>...</td>
+                        <td>...</td>
+                        <td>...</td>
+                        <td>...</td>
+                    </tr>
+
+                </table>
+
+            </section>
+
+
+            <!-- ========================= -->
+            <!-- LINKS -->
+            <!-- ========================= -->
+
+            <section>
+                <h2>Quellen & Links</h2>
+
+                <ul>
+                    <li>OMG UML Specification</li>
+                    <li>draw.io</li>
+                    <li>PlantUML</li>
+                    <li>Mermaid</li>
+                    <li>Reveal.js</li>
+                </ul>
             </section>
 
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/plugin/notes/notes.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/plugin/highlight/highlight.min.js"></script>
-
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.4.0/dist/mermaid.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/reveal.js"></script>
 
     <script>
-        // Reveal.js initialisieren
         Reveal.initialize({
             hash: true,
-            slideNumber: true,
-            plugins: [RevealNotes, RevealHighlight]
-        });
-
-        // Mermaid.js initialisieren
-        mermaid.initialize({
-            startOnLoad: true,
-            theme: 'default',
-            securityLevel: 'loose'
+            slideNumber: true
         });
     </script>
+
 </body>
 
 </html>
