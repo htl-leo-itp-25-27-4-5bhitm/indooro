@@ -35,6 +35,9 @@
     <div class="reveal">
         <div class="slides">
 
+            <!-- ========================= -->
+            <!-- DECKBLATT -->
+            <!-- ========================= -->
             <section>
                 <h1>UML Modellierung</h1>
                 <h3>Indooro – Indoor Navigation für Supermärkte</h3>
@@ -47,9 +50,15 @@
                 <p class="small">
                     Team: Indooro
                 </p>
+                <aside class="notes">
+                    <strong>Was ihr sagt:</strong> "Hallo zusammen. Wir sind das Team Indooro. Wir zeigen euch heute nicht nur, was UML ist, sondern beweisen euch anhand unserer eigenen Indoor-Navigations-App für Supermärkte, wie man eine Software von der ersten Idee bis zum fertigen Code modelliert."
+                </aside>
             </section>
 
 
+            <!-- ========================= -->
+            <!-- UML ALLGEMEIN -->
+            <!-- ========================= -->
             <section>
                 <section>
                     <h2>Was ist UML?</h2>
@@ -62,6 +71,10 @@
                             <li>Unabhängig von Programmiersprache</li>
                         </ul>
                     </div>
+                    <aside class="notes">
+                        <strong>Was ihr sagt:</strong> "UML ist die universelle Sprache der Softwareentwickler. Stellt euch vor, ihr baut ein Haus. Da fangt ihr auch nicht direkt an zu mauern, sondern der Architekt zeichnet einen Plan. UML ist unser Bauplan."<br><br>
+                        <strong>Hintergrund-Info (Für euch):</strong> UML ist unabhängig von der Programmiersprache. Egal ob man in Java, Python oder C# programmiert, ein UML-Klassendiagramm sieht immer gleich aus.
+                    </aside>
                 </section>
 
 
@@ -75,6 +88,9 @@
                         <li>Dokumentation</li>
                         <li>Architektur verstehen</li>
                     </ul>
+                    <aside class="notes">
+                        <strong>Was ihr sagt:</strong> "Wir nutzen UML, um das System zu planen, bevor wir tausende Zeilen Code schreiben. Das spart extrem viel Zeit und verhindert Missverständnisse im Team, da jeder sofort versteht, wie die Architektur aussehen soll."
+                    </aside>
                 </section>
 
 
@@ -89,6 +105,9 @@
                             <li>Pflegeaufwand</li>
                         </ul>
                     </div>
+                    <aside class="notes">
+                        <strong>Was ihr sagt:</strong> "UML ist super für Logik und Datenstrukturen. Aber es hat Grenzen. Wir arbeiten bei Indooro mit Bluetooth-Beacons. Wie stark das Signal schwankt oder wie die App optisch aussieht, können wir in UML nicht zeichnen."
+                    </aside>
                 </section>
 
 
@@ -101,9 +120,15 @@
                         <li>Falsche Vererbung</li>
                         <li>Diagramm ohne Use-Case Bezug</li>
                     </ul>
+                    <aside class="notes">
+                        <strong>Was ihr sagt:</strong> "Ein typischer Anfängerfehler ist es, Objekte mit Klassen zu verwechseln, oder wild mit Vererbungs-Pfeilen um sich zu werfen. Dazu kommen wir gleich noch bei unserem Review."
+                    </aside>
                 </section>
             </section>
 
+            <!-- ========================= -->
+            <!-- INDOORO ANWENDUNG -->
+            <!-- ========================= -->
             <section>
                 <section>
                     <h2>Unser Projekt: Indooro</h2>
@@ -121,6 +146,9 @@
                             <li>Produkt wird gefunden</li>
                         </ul>
                     </div>
+                    <aside class="notes">
+                        <strong>Was ihr sagt:</strong> "Damit die Diagramme gleich Sinn ergeben, kurz zu unserem Projekt: Indooro ist eine App, mit der man Produkte im Supermarkt findet. Unser roter Faden für heute: Ein Kunde sucht Milch. Die App peilt Beacons an, berechnet die Route und führt den Kunden zum Regal."
+                    </aside>
                 </section>
 
 
@@ -133,37 +161,113 @@
                         <li>Navigationslogik verstehen</li>
                         <li>Use Cases ableiten</li>
                     </ul>
+                    <aside class="notes">
+                        <strong>Was ihr sagt:</strong> "Um das Backend, welches in Java geschrieben ist, und die App sauber zu verknüpfen, brauchten wir UML. Es war die einzige Möglichkeit sicherzustellen, dass die App genau die Daten bekommt, die das Backend liefert."
+                    </aside>
                 </section>
             </section>
 
 
 
+            <!-- ========================= -->
+            <!-- UML DIAGRAMME -->
+            <!-- ========================= -->
             <section>
 
+                <!-- THEORIE: Use-Case -->
                 <section>
-                    <h2>Use Case Diagramm</h2>
+                    <h2>Was ist ein Use-Case Diagramm?</h2>
 
-                    <img src="usecasediagramm.png" alt="Use-Case-Diagramm"
-                        style="max-height: 65vh; max-width: 100%; object-fit: contain;">
+                    <div class="box">
+                        <ul>
+                            <li>Beschreibt das externe Systemverhalten</li>
+                            <li>Fokus auf das <strong>"Was"</strong>, niemals auf das <strong>"Wie"</strong></li>
+                            <li><strong>Elemente:</strong> Akteure (Menschen/Systeme), Anwendungsfälle (Ovale), Systemgrenze (Rechteck)</li>
+                        </ul>
+                    </div>
+                    <aside class="notes">
+                        <strong>Was ihr sagt:</strong> "Bevor wir unser Indooro-Diagramm zeigen, kurz zur Theorie: Ein Use-Case-Diagramm beschreibt aus der Vogelperspektive, was ein System tun soll. Es zeigt Akteure, also Benutzer, und Anwendungsfälle, also die Funktionen. Es geht hierbei nur um das 'Was', niemals um technische Details."<br><br>
+                        <strong>Hintergrund-Info (Für euch):</strong> Es gehört zu den Verhaltensdiagrammen (Behavioral Diagrams) der UML.
+                    </aside>
                 </section>
 
+                <!-- PRAXIS: Use-Case -->
                 <section>
-                    <h2>Klassendiagramm</h2>
+                    <h2>Use Case Diagramm (Indooro)</h2>
+
+                    <img src="usecasediagramm.png" alt="Use-Case-Diagramm"
+                        style="max-height: 60vh; max-width: 100%; object-fit: contain;">
+                    <aside class="notes">
+                        <strong>Was ihr sagt:</strong> "Hier seht ihr diese Theorie angewandt auf Indooro. Die Strichmännchen sind unsere Akteure, z.B. der Kunde. Wenn der Kunde die Route berechnen will, muss das System vorher die Position bestimmen. Das nennt man in UML eine Include-Beziehung."<br><br>
+                        <strong>Hintergrund-Info (Für euch):</strong> Include bedeutet: Eine Aktion setzt zwingend eine andere voraus. (Route berechnen geht nicht ohne Position).
+                    </aside>
+                </section>
+
+                <!-- THEORIE: Klassendiagramm -->
+                <section>
+                    <h2>Was ist ein Klassendiagramm?</h2>
+
+                    <div class="box">
+                        <ul>
+                            <li>Zeigt die statische Struktur des Systems</li>
+                            <li>Der Bauplan für die spätere Programmierung</li>
+                            <li><strong>Elemente:</strong> Klassen, Attribute (Eigenschaften), Methoden (Funktionen)</li>
+                            <li><strong>Beziehungen:</strong> Wer kennt wen? Wer besteht woraus?</li>
+                        </ul>
+                    </div>
+                    <aside class="notes">
+                        <strong>Was ihr sagt:</strong> "Das Klassendiagramm ist das wohl wichtigste UML-Diagramm. Es ist der statische Bauplan unserer Software. Es zeigt Klassen mit ihren Eigenschaften und Funktionen, sowie deren Beziehungen untereinander. Wenn man dieses Diagramm hat, kann man fast schon anfangen zu programmieren."<br><br>
+                        <strong>Hintergrund-Info (Für euch):</strong> Es ist ein Strukturdiagramm. Wichtig: Hier stehen keine konkreten Werte (wie "5 Euro"), sondern nur Datentypen (wie "Preis: double").
+                    </aside>
+                </section>
+
+                <!-- PRAXIS: Klassendiagramm -->
+                <section>
+                    <h2>Klassendiagramm (Indooro)</h2>
 
                     <img src="klassendiagramm.png" alt="Klassendiagramm"
                         style="max-height: 60vh; max-width: 100%; object-fit: contain;">
+                    <aside class="notes">
+                        <strong>Was ihr sagt:</strong> "Hier sehen wir das für unsere App. Wir sehen, dass ein Regal (Shelf) mehrere Produkte (Product) enthält. Die Kästchen zeigen den Namen, die Eigenschaften (wie z.B. Name, Preis) und die Funktionen der Klassen."<br><br>
+                        <strong>Hintergrund-Info (Für euch):</strong> Das Klassendiagramm ist statisch. Es zeigt, wie das Programm auf der Festplatte liegt, wenn es noch gar nicht gestartet wurde.
+                    </aside>
                 </section>
 
+                <!-- THEORIE: Objektdiagramm -->
                 <section>
-                    <h2>Objektdiagramm</h2>
+                    <h2>Was ist ein Objektdiagramm?</h2>
+
+                    <div class="box">
+                        <ul>
+                            <li>Zeigt einen Schnappschuss des Systems zur Laufzeit</li>
+                            <li>Beinhaltet konkrete Instanzen (Objekte) von Klassen</li>
+                            <li>Zeigt echte Werte statt nur Datentypen</li>
+                            <li>Nutzt man oft, um komplexe Situationen zu testen</li>
+                        </ul>
+                    </div>
+                    <aside class="notes">
+                        <strong>Was ihr sagt:</strong> "Das Objektdiagramm ist der kleine Bruder des Klassendiagramms. Während das Klassendiagramm der abstrakte Bauplan ist, zeigt uns das Objektdiagramm konkrete Instanzen zu einem ganz bestimmten Zeitpunkt, wenn das Programm läuft. Hier sehen wir echte Werte."<br><br>
+                        <strong>Hintergrund-Info (Für euch):</strong> Nützlich, um das Klassendiagramm auf Logikfehler zu prüfen ("Kann dieser Zustand überhaupt existieren?").
+                    </aside>
+                </section>
+
+                <!-- PRAXIS: Objektdiagramm -->
+                <section>
+                    <h2>Objektdiagramm (Indooro)</h2>
 
                     <img src="objektdiagramm.png" alt="Objektdiagramm"
                         style="max-height: 60vh; max-width: 100%; object-fit: contain;">
+                    <aside class="notes">
+                        <strong>Was ihr sagt:</strong> "Hier unser Schnappschuss zur Laufzeit. Es zeigt, was passiert, wenn die App gerade geöffnet ist. Hier steht nicht mehr abstrakt 'Product', sondern ganz konkret die 'Milchpackung mit der ID 123', die im 'Kühlregal Nummer 4' liegt."
+                    </aside>
                 </section>
 
             </section>
 
 
+            <!-- ========================= -->
+            <!-- TRACEABILITY -->
+            <!-- ========================= -->
             <section>
                 <h2>Traceability</h2>
 
@@ -188,9 +292,16 @@
                     </ul>
 
                 </div>
+                <aside class="notes">
+                    <strong>Was ihr sagt:</strong> "Traceability heißt Rückverfolgbarkeit. Wir bauen keinen Code, den wir nicht brauchen. Wenn wir den Use-Case 'Produkt suchen' haben, brauchen wir zwingend die Klasse Product für die Daten, die Klasse Shelf für den Ort, den RouteService für die Logik und die UserPosition für den Startpunkt. Fehlt eine Klasse, funktioniert der Use-Case nicht."<br><br>
+                    <strong>Hintergrund-Info (Für euch):</strong> Der Lehrer will hier sehen, dass Diagramme nicht isoliert sind. Aus dem Use-Case-Kreis "Produkt suchen" werden später echte Programmier-Dateien (Klassen).
+                </aside>
             </section>
 
 
+            <!-- ========================= -->
+            <!-- ARTEFAKTE -->
+            <!-- ========================= -->
             <section>
                 <h2>Projekt-Artefakte (Belege)</h2>
                 <p class="small">Vom UML zum echten System (Draft)</p>
@@ -212,7 +323,9 @@
     shelf_id INT REFERENCES Shelf(id)
 );</code></pre>
                 </div>
-                
+                <aside class="notes">
+                    <strong>Was ihr sagt:</strong> "Dass wir uns das nicht nur ausdenken, seht ihr hier. Wir haben UML direkt in unser Java-Backend übersetzt. Ihr seht oben einen Entwurf unseres Java-Codes. Die Klasse Product hat eine direkte Verbindung zur Klasse Shelf. Und genau diese Verbindung findet sich unten im Datenbank-Schema wieder, wo das Produkt die shelf_id speichert. Alles greift ineinander."
+                </aside>
             </section>
 
             <section>
@@ -245,10 +358,16 @@
                         <td>Die Milch im Regal weiß nicht, wer zu ihr navigiert.</td>
                     </tr>
                 </table>
+                <aside class="notes">
+                    <strong>Was ihr sagt:</strong> "Natürlich macht man am Anfang Fehler. Unser erster Fehler: Wir haben gesagt 'Ein Beacon erbt von einer Position'. Das ist Quatsch. Ein Beacon ist keine Position, er hat eine. Oder wir haben konkret 'Milch' ins Klassendiagramm geschrieben, obwohl das ein Objekt ist und keine abstrakte Klasse."
+                </aside>
             </section>
 
             
 
+            <!-- ========================= -->
+            <!-- KI TEIL -->
+            <!-- ========================= -->
             <section>
                 <h2>KI-resistente Aufgaben</h2>
 
@@ -258,6 +377,9 @@
                     <li>Projektbezug erzwingen</li>
                     <li>Review & Diskussion</li>
                 </ul>
+                <aside class="notes">
+                    <strong>Was ihr sagt:</strong> "Zum Schluss noch die Frage: Wie prüft man das heute, wo KI einem alles generieren kann? Lehrer dürfen nicht mehr nur sagen 'Malt ein Diagramm'. Man muss das Diagramm begründen können oder live an der Tafel erklären."
+                </aside>
             </section>
 
 
@@ -277,6 +399,9 @@
                         <li>Blindes Übernehmen</li>
                     </ul>
                 </div>
+                <aside class="notes">
+                    <strong>Was ihr sagt:</strong> "KI ist super, um den Code für die Diagramme schnell zu schreiben, aber sie macht oft logische Fehler, die man ohne eigenes Verständnis nicht erkennt. Man übernimmt schnell Fehler blind in die eigene Architektur."
+                </aside>
             </section>
 
 
@@ -289,9 +414,15 @@
                     <li>KI als Assistenz</li>
                     <li>Architektur bleibt menschlich</li>
                 </ul>
+                <aside class="notes">
+                    <strong>Was ihr sagt:</strong> "Die Zukunft geht in Richtung Text-zu-UML oder Skizze-zu-Code. KI wird unser Assistent, aber die eigentliche Architekturentscheidung – also wie die Software im Kern funktioniert – bleibt beim Menschen."
+                </aside>
             </section>
 
 
+            <!-- ========================= -->
+            <!-- PROMPTS -->
+            <!-- ========================= -->
             <section>
                 <h2>Verwendete Prompts</h2>
 
@@ -350,9 +481,16 @@ Bitte beschreibe den Inhalt der Diagramme genau und gib mir für jedes Diagramm 
                         </td>
                     </tr>
                 </table>
+                <aside class="notes">
+                    <strong>Was ihr sagt:</strong> "Auch wir waren transparent. Hier seht ihr unseren riesigen Prompt, mit dem wir die Struktur dieser Präsentation und die Zusammenhänge generiert haben. Wir mussten die Ergebnisse aber kritisch prüfen, um sie heute überhaupt erklären zu können."<br><br>
+                    <strong>Hintergrund-Info (Für euch):</strong> Seid hier ehrlich. Sagt dem Lehrer: "Ja, wir haben KI intensiv genutzt. Aber wir haben die Zeit genutzt, um die generierten Ergebnisse zu verstehen, statt sie nur abzuschreiben." Das gibt Pluspunkte!
+                </aside>
             </section>
 
 
+            <!-- ========================= -->
+            <!-- LINKS -->
+            <!-- ========================= -->
             <section>
                 <h2>Quellen & Links</h2>
 
@@ -363,11 +501,15 @@ Bitte beschreibe den Inhalt der Diagramme genau und gib mir für jedes Diagramm 
                     <li>Mermaid</li>
                     <li>Reveal.js</li>
                 </ul>
+                <aside class="notes">
+                    <strong>Was ihr sagt:</strong> "Hier sind noch unsere verwendeten Quellen. Das war unsere Präsentation über UML am Beispiel Indooro. Danke für eure Aufmerksamkeit! Habt ihr noch Fragen?"
+                </aside>
             </section>
 
         </div>
     </div>
 
+    <!-- SAUBERER SCRIPT-BLOCK -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/reveal.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/plugin/notes/notes.min.js"></script>
 
