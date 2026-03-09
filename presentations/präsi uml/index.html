@@ -12,25 +12,20 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/theme/white.min.css">
 
     <style>
-        .reveal h1,
-        h2,
-        h3 {
-            text-transform: none;
-        }
+        .reveal h1, .reveal h2, .reveal h3 { text-transform: none; }
+        .box { background: #f2f2f2; padding: 20px; border-radius: 10px; text-align: left; }
+        .small { font-size: 0.7em; }
+        table { font-size: 0.6em; }
 
-        .box {
-            background: #f2f2f2;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: left;
-        }
-
-        .small {
-            font-size: 0.7em;
-        }
-
-        table {
-            font-size: 0.6em;
+        /* ========================================= */
+        /* DER MAGISCHE FIX FÜR DEN PDF-EXPORT       */
+        /* ========================================= */
+        @media print {
+            body, html { width: 100%; height: auto; background: white; }
+            .reveal { width: 100%; height: auto; }
+            .reveal .slides { position: static !important; width: 100% !important; height: auto !important; transform: none !important; }
+            .reveal .slides section { display: block !important; position: relative !important; opacity: 1 !important; page-break-after: always !important; top: 0 !important; left: 0 !important; min-height: 100vh; margin: 0; padding: 20px 0; }
+            .reveal .controls, .reveal .progress, .reveal .slide-number { display: none !important; }
         }
     </style>
 </head>
@@ -39,10 +34,6 @@
 
     <div class="reveal">
         <div class="slides">
-
-            <!-- ========================= -->
-            <!-- DECKBLATT -->
-            <!-- ========================= -->
 
             <section>
                 <h1>UML Modellierung</h1>
@@ -54,14 +45,11 @@
                 </p>
 
                 <p class="small">
-                    Team: _______
+                    Team: Indooro
                 </p>
             </section>
 
 
-            <!-- ========================= -->
-            <!-- UML ALLGEMEIN -->
-            <!-- ========================= -->
             <section>
                 <section>
                     <h2>Was ist UML?</h2>
@@ -116,9 +104,6 @@
                 </section>
             </section>
 
-            <!-- ========================= -->
-            <!-- INDOORO ANWENDUNG -->
-            <!-- ========================= -->
             <section>
                 <section>
                     <h2>Unser Projekt: Indooro</h2>
@@ -153,17 +138,10 @@
 
 
 
-            <!-- ========================= -->
-            <!-- UML DIAGRAMME -->
-            <!-- ========================= -->
-
             <section>
 
                 <section>
                     <h2>Use Case Diagramm</h2>
-
-                    <p class="small">
-                    </p>
 
                     <img src="usecasediagramm.png" alt="Use-Case-Diagramm"
                         style="max-height: 65vh; max-width: 100%; object-fit: contain;">
@@ -172,9 +150,6 @@
                 <section>
                     <h2>Klassendiagramm</h2>
 
-                    <p class="small">
-                    </p>
-
                     <img src="klassendiagramm.png" alt="Klassendiagramm"
                         style="max-height: 60vh; max-width: 100%; object-fit: contain;">
                 </section>
@@ -182,19 +157,12 @@
                 <section>
                     <h2>Objektdiagramm</h2>
 
-                    <p class="small">
-                    </p>
-
                     <img src="objektdiagramm.png" alt="Objektdiagramm"
                         style="max-height: 60vh; max-width: 100%; object-fit: contain;">
                 </section>
 
             </section>
 
-
-            <!-- ========================= -->
-            <!-- TRACEABILITY -->
-            <!-- ========================= -->
 
             <section>
                 <h2>Traceability</h2>
@@ -204,72 +172,82 @@
                     <strong>Use Case 1:</strong> Produkt suchen
                     → Klassen:
                     <ul>
-                        <li>Product</li>
-                        <li>Shelf</li>
-                        <li>RouteService</li>
-                        <li>UserPosition</li>
+                        <li><strong>Product:</strong> Speichert Name und ID der Ware.</li>
+                        <li><strong>Shelf:</strong> Kennt die physische Position (x/y) im Markt.</li>
+                        <li><strong>SearchService:</strong> Logik, die die Datenbank durchsucht.</li>
+                        <li><strong>AppUI:</strong> Das Interface, wo der Kunde tippt.</li>
                     </ul>
-                    <br><br>
+                    <br>
                     <strong>Use Case 2:</strong> Route berechnen
                     → Klassen:
                     <ul>
-                        <li>Beacon</li>
-                        <li>NavigationService</li>
-                        <li>Waypoint</li>
-                        <li>StoreMap</li>
+                        <li><strong>Beacon:</strong> Liefert Bluetooth-Signal zur Ortung.</li>
+                        <li><strong>UserPosition:</strong> Speichert, wo der Kunde steht.</li>
+                        <li><strong>RouteCalculator:</strong> Algorithmus für den Weg.</li>
+                        <li><strong>StoreMap:</strong> Liefert Infos, wo Wände/Regale sind.</li>
                     </ul>
 
                 </div>
             </section>
 
 
-            <!-- ========================= -->
-            <!-- ARTEFAKTE -->
-            <!-- ========================= -->
-
             <section>
-                <h2>Projekt-Artefakte</h2>
+                <h2>Projekt-Artefakte (Belege)</h2>
+                <p class="small">Vom UML zum echten System (Draft)</p>
 
-                <ul>
-                    <li>Code-Screenshot</li>
-                    <li>Datenbankschema</li>
-                    <li>UML Tool Screenshot</li>
-                </ul>
-
-                <p class="small">
-                    ➡ Pflicht: 3 Belege aus Projekt / Quelle
-                </p>
-            </section>
-
-
-            <!-- ========================= -->
-            <!-- DIAGRAM REVIEW -->
-            <!-- ========================= -->
-
-            <section>
-                <h2>Diagramm Review</h2>
+                <div class="box" style="margin-bottom: 10px;">
+                    <strong>1. Java Klasse (aus dem Klassendiagramm)</strong>
+                    <pre><code style="font-size: 0.8em;">public class Product {
+    public UUID id;
+    public String name;
+    public Shelf shelf; // Hier ist die Assoziation aus dem UML!
+}</code></pre>
+                </div>
 
                 <div class="box">
-
-                    <strong>Fehler 1:</strong> Vererbung statt Beziehung <br>
-                    <strong>Vorher:</strong> Beacon → Position <br>
-                    <strong>Nachher:</strong> Beacon hat Position
-
-                    <br><br>
-
-                    <strong>Fehler 2:</strong> Objekt als Klasse
-
-                    <br><br>
-
-                    <strong>Fehler 3:</strong> falsche Abhängigkeit
-
+                    <strong>2. Datenbank-Schema (Entwurf)</strong>
+                    <pre><code style="font-size: 0.8em;">CREATE TABLE Product (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(100),
+    shelf_id INT REFERENCES Shelf(id)
+);</code></pre>
                 </div>
+                
             </section>
 
+            <section>
+                <h2>Diagramm Review (Fehlerkultur)</h2>
+                <p class="small">Typische Anfängerfehler am Beispiel Indooro</p>
 
-            <!-- ========================= -->
-            <!-- KI TEIL -->
-            <!-- ========================= -->
+                <table border="1" style="width: 100%; text-align: left;">
+                    <tr>
+                        <th>Fehler</th>
+                        <th>Vorher ❌</th>
+                        <th>Nachher ✅</th>
+                        <th>Erklärung</th>
+                    </tr>
+                    <tr>
+                        <td><strong>1. Vererbung statt Assoziation</strong></td>
+                        <td>Beacon erbt von Position</td>
+                        <td>Beacon hat eine Position</td>
+                        <td>Ein Beacon *ist* keine Position. Er ist ein Gerät, das physisch dort montiert ist.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>2. Objekte im Klassendiagramm</strong></td>
+                        <td>Klasse heißt "Milch"</td>
+                        <td>Klasse heißt "Product"</td>
+                        <td>Klassen sind abstrakte Baupläne. "Milch" ist nur ein konkretes Objekt zur Laufzeit.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>3. Falsche Abhängigkeit</strong></td>
+                        <td>Product kennt Route</td>
+                        <td>Route kennt Product</td>
+                        <td>Die Milch im Regal weiß nicht, wer zu ihr navigiert.</td>
+                    </tr>
+                </table>
+            </section>
+
+            
 
             <section>
                 <h2>KI-resistente Aufgaben</h2>
@@ -314,49 +292,66 @@
             </section>
 
 
-            <!-- ========================= -->
-            <!-- PROMPTS -->
-            <!-- ========================= -->
-
             <section>
                 <h2>Verwendete Prompts</h2>
 
-                <table border="1">
+                <table border="1" style="width: 100%;">
                     <tr>
-                        <th>Ziel</th>
-                        <th>Prompt</th>
-                        <th>Tool</th>
-                        <th>Output</th>
-                        <th>Änderungen</th>
-                        <th>Vertrauen?</th>
+                        <th style="width: 15%;">Ziel</th>
+                        <th style="width: 55%;">Prompt (Komplett)</th>
+                        <th style="width: 10%;">Tool</th>
+                        <th style="width: 20%;">Output & Vertrauen</th>
                     </tr>
 
                     <tr>
-                        <td>Use Case erstellen</td>
-                        <td>...</td>
-                        <td>ChatGPT</td>
-                        <td>...</td>
-                        <td>...</td>
-                        <td>...</td>
-                    </tr>
+                        <td>Komplette Struktur, Diagramme & Artefakte</td>
+                        <td>
+                            <div style="max-height: 250px; overflow-y: auto; font-size: 0.5em; text-align: left; background: #f9f9f9; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap;">Du bist ein erfahrener Software-Architekt und Dozent für Informatik an einer HTL (Höhere Technische Lehranstalt). 
 
-                    <tr>
-                        <td>Klassendiagramm</td>
-                        <td>...</td>
-                        <td>...</td>
-                        <td>...</td>
-                        <td>...</td>
-                        <td>...</td>
-                    </tr>
+Ich habe einen Arbeitsauftrag für die Schule, den ich am Beispiel meines aktuellen Projekts "Indooro" lösen muss. 
+Bitte erarbeite den kompletten Inhalt für diese Präsentation (Dauer ca. 20 Minuten). 
 
+### 1. Der Projekt-Kontext (Indooro) 
+Indooro ist ein Indoor-Navigationssystem für Supermärkte (SPAR). 
+- **Backend:** Java 21 / Quarkus / OpenSearch. 
+- **Frontend/Mobile:** Capacitor-App (Hybrid) mit Bluetooth-Zugriff. 
+- **Hardware:** 5 iBKS USB Beacons im Laden für Trilateration. 
+- **Daten:** JSON-Layout des Marktes und Produkt-Daten. 
+
+### 2. Das Szenario (Der Rote Faden) 
+Wir modellieren für alle Diagramme einen durchgängigen Sachverhalt: 
+**"Ein Kunde sucht im Markt nach 'Milch', die App bestimmt mittels Beacons die Position und berechnet den Weg zum Regal."** ### 3. Die Aufgabenstellung (Bitte exakt abarbeiten) 
+
+Erstelle den Inhalt für die Präsentation in folgenden Abschnitten: 
+#### A) UML Allgemein & Theorie (Kurz) 
+- Wozu nutzen wir UML bei Indooro? 
+- Wo sind die Grenzen? 
+
+#### B) Die Diagramme (Anhand des Szenarios) 
+Bitte beschreibe den Inhalt der Diagramme genau und gib mir für jedes Diagramm den Mermaid.js oder PlantUML Code. 
+1.  **Use-Case-Diagramm:** Akteure, Cases, include-Beziehungen.
+2.  **Klassendiagramm:** Backend/App Klassen (Product, Shelf, Position, Beacon, Route), Beziehungen.
+3.  **Objektdiagramm:** Konkreter Zustand zur Laufzeit.
+
+#### C) Traceability & Artefakte (Pflichtteil) 
+1.  **Traceability:** Vom Use-Case zu 4 konkreten Klassen inkl. Begründung.
+2.  **Artefakte:** 3 "Fake"-Artefakte (Java-Code, JSON, SQL). 
+
+#### D) Diagramm-Review (Fehlerkultur) 
+3 typische Fehler (Vorher/Nachher) bezogen auf Indooro. 
+
+#### E) KI-Resistenz (Reflexion) 
+3 Fragen beantworten: "Prompt-only" verhindern, Pro/Contra KI, Zukunft von UML & KI.</div>
+                        </td>
+                        <td>ChatGPT / Gemini</td>
+                        <td>
+                            <strong>Output:</strong> Komplettes Skript + HTML Struktur.<br><br>
+                            <strong>Vertrauen:</strong> Mittel. Struktur super, Logik und Hintergrundwissen mussten wir uns selbst erarbeiten/prüfen.
+                        </td>
+                    </tr>
                 </table>
-
             </section>
 
-
-            <!-- ========================= -->
-            <!-- LINKS -->
-            <!-- ========================= -->
 
             <section>
                 <h2>Quellen & Links</h2>
@@ -374,11 +369,15 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/reveal.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.5.0/plugin/notes/notes.min.js"></script>
 
     <script>
         Reveal.initialize({
             hash: true,
-            slideNumber: true
+            slideNumber: true,
+            viewDistance: 100, // Lädt alle Folien, das fixt den PDF-Druck Bug!
+            pdfSeparateFragments: false,
+            plugins: [ RevealNotes ]
         });
     </script>
 
