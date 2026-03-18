@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Indooro</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f3f0e8;
+      --ink: #17301f;
+      --card: rgba(255,255,255,0.82);
+      --line: rgba(23,48,31,0.10);
+      --green: #2f6f4f;
+      --sand: #e8c784;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(232,199,132,0.5), transparent 30%),
+        linear-gradient(135deg, #f5f1e8 0%, #dce7d7 100%);
+    }
+
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 48px 20px 64px;
+    }
+
+    .hero {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      padding: 40px 32px;
+      box-shadow: 0 24px 60px rgba(23,48,31,0.08);
+      backdrop-filter: blur(10px);
+    }
+
+    .eyebrow {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(47,111,79,0.10);
+      color: var(--green);
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 18px 0 12px;
+      font-size: clamp(40px, 7vw, 76px);
+      line-height: 0.95;
+    }
+
+    p {
+      max-width: 660px;
+      font-size: 18px;
+      line-height: 1.6;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+      margin-top: 32px;
+    }
+
+    .card {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      background: rgba(255,255,255,0.88);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 22px;
+      transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+      box-shadow: 0 10px 30px rgba(23,48,31,0.07);
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(47,111,79,0.35);
+      box-shadow: 0 18px 40px rgba(23,48,31,0.12);
+    }
+
+    .card strong {
+      display: block;
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+
+    .card span {
+      display: block;
+      font-size: 15px;
+      line-height: 1.5;
+      color: rgba(23,48,31,0.8);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <div class="eyebrow">Indooro LeoCloud</div>
+      <h1>Wohin soll es gehen?</h1>
+      <p>
+        Diese Startseite fuehrt direkt zu den gehosteten Indooro-Werkzeugen in der LeoCloud.
+        Der Admin-Editor speichert Layouts am Server. Die Kundensuche und die Swift-App koennen
+        danach auf dasselbe aktuelle Layout zugreifen.
+      </p>
+
+      <div class="grid">
+        <a class="card" href="/admin/">
+          <strong>Admin Editor</strong>
+          <span>Layout bearbeiten, exportieren und direkt am Server speichern.</span>
+        </a>
+
+        <a class="card" href="/customer/">
+          <strong>Kundensuche</strong>
+          <span>Produkte suchen und das aktuell gespeicherte Layout im Browser pruefen.</span>
+        </a>
+
+        <a class="card" href="/api/admin/health">
+          <strong>Backend Health</strong>
+          <span>Pruefen, ob die API im LeoCloud-Cluster erreichbar ist.</span>
+        </a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

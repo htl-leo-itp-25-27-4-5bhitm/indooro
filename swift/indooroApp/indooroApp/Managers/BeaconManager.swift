@@ -25,9 +25,9 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     @Published var isLoadingProducts: Bool = false
     @Published var productLoadingError: String? = nil
     
-    // API URL (Für Simulator: localhost)
-    private let apiBase = "http://localhost:8080/api"
-    
+    // API URL der LeoCloud-Instanz
+    private let apiBase = "https://it220209.cloud.htl-leonding.ac.at/api"
+
     // Internes
     private var centralManager: CBCentralManager?
     private var rssiBuffer: [String: [Int]] = [:]
@@ -41,7 +41,8 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     
     override init() {
         super.init()
-        loadLayoutFromJSON()
+        loadLayoutFromBundle()
+        loadLayoutFromServer()
         
         // Filter initialisieren
         for beacon in beacons {
@@ -329,21 +330,49 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     
     // --- HELPER ---
     
-    private func loadLayoutFromJSON() {
+    private func loadLayoutFromServer() {
+        guard let url = URL(string: "\(apiBase)/layout/current") else { return }
+
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+            guard let self else { return }
+
+            if let error {
+                print("❌ Server-Layout konnte nicht geladen werden: \(error.localizedDescription)")
+                return
+            }
+
+            guard let data else { return }
+
+            do {
+                let layout = try JSONDecoder().decode(LayoutData.self, from: data)
+                DispatchQueue.main.async {
+                    self.applyLayout(layout)
+                }
+            } catch {
+                print("❌ JSON Fehler beim Server-Layout: \(error)")
+            }
+        }.resume()
+    }
+
+    private func loadLayoutFromBundle() {
         guard let url = Bundle.main.url(forResource: "layout", withExtension: "json") else { return }
         do {
             let data = try Data(contentsOf: url)
             let layout = try JSONDecoder().decode(LayoutData.self, from: data)
-            self.gridWidth = layout.gridSize.width
-            self.gridHeight = layout.gridSize.height
-            self.shelves = layout.elements.filter { $0.type != "beacon" }
-            self.beacons = layout.elements
-                .filter { $0.type == "beacon" }
-                .compactMap { element in
-                    guard let name = element.beaconId else { return nil }
-                    return IndooroBeacon(id: String(element.id), name: name, positionX: element.x, positionY: element.y)
-                }
+            applyLayout(layout)
         } catch { print("❌ JSON Fehler beim Layout: \(error)") }
+    }
+
+    private func applyLayout(_ layout: LayoutData) {
+        self.gridWidth = layout.gridSize.width
+        self.gridHeight = layout.gridSize.height
+        self.shelves = layout.elements.filter { $0.type != "beacon" }
+        self.beacons = layout.elements
+            .filter { $0.type == "beacon" }
+            .compactMap { element in
+                guard let name = element.beaconId else { return nil }
+                return IndooroBeacon(id: String(element.id), name: name, positionX: element.x, positionY: element.y)
+            }
     }
     
     private func updateBeaconUI(name: String, rssi: Int, distance: Double) {
