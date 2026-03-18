@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SettingsInfoView: View {
+    @ObservedObject var beaconManager: BeaconManager
     @AppStorage("notifications_enabled") private var notificationsEnabled = true
     @AppStorage("show_live_position") private var showLivePosition = true
 
@@ -8,6 +9,7 @@ struct SettingsInfoView: View {
         NavigationStack {
             List {
                 appOverviewSection
+                layoutsSection
                 preferencesSection
                 accountSection
                 supportSection
@@ -49,6 +51,37 @@ struct SettingsInfoView: View {
         }
     }
 
+    private var layoutsSection: some View {
+        Section("Layouts") {
+            NavigationLink {
+                LayoutSelectionView(beaconManager: beaconManager)
+            } label: {
+                HStack(spacing: 12) {
+                    Label("Layout auswählen", systemImage: "square.stack.3d.down.forward")
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(beaconManager.currentLayoutName)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+
+                        Text(beaconManager.selectedLayoutId == nil ? "Aktuelles Server-Layout" : "Gespeicherte Version")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+
+            if let savedAt = beaconManager.currentLayoutSavedAt, !savedAt.isEmpty {
+                Label("Aktiv seit \(formattedLayoutDate(savedAt))", systemImage: "clock")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+
     private var accountSection: some View {
         Section("Konto (Demo)") {
             NavigationLink {
@@ -70,6 +103,128 @@ struct SettingsInfoView: View {
             Label("Version 1.0 Demo", systemImage: "info.circle")
                 .foregroundColor(.secondary)
         }
+    }
+}
+
+private struct LayoutSelectionView: View {
+    @ObservedObject var beaconManager: BeaconManager
+
+    var body: some View {
+        List {
+            currentLayoutSection
+            historySection
+        }
+        .navigationTitle("Layouts")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    beaconManager.loadLayoutHistory(forceReload: true)
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+            }
+        }
+        .onAppear {
+            beaconManager.loadLayoutHistory()
+        }
+    }
+
+    private var currentLayoutSection: some View {
+        Section("Live") {
+            Button {
+                beaconManager.selectCurrentLayout()
+            } label: {
+                LayoutSelectionRow(
+                    title: "Aktuelles Server-Layout",
+                    subtitle: "Verwendet immer das zuletzt exportierte Layout aus LeoCloud.",
+                    detail: beaconManager.selectedLayoutId == nil ? beaconManager.currentLayoutName : "Zum Live-Stand wechseln",
+                    isSelected: beaconManager.selectedLayoutId == nil,
+                    systemImage: "server.rack"
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder
+    private var historySection: some View {
+        Section("Letzte Layouts") {
+            if beaconManager.isLoadingLayoutHistory {
+                HStack {
+                    ProgressView()
+                    Text("Layout-Historie wird geladen …")
+                        .foregroundColor(.secondary)
+                }
+            } else if let error = beaconManager.layoutHistoryError, beaconManager.layoutHistory.isEmpty {
+                Text(error)
+                    .foregroundColor(.secondary)
+            } else if beaconManager.layoutHistory.isEmpty {
+                Text("Noch keine gespeicherten Layout-Versionen vorhanden.")
+                    .foregroundColor(.secondary)
+            } else {
+                ForEach(beaconManager.layoutHistory) { layout in
+                    Button {
+                        beaconManager.selectLayout(layout)
+                    } label: {
+                        LayoutSelectionRow(
+                            title: layout.shopName,
+                            subtitle: "Gespeichert \(formattedLayoutDate(layout.savedAt))",
+                            detail: "\(layout.elementCount) Elemente",
+                            isSelected: beaconManager.selectedLayoutId == layout.layoutId,
+                            systemImage: "clock.arrow.circlepath"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+}
+
+private struct LayoutSelectionRow: View {
+    let title: String
+    let subtitle: String
+    let detail: String
+    let isSelected: Bool
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.accentColor.opacity(0.14))
+                .frame(width: 42, height: 42)
+                .overlay(
+                    Image(systemName: systemImage)
+                        .foregroundColor(.accentColor)
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 6) {
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.accentColor)
+                }
+
+                Text(detail)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
 
@@ -236,6 +391,22 @@ private var fieldBackground: some View {
         .fill(Color(.secondarySystemBackground))
 }
 
+private func formattedLayoutDate(_ value: String) -> String {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+    if let date = formatter.date(from: value) {
+        return date.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    let fallbackFormatter = ISO8601DateFormatter()
+    if let date = fallbackFormatter.date(from: value) {
+        return date.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    return value
+}
+
 #Preview {
-    SettingsInfoView()
+    SettingsInfoView(beaconManager: BeaconManager())
 }

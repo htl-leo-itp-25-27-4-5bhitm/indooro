@@ -24,9 +24,19 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     @Published var allProducts: [Product] = []
     @Published var isLoadingProducts: Bool = false
     @Published var productLoadingError: String? = nil
+
+    // Layouts
+    @Published var layoutHistory: [LayoutHistoryEntry] = []
+    @Published var isLoadingLayoutHistory: Bool = false
+    @Published var layoutHistoryError: String? = nil
+    @Published var selectedLayoutId: String? = nil
+    @Published var currentLayoutName: String = "Aktuelles Layout"
+    @Published var currentLayoutSavedAt: String? = nil
     
     // API URL der LeoCloud-Instanz
     private let apiBase = "https://it220209.cloud.htl-leonding.ac.at/api"
+    private let selectedLayoutStorageKey = "selected_layout_id"
+    private let layoutHistoryLimit = 12
 
     // Internes
     private var centralManager: CBCentralManager?
@@ -42,7 +52,8 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     override init() {
         super.init()
         loadLayoutFromBundle()
-        loadLayoutFromServer()
+        let persistedLayoutId = UserDefaults.standard.string(forKey: selectedLayoutStorageKey)
+        loadLayoutFromServer(layoutId: persistedLayoutId)
         
         // Filter initialisieren
         for beacon in beacons {
@@ -203,6 +214,52 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
         
         fetchProducts(from: endpoints, attempt: 0)
     }
+
+    func loadLayoutHistory(forceReload: Bool = false) {
+        guard !isLoadingLayoutHistory else { return }
+        if !forceReload, !layoutHistory.isEmpty { return }
+
+        isLoadingLayoutHistory = true
+        layoutHistoryError = nil
+
+        guard let url = URL(string: "\(apiBase)/layout/history?limit=\(layoutHistoryLimit)") else {
+            isLoadingLayoutHistory = false
+            layoutHistoryError = "Layout-Historie konnte nicht geladen werden."
+            return
+        }
+
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.isLoadingLayoutHistory = false
+
+                if let error {
+                    self.layoutHistoryError = error.localizedDescription
+                    return
+                }
+
+                guard let data else {
+                    self.layoutHistoryError = "Keine Layout-Daten erhalten."
+                    return
+                }
+
+                do {
+                    self.layoutHistory = try JSONDecoder().decode([LayoutHistoryEntry].self, from: data)
+                    self.layoutHistoryError = nil
+                } catch {
+                    self.layoutHistoryError = "Layout-Historie konnte nicht gelesen werden."
+                }
+            }
+        }.resume()
+    }
+
+    func selectCurrentLayout() {
+        loadLayoutFromServer(layoutId: nil, persistSelection: true)
+    }
+
+    func selectLayout(_ layout: LayoutHistoryEntry) {
+        loadLayoutFromServer(layoutId: layout.layoutId, persistSelection: true)
+    }
     
     // --- PRODUKT API ---
     
@@ -330,14 +387,30 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     
     // --- HELPER ---
     
-    private func loadLayoutFromServer() {
-        guard let url = URL(string: "\(apiBase)/layout/current") else { return }
+    private func loadLayoutFromServer(layoutId: String? = nil, persistSelection: Bool = false) {
+        let endpoint: String
+        if let layoutId, !layoutId.isEmpty {
+            let encodedLayoutId = layoutId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? layoutId
+            endpoint = "\(apiBase)/layout/versions/\(encodedLayoutId)"
+        } else {
+            endpoint = "\(apiBase)/layout/current"
+        }
 
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, error in
+        guard let url = URL(string: endpoint) else { return }
+
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             guard let self else { return }
 
             if let error {
                 print("❌ Server-Layout konnte nicht geladen werden: \(error.localizedDescription)")
+                if layoutId != nil {
+                    self.loadLayoutFromServer(layoutId: nil, persistSelection: true)
+                }
+                return
+            }
+
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 404, layoutId != nil {
+                self.loadLayoutFromServer(layoutId: nil, persistSelection: true)
                 return
             }
 
@@ -347,6 +420,8 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
                 let layout = try JSONDecoder().decode(LayoutData.self, from: data)
                 DispatchQueue.main.async {
                     self.applyLayout(layout)
+                    self.selectedLayoutId = layoutId
+                    self.persistSelectedLayoutId(persistSelection ? layoutId : self.selectedLayoutId)
                 }
             } catch {
                 print("❌ JSON Fehler beim Server-Layout: \(error)")
@@ -366,6 +441,8 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
     private func applyLayout(_ layout: LayoutData) {
         self.gridWidth = layout.gridSize.width
         self.gridHeight = layout.gridSize.height
+        self.currentLayoutName = layout.shopName
+        self.currentLayoutSavedAt = layout.savedAt ?? layout.exportDate
         self.shelves = layout.elements.filter { $0.type != "beacon" }
         self.beacons = layout.elements
             .filter { $0.type == "beacon" }
@@ -373,6 +450,16 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
                 guard let name = element.beaconId else { return nil }
                 return IndooroBeacon(id: String(element.id), name: name, positionX: element.x, positionY: element.y)
             }
+        self.targetPosition = nil
+        self.navigationPath = []
+    }
+
+    private func persistSelectedLayoutId(_ layoutId: String?) {
+        if let layoutId, !layoutId.isEmpty {
+            UserDefaults.standard.set(layoutId, forKey: selectedLayoutStorageKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: selectedLayoutStorageKey)
+        }
     }
     
     private func updateBeaconUI(name: String, rssi: Int, distance: Double) {

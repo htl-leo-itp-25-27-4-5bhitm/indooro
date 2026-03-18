@@ -27,7 +27,7 @@ struct ContentView: View {
             }
             .tag(AppTab.products)
 
-            SettingsInfoView()
+            SettingsInfoView(beaconManager: beaconManager)
                 .tabItem {
                     Label("Info", systemImage: "gearshape")
                 }

@@ -5,7 +5,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
@@ -48,12 +50,48 @@ public class LayoutResource {
         }
 
         try {
-            layoutService.saveCurrentLayout(layout);
-            return Response.ok(Map.of("message", "Layout saved successfully")).build();
+            LayoutService.LayoutHistoryEntry savedLayout = layoutService.saveCurrentLayout(layout);
+            return Response.ok(Map.of(
+                    "message", "Layout saved successfully",
+                    "layoutId", savedLayout.layoutId(),
+                    "savedAt", savedLayout.savedAt()
+            )).build();
         } catch (IOException e) {
             LOG.error("Error saving current layout", e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity(Map.of("error", "Layout could not be saved"))
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/history")
+    public Response getLayoutHistory(@QueryParam("limit") Integer limit) {
+        try {
+            return Response.ok(layoutService.getRecentLayouts(limit)).build();
+        } catch (IOException e) {
+            LOG.error("Error loading layout history", e);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of("error", "Layout history could not be loaded"))
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/versions/{layoutId}")
+    public Response getLayoutVersion(@PathParam("layoutId") String layoutId) {
+        try {
+            JsonNode layout = layoutService.getLayoutVersion(layoutId);
+            if (layout == null) {
+                return Response.status(Response.Status.NOT_FOUND)
+                        .entity(Map.of("error", "Layout version not found"))
+                        .build();
+            }
+            return Response.ok(layout).build();
+        } catch (IOException e) {
+            LOG.error("Error loading layout version", e);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of("error", "Layout version could not be loaded"))
                     .build();
         }
     }
