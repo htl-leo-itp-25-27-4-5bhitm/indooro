@@ -29,6 +29,28 @@ struct LayoutElement: Codable, Identifiable {
     // NEU: Kategorie und Meter direkt aus dem JSON
     let category: String?
     let meter: Int?
+    let rotation: Double?
+    let accessAngle: Double?
+    let locked: Bool?
+
+    var categoryCode: String? {
+        guard let category, !category.isEmpty else { return nil }
+        if let slashIndex = category.firstIndex(of: "/") {
+            return String(category[..<slashIndex])
+        }
+        return category
+    }
+
+    var resolvedMeter: Int? {
+        if let meter {
+            return meter
+        }
+
+        guard let category, let slashIndex = category.firstIndex(of: "/") else { return nil }
+        let meterStart = category.index(after: slashIndex)
+        guard meterStart < category.endIndex else { return nil }
+        return Int(category[meterStart...])
+    }
 }
 
 struct LayoutHistoryEntry: Codable, Identifiable, Hashable {

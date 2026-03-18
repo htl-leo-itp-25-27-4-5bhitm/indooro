@@ -17,6 +17,7 @@ struct ShelfView: View {
             shelfLabel(width: width, height: height)
         }
         .frame(width: width, height: height, alignment: .center)
+        .rotationEffect(.degrees(element.rotation ?? 0))
         .position(x: xPos, y: yPos)
     }
 

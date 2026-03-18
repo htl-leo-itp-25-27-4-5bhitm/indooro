@@ -34,6 +34,7 @@ let zoom = 1;
 let shopName = 'Mein Supermarkt';
 let isRotating = false;
 let showRotationUI = false;
+const LAYOUT_API = '/api/layout/current';
 
 const cellSize = 20; // pixels per meter cell
 
@@ -116,6 +117,7 @@ const propertiesWrapper = document.getElementById('propertiesWrapper');
 const modeLabel = document.getElementById('modeLabel');
 const shopNameInput = document.getElementById('shopName');
 const launchBtn = document.getElementById('launchBtn');
+const saveStatus = document.getElementById('saveStatus');
 
 /* ----- Load Categories from JSON ----- */
 async function loadCategories() {
@@ -137,6 +139,113 @@ async function loadCategories() {
       { id: '310', name: 'Obst & Gemüse', color: '#4CAF50', icon: '🥬' },
       { id: '520', name: 'Molkereiprodukte', color: '#BBDEFB', icon: '🥛' },
     ];
+  }
+}
+
+function setSaveStatus(message, tone = 'neutral') {
+  if (!saveStatus) return;
+
+  saveStatus.textContent = message;
+  saveStatus.className = 'text-sm';
+
+  if (tone === 'success') {
+    saveStatus.classList.add('text-green-600');
+  } else if (tone === 'error') {
+    saveStatus.classList.add('text-red-600');
+  } else {
+    saveStatus.classList.add('text-gray-500');
+  }
+}
+
+function normalizeImportedElements(items = []) {
+  return items.map(el => {
+    const normalized = { ...el };
+
+    if (typeof normalized.category === 'string' && normalized.category.includes('/')) {
+      const [category, meter] = normalized.category.split('/');
+      normalized.category = category;
+      normalized.meter = Number.parseInt(meter, 10) || normalized.meter;
+    }
+
+    normalized.rotation = Number.isFinite(normalized.rotation) ? normalized.rotation : 0;
+    normalized.accessAngle = Number.isFinite(normalized.accessAngle) ? normalized.accessAngle : 90;
+    normalized.locked = Boolean(normalized.locked);
+
+    return normalized;
+  });
+}
+
+function buildLayoutPayload() {
+  recalcMeters();
+
+  const exportElements = elements.map(el => {
+    if (el.category !== null && el.category !== undefined) {
+      return {
+        ...el,
+        category: `${el.category}/${el.meter}`,
+        meter: el.meter ?? null,
+        rotation: el.rotation || 0,
+        accessAngle: el.accessAngle || 0,
+        locked: Boolean(el.locked)
+      };
+    }
+
+    return {
+      ...el,
+      rotation: el.rotation || 0,
+      accessAngle: el.accessAngle || 0,
+      locked: Boolean(el.locked)
+    };
+  });
+
+  return {
+    shopName: shopNameInput.value || 'Mein Supermarkt',
+    gridSize,
+    elements: exportElements,
+    exportDate: new Date().toISOString()
+  };
+}
+
+async function saveLayoutToServer(layoutData) {
+  const response = await fetch(LAYOUT_API, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(layoutData)
+  });
+
+  if (!response.ok) {
+    throw new Error('Layout konnte nicht am Server gespeichert werden.');
+  }
+
+  setSaveStatus('Layout am Server gespeichert', 'success');
+}
+
+async function loadSavedLayout() {
+  try {
+    const response = await fetch(LAYOUT_API);
+    if (!response.ok) {
+      throw new Error('Kein gespeichertes Layout gefunden');
+    }
+
+    const data = await response.json();
+    if (!data || !data.gridSize || !Array.isArray(data.elements)) {
+      throw new Error('Layout-Daten ungueltig');
+    }
+
+    shopNameInput.value = data.shopName || 'Mein Supermarkt';
+    gridSize = data.gridSize || gridSize;
+    gridWidthInput.value = gridSize.width;
+    gridHeightInput.value = gridSize.height;
+    elements = normalizeImportedElements(data.elements || []);
+    selectedElement = null;
+    recalcMeters();
+    renderProperties();
+    renderCanvas();
+    setSaveStatus('Gespeichertes Layout geladen', 'success');
+  } catch (error) {
+    setSaveStatus('Noch kein gespeichertes Layout am Server', 'neutral');
   }
 }
 
@@ -297,24 +406,22 @@ async function initUI() {
   });
 
   // initial render
+  await loadSavedLayout();
   setTool('select');
   saveState(); // Initial state
   renderCanvas();
 }
 
-function launchSimulation() {
-  const layoutData = {
-    shopName: shopNameInput.value || 'Mein Supermarkt',
-    gridSize,
-    elements,
-    timestamp: new Date().toISOString()
-  };
-  
+async function launchSimulation() {
+  const layoutData = buildLayoutPayload();
+
   try {
     localStorage.setItem('indooro_live_layout', JSON.stringify(layoutData));
-    window.open('../customer/index.html', '_blank');
+    await saveLayoutToServer(layoutData);
+    window.open('/customer/', '_blank');
   } catch (error) {
     alert('Fehler beim Starten der Simulation: ' + error.message);
+    setSaveStatus(error.message, 'error');
   }
 }
 
@@ -1270,27 +1377,8 @@ function applyTemplate(t) {
 }
 
 /* ----- Export / Import ----- */
-function exportLayout() {
-  recalcMeters(); // Meter aktualisieren
-
-  const exportElements = elements.map(el => {
-    if (el.category !== null) {
-      return {
-        ...el,
-        category: `${el.category}/${el.meter}`,
-        rotation: el.rotation || 0,
-        accessAngle: el.accessAngle || 0
-      };
-    }
-    return el;
-  });
-
-  const data = {
-    shopName: shopNameInput.value || 'Mein_Supermarkt',
-    gridSize,
-    elements: exportElements,
-    exportDate: new Date().toISOString()
-  };
+async function exportLayout() {
+  const data = buildLayoutPayload();
 
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -1299,6 +1387,13 @@ function exportLayout() {
   a.download = `${(shopNameInput.value || 'shop').replace(/\s/g,'_')}_layout.json`;
   a.click();
   URL.revokeObjectURL(url);
+
+  try {
+    await saveLayoutToServer(data);
+  } catch (error) {
+    alert('Layout wurde heruntergeladen, aber nicht am Server gespeichert: ' + error.message);
+    setSaveStatus(error.message, 'error');
+  }
 }
 
 function importLayout(e) {
@@ -1312,19 +1407,7 @@ function importLayout(e) {
       gridSize = data.gridSize || gridSize;
       gridWidthInput.value = gridSize.width;
       gridHeightInput.value = gridSize.height;
-      elements = data.elements || [];
-
-      // category zurück splitten: "310/2" → category="310", meter=2
-      elements.forEach(el => {
-        if (el.category && el.category.includes("/")) {
-          const [cat, meter] = el.category.split("/");
-          el.category = cat;
-          el.meter = parseInt(meter);
-        }
-
-        el.rotation = el.rotation || 0;
-        el.accessAngle = el.accessAngle || 0;
-      });
+      elements = normalizeImportedElements(data.elements || []);
 
       recalcMeters();
 
@@ -1333,6 +1416,7 @@ function importLayout(e) {
       renderCanvas();
     } catch (err) {
       alert('Fehler beim Laden der Datei');
+      setSaveStatus('Import fehlgeschlagen', 'error');
     }
   };
   reader.readAsText(file);

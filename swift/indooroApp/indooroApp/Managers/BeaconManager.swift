@@ -97,32 +97,21 @@ class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate {
 
         // 2. Passendes Regal im Layout suchen
         if let shelf = shelves.first(where: { element in
-            // Hat das Regal überhaupt eine Kategorie? (Kassen etc. haben oft keine)
-            guard let elCategory = element.category else { return false }
-            
-            // A) Kategorie-Check
-            // Wir prüfen, ob die Regal-Kategorie mit der Produkt-Kategorie beginnt.
-            // (JSON kann "310/2" sein, Produkt "310". Beides fängt mit "310" an)
-            if !elCategory.starts(with: prodCategory) {
+            guard let elementCategory = element.categoryCode else { return false }
+
+            if elementCategory != prodCategory {
                 return false
             }
-            
-            // B) Meter-Check (Das ist neu!)
-            if let elMeter = element.meter {
-                // Fall 1: Regal hat einen Meter (z.B. 2).
-                // Dann MUSS das Produkt auch diesen Meter suchen.
+
+            if let elementMeter = element.resolvedMeter {
                 if let pMeter = prodMeter {
-                    return elMeter == pMeter
+                    return elementMeter == pMeter
                 } else {
-                    // Produkt hat keinen Meter im Code, Regal aber schon -> Passt nicht exakt.
                     return false
                 }
-            } else {
-                // Fall 2: Regal hat KEINEN Meter (nil).
-                // Das bedeutet, das Regal gilt für die ganze Kategorie (oder Meter ist egal).
-                // Da die Kategorie (A) schon passt, ist das ein Treffer.
-                return true
             }
+
+            return true
         }) {
             // 3. Ziel setzen (Mitte des gefundenen Regals)
             let tx = shelf.x + (shelf.width ?? 1) / 2
