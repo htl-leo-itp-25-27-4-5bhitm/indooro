@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -75,24 +76,22 @@ public class LayoutService {
 
         SearchResponse<JsonNode> response = client.search(s -> s
                 .index(layoutIndexName)
-                .size(finalLimit)
-                .query(q -> q.term(t -> t
-                        .field("recordType")
-                        .value(v -> v.stringValue("version"))))
-                .sort(sort -> sort.field(f -> f.field("savedAt").order(org.opensearch.client.opensearch._types.SortOrder.Desc))),
+                .size(Math.max(finalLimit * 3, 20))
+                .query(q -> q.matchAll(m -> m)),
                 JsonNode.class
         );
 
         List<LayoutHistoryEntry> layouts = new ArrayList<>();
         for (Hit<JsonNode> hit : response.hits().hits()) {
             JsonNode source = hit.source();
-            if (source == null) {
+            if (source == null || !"version".equals(source.path("recordType").asText())) {
                 continue;
             }
             layouts.add(toHistoryEntry(source));
         }
 
-        return layouts;
+        layouts.sort(Comparator.comparing(LayoutHistoryEntry::savedAt).reversed());
+        return layouts.stream().limit(finalLimit).toList();
     }
 
     public LayoutHistoryEntry saveCurrentLayout(JsonNode layout) throws IOException {
