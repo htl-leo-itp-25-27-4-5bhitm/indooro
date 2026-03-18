@@ -32,6 +32,8 @@ let gridSize = { width: 40, height: 60 };
 let showGrid = true;
 let zoom = 1;
 let shopName = 'Mein Supermarkt';
+let isRotating = false;
+let showRotationUI = false;
 
 const cellSize = 20; // pixels per meter cell
 
@@ -499,6 +501,8 @@ function renderRegularElement(el) {
   div.style.top = (el.y * cellSize * zoom) + 'px';
   div.style.width = (el.width * cellSize * zoom) + 'px';
   div.style.height = (el.height * cellSize * zoom) + 'px';
+  div.style.transform = `rotate(${el.rotation || 0}deg)`;
+  div.style.transformOrigin = 'center';
   
   // Background color with collision warning
   if (hasCollision) {
@@ -508,6 +512,13 @@ function renderRegularElement(el) {
   }
   
   div.style.opacity = '0.95';
+
+  if (el.locked) {
+    div.style.opacity = '0.7';
+    div.style.border = '2px dashed #333';
+    div.style.backgroundColor = '#d1d5db'; // grau
+  }
+
   div.dataset.id = el.id;
   
   // Add tooltip with full information
@@ -555,6 +566,196 @@ function renderRegularElement(el) {
     renderProperties();
   });
 
+  // 🔄 ROTATE HANDLE (deutlich sichtbar)
+  const rotateHandle = document.createElement('div');
+  rotateHandle.className = 'absolute cursor-pointer';
+  rotateHandle.innerHTML = '🔄';
+  rotateHandle.style.cursor = 'grab';
+
+  // größer & auffälliger
+  rotateHandle.style.fontSize = '20px';
+
+  // Position: über dem Regal
+  rotateHandle.style.top = '20px';
+  rotateHandle.style.left = '50%';
+  rotateHandle.style.transform = 'translateX(-50%)';
+
+  // Hover-Effekt (optional nice)
+  rotateHandle.style.transition = 'transform 0.1s';
+
+  rotateHandle.addEventListener('mouseenter', () => {
+    rotateHandle.style.transform = 'translateX(-50%) scale(1.2)';
+  });
+
+  rotateHandle.addEventListener('mouseleave', () => {
+    rotateHandle.style.transform = 'translateX(-50%) scale(1)';
+  });
+
+  rotateHandle.addEventListener('mousedown', (e) => {
+    if (el.locked) return;
+
+    selectedElement = el;
+    isRotating = true;
+    showRotationUI = true;
+
+    renderCanvas();
+
+    rotateHandle.style.cursor = 'grabbing';
+
+    e.stopPropagation();
+
+    const rect = canvasContainer.getBoundingClientRect();
+
+    const centerX = el.x + el.width / 2;
+    const centerY = el.y + el.height / 2;
+
+    const startMouseX = (e.clientX - rect.left) / (cellSize * zoom);
+    const startMouseY = (e.clientY - rect.top) / (cellSize * zoom);
+
+    const startAngle = Math.atan2(startMouseY - centerY, startMouseX - centerX) * (180 / Math.PI);
+
+    const initialRotation = el.rotation || 0;
+
+    function onMove(ev) {
+      const rect = canvasContainer.getBoundingClientRect();
+
+      const mx = (ev.clientX - rect.left) / (cellSize * zoom);
+      const my = (ev.clientY - rect.top) / (cellSize * zoom);
+
+      const currentAngle = Math.atan2(my - centerY, mx - centerX) * (180 / Math.PI);
+
+      // 🔥 relative Rotation berechnen
+      let delta = currentAngle - startAngle;
+
+      let newRotation = initialRotation + delta;
+
+      // optional: normalisieren (-180 bis 180)
+      if (newRotation > 180) newRotation -= 360;
+      if (newRotation < -180) newRotation += 360;
+
+      // runden
+      el.rotation = Math.round(newRotation * 100) / 100;
+
+      renderCanvas();
+    }
+
+    function onUp() {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+
+      isRotating = false;
+
+      rotateHandle.style.cursor = 'grab';
+
+      saveState();
+      renderCanvas();
+    }
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  });
+
+  div.appendChild(rotateHandle);
+
+
+  // 🔒 Lock Button
+  const lockBtn = document.createElement('div');
+  lockBtn.className = 'absolute cursor-pointer';
+
+  lockBtn.innerHTML = el.locked ? '🔒' : '🔓';
+
+  // bessere Position (im Regal oben rechts innen)
+  lockBtn.style.top = '4px';
+  lockBtn.style.right = '4px';
+  lockBtn.style.fontSize = '18px';
+  lockBtn.style.zIndex = '10';
+
+  // leichter Hintergrund damit sichtbar
+  lockBtn.style.background = 'rgba(255,255,255,0.7)';
+  lockBtn.style.borderRadius = '6px';
+  lockBtn.style.padding = '2px 4px';
+
+  lockBtn.addEventListener('mousedown', (e) => {
+  e.stopPropagation(); // verhindert Drag
+  e.preventDefault();  // verhindert Fokus-Probleme
+
+  el.locked = !el.locked;
+
+  lockBtn.style.transform = 'scale(1.3)';
+  setTimeout(() => {
+    lockBtn.style.transform = 'scale(1)';
+  }, 120);
+
+  renderCanvas();
+});
+
+  div.appendChild(lockBtn);
+
+  // ⬇️ ACCESS ARROW (klar sichtbar & sauber zentriert)
+  const arrow = document.createElement('div');
+  arrow.className = 'absolute';
+  arrow.innerHTML = '⬇️';
+
+  // größer machen
+  arrow.style.fontSize = '20px';
+
+  // besser positionieren (näher am Regal)
+  arrow.style.left = '50%';
+  arrow.style.bottom = '10%';
+  arrow.style.marginTop = '2px';
+
+  // sauber zentrieren
+  arrow.style.transform = 'translateX(-50%)';
+
+  div.appendChild(arrow);
+
+  // 🔥 ROTATION BOX
+  if (showRotationUI && selectedElement && selectedElement.id === el.id) {
+    const angleBox = document.createElement('div');
+    angleBox.className = 'absolute bg-white border rounded shadow px-2 py-1 text-xs';
+
+    const centerX = (el.x + el.width / 2) * cellSize * zoom;
+    const topY = (el.y * cellSize * zoom) - 50;
+
+    angleBox.style.left = centerX + 'px';
+    angleBox.style.top = topY + 'px';
+    angleBox.style.transform = 'translateX(-50%)';
+    angleBox.style.position = 'absolute';
+    angleBox.style.zIndex = '9999';
+
+    angleBox.innerHTML = `
+    <input 
+      type="number" 
+      value="${(el.rotation || 0).toFixed(2)}" 
+        step="0.1"
+        class="w-16 text-center border rounded text-xs"
+      />°
+    `;
+
+    const input = angleBox.querySelector('input');
+
+    input.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+    });
+
+    input.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    input.addEventListener('input', (e) => {
+      let val = parseFloat(e.target.value);
+      if (!isNaN(val)) {
+        el.rotation = Math.round(val * 100) / 100;
+      }
+    });
+
+    input.addEventListener('change', () => {
+      renderCanvas();
+    });
+
+    canvasContainer.appendChild(angleBox);
+  }
+
   canvasContainer.appendChild(div);
 }
 
@@ -563,6 +764,9 @@ let currentMouseCell = { x: 0, y: 0 };
 
 /* ----- Mouse events on canvasContainer ----- */
 canvasContainer.addEventListener('mousedown', (e) => {
+  if (!isRotating) {
+    showRotationUI = false;
+  }
   const rect = canvasContainer.getBoundingClientRect();
   const x = Math.round((e.clientX - rect.left) / (cellSize * zoom));
   const y = Math.round((e.clientY - rect.top) / (cellSize * zoom));
@@ -598,7 +802,7 @@ window.addEventListener('mousemove', (e) => {
   const y = (e.clientY - rect.top) / (cellSize * zoom);
   currentMouseCell = { x: Math.round(x), y: Math.round(y) };
 
-  if (isDragging && selectedElement) {
+  if (isDragging && selectedElement && !selectedElement.locked) {
     const isBeacon = selectedElement.type === 'beacon';
     
     if (isBeacon) {
@@ -660,6 +864,9 @@ window.addEventListener('mouseup', (e) => {
         height: Math.abs(ny - drawStart.y) + 1,
         label: 'Leer',
         color: '#E5E7EB',
+        rotation: 0,
+        accessAngle: 90,
+        locked: false
       };
       elements.push(newElement);
       selectedElement = newElement;
@@ -1070,7 +1277,9 @@ function exportLayout() {
     if (el.category !== null) {
       return {
         ...el,
-        category: `${el.category}/${el.meter}`
+        category: `${el.category}/${el.meter}`,
+        rotation: el.rotation || 0,
+        accessAngle: el.accessAngle || 0
       };
     }
     return el;
@@ -1112,6 +1321,9 @@ function importLayout(e) {
           el.category = cat;
           el.meter = parseInt(meter);
         }
+
+        el.rotation = el.rotation || 0;
+        el.accessAngle = el.accessAngle || 0;
       });
 
       recalcMeters();
