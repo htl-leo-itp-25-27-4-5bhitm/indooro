@@ -18,6 +18,7 @@
 
       <nav class="nav-links">
         <a href="#dashboard">Dashboard</a>
+        <a href="#system-logs">System Log</a>
         <a href="#regions">Regionen</a>
         <a href="#stores">Filialen</a>
         <a href="#store-detail">Filialdetail</a>
@@ -60,6 +61,18 @@
           <span>Zugewiesene Beacons</span>
           <strong id="statAssignedBeacons">0</strong>
         </article>
+      </section>
+
+      <section class="panel" id="system-logs">
+        <div class="panel-header">
+          <div>
+            <span class="eyebrow">Nachvollziehbarkeit</span>
+            <h3>Letzte System-Logs</h3>
+          </div>
+          <button id="refreshLogsBtn" class="secondary-button">Logs neu laden</button>
+        </div>
+        <p class="hint">Hier siehst du die letzten protokollierten Aenderungen aus der Admin-Plattform. Das sind keine rohen Kubernetes-Pod-Logs, sondern die fuer euch relevanten System- und Verwaltungsereignisse.</p>
+        <div id="systemLogs" class="timeline"></div>
       </section>
 
       <section class="panel" id="regions">

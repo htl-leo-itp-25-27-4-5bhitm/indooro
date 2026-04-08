@@ -440,6 +440,13 @@ button {
   border-left: 3px solid rgba(46, 109, 79, 0.22);
 }
 
+.timeline-heading {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .timeline-entry strong,
 .timeline-entry time {
   display: block;

@@ -1,5 +1,6 @@
 package at.htl.admin.service;
 
+import at.htl.admin.dto.AdminLogDtos;
 import at.htl.admin.entity.AuditLogEntity;
 import at.htl.admin.repository.AuditLogRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -9,6 +10,7 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
 import java.util.UUID;
+import java.util.List;
 
 @ApplicationScoped
 public class AuditLogService {
@@ -38,10 +40,31 @@ public class AuditLogService {
         auditLogRepository.persist(entry);
     }
 
+    public AdminLogDtos.SystemLogResponse getRecentLogs(int limit) {
+        int normalizedLimit = Math.min(Math.max(limit, 1), 100);
+        List<AdminLogDtos.SystemLogEntry> entries = auditLogRepository.listRecent(normalizedLimit).stream()
+                .map(this::toSystemLogEntry)
+                .toList();
+        return new AdminLogDtos.SystemLogResponse(normalizedLimit, entries);
+    }
+
     private JsonNode toJson(Object value) {
         if (value == null) {
             return null;
         }
         return objectMapper.valueToTree(value);
+    }
+
+    private AdminLogDtos.SystemLogEntry toSystemLogEntry(AuditLogEntity entry) {
+        return new AdminLogDtos.SystemLogEntry(
+                entry.id,
+                entry.entityType,
+                entry.entityId,
+                entry.action,
+                entry.summary,
+                entry.actorRole,
+                entry.actorLabel,
+                entry.createdAt
+        );
     }
 }

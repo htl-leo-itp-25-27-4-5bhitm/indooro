@@ -1,4 +1,5 @@
 const API = {
+  adminLogs: '/api/admin/logs',
   regions: '/api/regions',
   stores: '/api/stores',
   beacons: '/api/beacons',
@@ -13,6 +14,7 @@ const state = {
   selectedStoreBeacons: [],
   selectedStoreLayouts: [],
   selectedStoreAudit: [],
+  systemLogs: [],
   editingRegionId: null,
   editingStoreId: null,
   editingBeaconId: null,
@@ -34,9 +36,11 @@ const els = {
   statFreeBeacons: document.getElementById('statFreeBeacons'),
   statAssignedBeacons: document.getElementById('statAssignedBeacons'),
   refreshAllBtn: document.getElementById('refreshAllBtn'),
+  refreshLogsBtn: document.getElementById('refreshLogsBtn'),
   refreshBeaconsBtn: document.getElementById('refreshBeaconsBtn'),
   refreshStoreDetailBtn: document.getElementById('refreshStoreDetailBtn'),
   openEditorLink: document.getElementById('openEditorLink'),
+  systemLogs: document.getElementById('systemLogs'),
   regionsList: document.getElementById('regionsList'),
   regionForm: document.getElementById('regionForm'),
   regionFormTitle: document.getElementById('regionFormTitle'),
@@ -186,6 +190,11 @@ async function loadBootstrapData() {
   }
 }
 
+async function loadSystemLogs() {
+  const payload = await fetchJson(`${API.adminLogs}?limit=20`);
+  state.systemLogs = payload.entries || [];
+}
+
 async function loadStoreDetail(storeId) {
   const [detail, beacons, layouts, audit] = await Promise.all([
     fetchJson(`${API.stores}/${storeId}`),
@@ -218,6 +227,22 @@ function renderStats() {
   els.statStores.textContent = String(activeStores);
   els.statFreeBeacons.textContent = String(freeBeacons);
   els.statAssignedBeacons.textContent = String(assignedBeacons);
+}
+
+function renderSystemLogs() {
+  els.systemLogs.innerHTML = state.systemLogs.length
+    ? state.systemLogs.map((entry) => `
+        <div class="timeline-entry">
+          <div class="timeline-heading">
+            <strong>${escapeHtml(entry.action)}</strong>
+            <span class="badge neutral">${escapeHtml(entry.entityType)}</span>
+          </div>
+          <time>${formatDate(entry.createdAt)}</time>
+          <p>${escapeHtml(entry.summary || 'Systemereignis protokolliert')}</p>
+          <div class="item-meta">Rolle ${escapeHtml(entry.actorRole || 'SYSTEM')} · ${escapeHtml(entry.actorLabel || 'system')}</div>
+        </div>
+      `).join('')
+    : '<div class="empty-state">Noch keine System-Logs vorhanden. Sobald Filialen, Regionen, Beacons oder Layouts geaendert werden, erscheinen sie hier.</div>';
 }
 
 function renderRegionOptions() {
@@ -467,8 +492,10 @@ async function refreshAll({ keepStatusMessage = false } = {}) {
   }
 
   await loadBootstrapData();
+  await loadSystemLogs();
   renderRegionOptions();
   renderStats();
+  renderSystemLogs();
   renderRegions();
   renderStores();
   renderBeacons();
@@ -651,6 +678,11 @@ async function activateLayout(layoutId) {
 
 function bindEvents() {
   els.refreshAllBtn.addEventListener('click', () => refreshAll());
+  els.refreshLogsBtn.addEventListener('click', async () => {
+    await loadSystemLogs();
+    renderSystemLogs();
+    setStatus('System-Logs wurden aktualisiert.', 'success');
+  });
   els.refreshBeaconsBtn.addEventListener('click', () => refreshAll());
   els.refreshStoreDetailBtn.addEventListener('click', async () => {
     if (!state.selectedStoreId) {

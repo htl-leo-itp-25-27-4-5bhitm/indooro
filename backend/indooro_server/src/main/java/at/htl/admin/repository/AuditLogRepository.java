@@ -13,4 +13,8 @@ public class AuditLogRepository implements PanacheRepositoryBase<AuditLogEntity,
     public List<AuditLogEntity> listByEntity(String entityType, UUID entityId) {
         return list("entityType = ?1 and entityId = ?2 order by createdAt desc", entityType, entityId);
     }
+
+    public List<AuditLogEntity> listRecent(int limit) {
+        return find("order by createdAt desc").page(0, Math.max(1, limit)).list();
+    }
 }
