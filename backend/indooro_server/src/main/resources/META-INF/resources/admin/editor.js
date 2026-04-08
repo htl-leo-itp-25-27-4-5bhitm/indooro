@@ -34,7 +34,12 @@ let zoom = 1;
 let shopName = 'Mein Supermarkt';
 let isRotating = false;
 let showRotationUI = false;
-const LAYOUT_API = '/api/layout/current';
+const LEGACY_LAYOUT_API = '/api/layout/current';
+const urlParams = new URLSearchParams(window.location.search);
+const storeId = urlParams.get('storeId');
+let storeContext = null;
+let assignedBeacons = [];
+let editorLayoutId = null;
 
 const cellSize = 20; // pixels per meter cell
 
@@ -118,6 +123,26 @@ const modeLabel = document.getElementById('modeLabel');
 const shopNameInput = document.getElementById('shopName');
 const launchBtn = document.getElementById('launchBtn');
 const saveStatus = document.getElementById('saveStatus');
+const storeContextBox = document.getElementById('storeContextBox');
+const assignedBeaconsPanel = document.getElementById('assignedBeaconsPanel');
+const assignedBeaconsList = document.getElementById('assignedBeaconsList');
+const backLink = document.getElementById('backLink');
+
+function hasStoreContext() {
+  return Boolean(storeId);
+}
+
+function getCurrentLayoutEndpoint() {
+  return hasStoreContext() ? `/api/stores/${storeId}/layout/current` : LEGACY_LAYOUT_API;
+}
+
+function getSaveLayoutEndpoint() {
+  return hasStoreContext() ? `/api/stores/${storeId}/layout/versions` : LEGACY_LAYOUT_API;
+}
+
+function getEditorContextEndpoint() {
+  return `/api/stores/${storeId}/layout/editor-context`;
+}
 
 /* ----- Load Categories from JSON ----- */
 async function loadCategories() {
@@ -157,6 +182,106 @@ function setSaveStatus(message, tone = 'neutral') {
   }
 }
 
+function findAssignedBeaconByCode(beaconCode) {
+  return assignedBeacons.find(beacon => beacon.beaconCode === beaconCode) || null;
+}
+
+function enrichBeaconElement(element) {
+  if (!element || element.type !== 'beacon') {
+    return element;
+  }
+
+  const normalized = { ...element };
+  const matchingBeacon = findAssignedBeaconByCode(normalized.beaconId)
+    || assignedBeacons.find(beacon => beacon.identityKey === normalized.identityKey)
+    || null;
+
+  if (matchingBeacon) {
+    normalized.beaconDbId = matchingBeacon.beaconId;
+    normalized.beaconId = matchingBeacon.beaconCode;
+    normalized.identityKey = matchingBeacon.identityKey;
+    normalized.uuid = matchingBeacon.uuid;
+    normalized.major = matchingBeacon.major;
+    normalized.minor = matchingBeacon.minor;
+  }
+
+  return normalized;
+}
+
+function getUsedBeaconCodes(excludeElementId = null) {
+  return new Set(
+    elements
+      .filter(el => el.type === 'beacon' && el.id !== excludeElementId && el.beaconId)
+      .map(el => el.beaconId)
+  );
+}
+
+function getNextAvailableBeacon(excludeElementId = null) {
+  if (!hasStoreContext()) {
+    return null;
+  }
+
+  const usedCodes = getUsedBeaconCodes(excludeElementId);
+  return assignedBeacons.find(beacon => !usedCodes.has(beacon.beaconCode)) || null;
+}
+
+function createBeaconElement(x, y, excludeElementId = null) {
+  const beacon = getNextAvailableBeacon(excludeElementId);
+  const snappedX = Math.max(0, Math.min(Math.round(x), gridSize.width));
+  const snappedY = Math.max(0, Math.min(Math.round(y), gridSize.height));
+
+  if (hasStoreContext() && !beacon) {
+    alert('Dieser Filiale sind aktuell keine freien Beacons mehr zugeordnet.');
+    return null;
+  }
+
+  return enrichBeaconElement({
+    id: Date.now() + Math.floor(Math.random() * 1000),
+    type: 'beacon',
+    beaconId: beacon ? beacon.beaconCode : `Indooro${elements.filter(el => el.type === 'beacon').length + 1}`,
+    beaconDbId: beacon ? beacon.beaconId : null,
+    identityKey: beacon ? beacon.identityKey : null,
+    uuid: beacon ? beacon.uuid : null,
+    major: beacon ? beacon.major : null,
+    minor: beacon ? beacon.minor : null,
+    x: snappedX,
+    y: snappedY,
+  });
+}
+
+function renderStoreContext() {
+  if (backLink) {
+    backLink.href = hasStoreContext() ? `/admin/#store-detail` : '/admin/';
+  }
+
+  if (!hasStoreContext() || !storeContextBox || !assignedBeaconsPanel || !assignedBeaconsList) {
+    return;
+  }
+
+  storeContextBox.classList.remove('hidden');
+  assignedBeaconsPanel.classList.remove('hidden');
+
+  const usedCodes = getUsedBeaconCodes();
+  const freeCount = assignedBeacons.filter(beacon => !usedCodes.has(beacon.beaconCode)).length;
+
+  storeContextBox.innerHTML = `
+    <strong>${storeContext?.store?.name || 'Filialeditor'}</strong><br>
+    Store-Code: ${storeContext?.store?.storeCode || '-'} · Zugewiesene Beacons: ${assignedBeacons.length} · Noch frei im Layout: ${freeCount}
+  `;
+
+  assignedBeaconsList.innerHTML = assignedBeacons.length
+    ? assignedBeacons.map(beacon => `
+        <div class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+          <div class="font-semibold">${beacon.beaconCode}</div>
+          <div class="text-xs text-gray-500">${beacon.identityKey}</div>
+          <div class="text-xs ${usedCodes.has(beacon.beaconCode) ? 'text-emerald-700' : 'text-amber-700'}">
+            ${usedCodes.has(beacon.beaconCode) ? 'Bereits im Layout platziert' : 'Noch nicht im Layout verwendet'}
+          </div>
+        </div>
+      `).join('')
+    : '<p class="text-sm text-gray-500">Dieser Filiale sind noch keine Beacons zugeordnet.</p>';
+}
+
 function normalizeImportedElements(items = []) {
   return items.map(el => {
     const normalized = { ...el };
@@ -171,7 +296,7 @@ function normalizeImportedElements(items = []) {
     normalized.accessAngle = Number.isFinite(normalized.accessAngle) ? normalized.accessAngle : 90;
     normalized.locked = Boolean(normalized.locked);
 
-    return normalized;
+    return enrichBeaconElement(normalized);
   });
 }
 
@@ -207,24 +332,64 @@ function buildLayoutPayload() {
 }
 
 async function saveLayoutToServer(layoutData) {
-  const response = await fetch(LAYOUT_API, {
+  const response = await fetch(getSaveLayoutEndpoint(), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(layoutData)
+    body: JSON.stringify(
+      hasStoreContext()
+        ? {
+            layoutName: shopNameInput.value || storeContext?.store?.name || 'Layout',
+            changeNote: 'Im Layout-Editor gespeichert',
+            activate: true,
+            layout: layoutData
+          }
+        : layoutData
+    )
   });
 
   if (!response.ok) {
     throw new Error('Layout konnte nicht am Server gespeichert werden.');
   }
 
-  setSaveStatus('Layout am Server gespeichert', 'success');
+  const savedLayout = await response.json();
+  editorLayoutId = savedLayout.layoutId || editorLayoutId;
+  setSaveStatus(hasStoreContext() ? 'Filiallayout gespeichert' : 'Layout am Server gespeichert', 'success');
 }
 
 async function loadSavedLayout() {
   try {
-    const response = await fetch(LAYOUT_API);
+    if (hasStoreContext()) {
+      const response = await fetch(getEditorContextEndpoint());
+      if (!response.ok) {
+        throw new Error('Kein Editor-Kontext gefunden');
+      }
+
+      storeContext = await response.json();
+      assignedBeacons = storeContext.assignedBeacons || [];
+      editorLayoutId = storeContext.currentLayout?.layoutId || null;
+
+      const layoutDocument = storeContext.currentLayout?.layout;
+      if (!layoutDocument || !layoutDocument.gridSize || !Array.isArray(layoutDocument.elements)) {
+        throw new Error('Layout-Daten ungueltig');
+      }
+
+      shopNameInput.value = layoutDocument.shopName || storeContext.store?.name || 'Mein Supermarkt';
+      gridSize = layoutDocument.gridSize || gridSize;
+      gridWidthInput.value = gridSize.width;
+      gridHeightInput.value = gridSize.height;
+      elements = normalizeImportedElements(layoutDocument.elements || []);
+      selectedElement = null;
+      recalcMeters();
+      renderStoreContext();
+      renderProperties();
+      renderCanvas();
+      setSaveStatus('Filiallayout geladen', 'success');
+      return;
+    }
+
+    const response = await fetch(getCurrentLayoutEndpoint());
     if (!response.ok) {
       throw new Error('Kein gespeichertes Layout gefunden');
     }
@@ -245,7 +410,8 @@ async function loadSavedLayout() {
     renderCanvas();
     setSaveStatus('Gespeichertes Layout geladen', 'success');
   } catch (error) {
-    setSaveStatus('Noch kein gespeichertes Layout am Server', 'neutral');
+    renderStoreContext();
+    setSaveStatus(hasStoreContext() ? 'Noch kein Filiallayout am Server' : 'Noch kein gespeichertes Layout am Server', 'neutral');
   }
 }
 
@@ -536,6 +702,7 @@ function renderCanvas() {
   countElementsSpan.innerText = elements.length;
   areaSizeW.innerText = gridSize.width;
   areaSizeH.innerText = gridSize.height;
+  renderStoreContext();
 }
 
 /* ----- Render Beacon Element ----- */
@@ -556,7 +723,7 @@ function renderBeaconElement(el) {
   div.dataset.id = el.id;
   
   // Tooltip
-  div.title = `Beacon: ${el.beaconId || 'Unbenannt'}\nPosition: (${el.x}m, ${el.y}m)`;
+  div.title = `Beacon: ${el.beaconId || 'Unbenannt'}\nPosition: (${el.x}m, ${el.y}m)${el.identityKey ? `\nIdentity: ${el.identityKey}` : ''}`;
 
   const inner = document.createElement('div');
   inner.className = 'flex flex-col items-center justify-center gap-0';
@@ -943,19 +1110,11 @@ window.addEventListener('mouseup', (e) => {
     const isBeaconTool = currentElementType.id === 'beacon';
     
     if (isBeaconTool) {
-      // Create beacon at snapped grid position
-      const beaconCount = elements.filter(el => el.type === 'beacon').length + 1;
-      const snappedX = Math.max(0, Math.min(Math.round(x), gridSize.width));
-      const snappedY = Math.max(0, Math.min(Math.round(y), gridSize.height));
-      const newBeacon = {
-        id: Date.now() + Math.floor(Math.random()*1000),
-        type: 'beacon',
-        beaconId: `Indooro${beaconCount}`,
-        x: snappedX,
-        y: snappedY,
-      };
-      elements.push(newBeacon);
-      selectedElement = newBeacon;
+      const newBeacon = createBeaconElement(x, y);
+      if (newBeacon) {
+        elements.push(newBeacon);
+        selectedElement = newBeacon;
+      }
     } else {
       // Create regular element
       const nx = Math.max(0, Math.min(gridSize.width-1, Math.round(x)));
@@ -1058,14 +1217,10 @@ function renderBeaconProperties(el) {
   duplicateBtn.innerHTML = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke-width="2"/></svg>';
   duplicateBtn.onclick = () => {
     saveState();
-    const beaconCount = elements.filter(e => e.type === 'beacon').length + 1;
-    const duplicate = {
-      id: Date.now() + Math.floor(Math.random() * 1000),
-      type: 'beacon',
-      beaconId: `Indooro${beaconCount}`,
-      x: Math.min(el.x + 2, gridSize.width),
-      y: el.y,
-    };
+    const duplicate = createBeaconElement(Math.min(el.x + 2, gridSize.width), el.y, el.id);
+    if (!duplicate) {
+      return;
+    }
     elements.push(duplicate);
     selectedElement = duplicate;
     renderCanvas();
@@ -1091,15 +1246,34 @@ function renderBeaconProperties(el) {
 
   // Beacon ID input
   const idDiv = document.createElement('div');
-  idDiv.innerHTML = `
-    <div>
-      <label class="block text-sm font-medium mb-1">Beacon ID (Hardware-Name)</label>
-      <input id="propBeaconId" type="text" value="${escapeHtml(el.beaconId || '')}" 
-             placeholder="z.B. Indooro1" 
-             class="w-full px-2 py-1 border border-gray-300 rounded" />
-      <p class="text-xs text-gray-500 mt-1">Muss mit dem Hardware-Namen übereinstimmen</p>
-    </div>
-  `;
+  const usedBeaconCodes = getUsedBeaconCodes(el.id);
+  if (hasStoreContext()) {
+    idDiv.innerHTML = `
+      <div>
+        <label class="block text-sm font-medium mb-1">Zugewiesener Beacon</label>
+        <select id="propBeaconId" class="w-full px-2 py-1 border border-gray-300 rounded">
+          ${assignedBeacons.map(beacon => `
+            <option value="${escapeHtml(beacon.beaconCode)}"
+              ${beacon.beaconCode === el.beaconId ? 'selected' : ''}
+              ${usedBeaconCodes.has(beacon.beaconCode) ? 'disabled' : ''}>
+              ${escapeHtml(beacon.beaconCode)} · ${escapeHtml(beacon.identityKey)}
+            </option>
+          `).join('')}
+        </select>
+        <p class="text-xs text-gray-500 mt-1">Es koennen nur die dieser Filiale zugeordneten Beacons verwendet werden.</p>
+      </div>
+    `;
+  } else {
+    idDiv.innerHTML = `
+      <div>
+        <label class="block text-sm font-medium mb-1">Beacon ID (Hardware-Name)</label>
+        <input id="propBeaconId" type="text" value="${escapeHtml(el.beaconId || '')}" 
+               placeholder="z.B. Indooro1" 
+               class="w-full px-2 py-1 border border-gray-300 rounded" />
+        <p class="text-xs text-gray-500 mt-1">Muss mit dem Hardware-Namen uebereinstimmen</p>
+      </div>
+    `;
+  }
   container.appendChild(idDiv);
 
   // Position display - now integer values for grid snapping
@@ -1134,14 +1308,34 @@ function renderBeaconProperties(el) {
   propertiesWrapper.appendChild(container);
 
   // Event listeners
-  let idTimeout;
-  document.getElementById('propBeaconId').addEventListener('input', (ev) => {
-    clearTimeout(idTimeout);
-    el.beaconId = ev.target.value;
-    elements = elements.map(it => it.id === el.id ? el : it);
-    renderCanvas();
-    idTimeout = setTimeout(() => saveState(), 500);
-  });
+  const beaconIdInput = document.getElementById('propBeaconId');
+  if (hasStoreContext()) {
+    beaconIdInput.addEventListener('change', (ev) => {
+      saveState();
+      const selectedBeacon = findAssignedBeaconByCode(ev.target.value);
+      if (!selectedBeacon) {
+        return;
+      }
+      el.beaconId = selectedBeacon.beaconCode;
+      el.beaconDbId = selectedBeacon.beaconId;
+      el.identityKey = selectedBeacon.identityKey;
+      el.uuid = selectedBeacon.uuid;
+      el.major = selectedBeacon.major;
+      el.minor = selectedBeacon.minor;
+      elements = elements.map(it => it.id === el.id ? el : it);
+      renderCanvas();
+      renderProperties();
+    });
+  } else {
+    let idTimeout;
+    beaconIdInput.addEventListener('input', (ev) => {
+      clearTimeout(idTimeout);
+      el.beaconId = ev.target.value;
+      elements = elements.map(it => it.id === el.id ? el : it);
+      renderCanvas();
+      idTimeout = setTimeout(() => saveState(), 500);
+    });
+  }
 
   document.getElementById('propBeaconX').addEventListener('change', (ev) => {
     saveState();

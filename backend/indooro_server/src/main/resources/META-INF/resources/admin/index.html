@@ -2,151 +2,309 @@
 <html lang="de">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Indooro - Layout Editor</title>
-  <script defer src="https://cdn.tailwindcss.com"></script>
-  <script defer src="editor.js"></script>
-  <link rel="stylesheet" href="editor.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Indooro Admin Plattform</title>
+  <link rel="stylesheet" href="app.css" />
+  <script defer src="app.js"></script>
 </head>
-<body class="h-screen antialiased text-gray-800 bg-gray-50">
-
-<div class="flex h-screen overflow-hidden">
-  <!-- Left Sidebar -->
-  <aside class="w-80 bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0">
-    <div class="p-4 border-b">
-      <input id="shopName" type="text" value="Mein Supermarkt" class="w-full px-3 py-2 text-lg font-bold border border-gray-300 rounded" />
-    </div>
-
-    <!-- Tools -->
-    <div class="p-4 border-b">
-      <h3 class="font-semibold mb-2">Werkzeuge</h3>
-      <div class="flex gap-2">
-        <button id="toolSelect" class="flex-1 px-3 py-2 rounded flex items-center justify-center gap-2 bg-blue-500 text-white">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h14M12 5v14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Auswählen
-        </button>
-        <button id="toolDraw" class="flex-1 px-3 py-2 rounded flex items-center justify-center gap-2 bg-gray-100">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Zeichnen
-        </button>
+<body>
+  <div class="admin-shell">
+    <aside class="sidebar">
+      <div>
+        <div class="brand-pill">Indooro Admin</div>
+        <h1>Filialen, Beacons und Layouts</h1>
+        <p class="lead">Die neue Admin-Plattform verbindet Filialstammdaten, Beacon-Zuordnung und den bestehenden Layout-Editor in einem durchgehenden Flow.</p>
       </div>
-    </div>
 
-    <!-- Element Type -->
-    <div class="p-4 border-b">
-      <h3 class="font-semibold mb-2">Element-Typ</h3>
-      <div id="elementTypes" class="grid grid-cols-2 gap-2"></div>
-    </div>
+      <nav class="nav-links">
+        <a href="#dashboard">Dashboard</a>
+        <a href="#regions">Regionen</a>
+        <a href="#stores">Filialen</a>
+        <a href="#store-detail">Filialdetail</a>
+        <a href="#beacons">Beacons</a>
+      </nav>
 
-    <!-- Templates -->
-    <div class="p-4 border-b">
-      <h3 class="font-semibold mb-2">Vorlagen</h3>
-      <div id="templates" class="space-y-2"></div>
-    </div>
+      <div class="sidebar-actions">
+        <a class="ghost-button" href="/admin/editor/">Globalen Editor oeffnen</a>
+        <a class="ghost-button" href="/customer/">Kundenansicht</a>
+        <a class="ghost-button" href="/">LeoCloud Startseite</a>
+      </div>
+    </aside>
 
-    <!-- Grid Settings -->
-    <div class="p-4">
-      <h3 class="font-semibold mb-2">Rastergröße</h3>
-      <div class="grid grid-cols-2 gap-2">
+    <main class="content">
+      <header class="page-header" id="dashboard">
         <div>
-          <label class="block text-xs font-medium mb-1">Breite (m)</label>
-          <input id="gridWidth" type="number" value="40" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+          <span class="eyebrow">Sprint Verwaltung</span>
+          <h2>Admin Plattform</h2>
+          <p id="pageStatus">Lade Regionen, Filialen und Beacons...</p>
         </div>
-        <div>
-          <label class="block text-xs font-medium mb-1">Höhe (m)</label>
-          <input id="gridHeight" type="number" value="60" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+        <div class="page-actions">
+          <button id="refreshAllBtn" class="primary-button">Neu laden</button>
         </div>
-      </div>
-    </div>
-  </aside>
+      </header>
 
-  <!-- Main area -->
-  <div class="flex-1 flex flex-col overflow-hidden">
-    <div class="bg-white border-b border-gray-200 p-3 flex items-center justify-between flex-shrink-0">
-      <div class="flex items-center gap-3">
-        <label class="flex items-center gap-2">
-          <input id="showGrid" type="checkbox" checked />
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3h4v4H3V3zm7 0h4v4h-4V3zm7 0h4v4h-4V3M3 10h4v4H3v-4zm7 0h4v4h-4v-4zm7 0h4v4h-4v-4M3 17h4v4H3v-4zm7 0h4v4h-4v-4zm7 0h4v4h-4v-4"/></svg>
-          Raster anzeigen
-        </label>
+      <section class="stats-grid">
+        <article class="stat-card">
+          <span>Aktive Regionen</span>
+          <strong id="statRegions">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Aktive Filialen</span>
+          <strong id="statStores">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Freie Beacons</span>
+          <strong id="statFreeBeacons">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Zugewiesene Beacons</span>
+          <strong id="statAssignedBeacons">0</strong>
+        </article>
+      </section>
 
-        <div class="flex items-center gap-2 ml-4">
-          <span class="text-sm">Zoom:</span>
-          <button id="zoomOut" class="px-2 py-1 bg-gray-100 rounded">-</button>
-          <span id="zoomLabel" class="text-sm w-12 text-center">100%</span>
-          <button id="zoomIn" class="px-2 py-1 bg-gray-100 rounded">+</button>
+      <section class="panel" id="regions">
+        <div class="panel-header">
+          <div>
+            <span class="eyebrow">Grundlage</span>
+            <h3>Regionen</h3>
+          </div>
+          <button id="resetRegionFormBtn" class="secondary-button">Neue Region</button>
         </div>
 
-        <div class="flex items-center gap-1 ml-4 border-l pl-4">
-          <button id="undoBtn" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded flex items-center gap-1" title="Rückgängig (Strg+Z)">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M3 7v6h6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          <button id="redoBtn" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded flex items-center gap-1" title="Wiederholen (Strg+Y)">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M21 7v6h-6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
+        <div class="two-column-grid">
+          <div>
+            <div id="regionsList" class="list-stack"></div>
+          </div>
+
+          <form id="regionForm" class="form-card">
+            <h4 id="regionFormTitle">Region anlegen</h4>
+            <label>
+              Code
+              <input name="code" maxlength="50" required placeholder="AT-NORD" />
+            </label>
+            <label>
+              Name
+              <input name="name" maxlength="120" required placeholder="Region Nord" />
+            </label>
+            <label>
+              Beschreibung
+              <textarea name="description" rows="4" maxlength="2000" placeholder="Optional"></textarea>
+            </label>
+            <div class="form-actions">
+              <button type="submit" class="primary-button">Speichern</button>
+              <button type="button" id="cancelRegionEditBtn" class="secondary-button">Zuruecksetzen</button>
+            </div>
+          </form>
         </div>
-      </div>
+      </section>
 
-      <div class="flex items-center gap-3">
-        <a href="/" class="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200 text-sm">Startseite</a>
-        <span id="saveStatus" class="text-sm text-gray-500">Layout noch nicht gespeichert</span>
-        <button id="newBtn" class="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 flex items-center gap-2">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M3 6h18M9 6v12m6-12v12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          Neu
-        </button>
+      <section class="panel" id="stores">
+        <div class="panel-header">
+          <div>
+            <span class="eyebrow">Kernobjekt</span>
+            <h3>Filialen</h3>
+          </div>
+          <button id="resetStoreFormBtn" class="secondary-button">Neue Filiale</button>
+        </div>
 
-        <label class="px-3 py-2 bg-blue-500 text-white rounded cursor-pointer hover:bg-blue-600 flex items-center gap-2">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 5 17 10"/>
-            <line x1="12" y1="5" x2="12" y2="19"/>
-          </svg>
-          Importieren
-          <input id="fileInput" type="file" accept=".json" class="hidden" />
-        </label>
+        <div class="toolbar-row">
+          <label class="search-field">
+            Suche
+            <input id="storeQuery" type="search" placeholder="Name, Store-Code oder Ort" />
+          </label>
+          <label>
+            Status
+            <select id="storeStatusFilter">
+              <option value="ACTIVE">Aktiv</option>
+              <option value="ARCHIVED">Archiviert</option>
+            </select>
+          </label>
+          <label>
+            Region
+            <select id="storeRegionFilter">
+              <option value="">Alle Regionen</option>
+            </select>
+          </label>
+          <button id="applyStoreFiltersBtn" class="secondary-button">Filter anwenden</button>
+        </div>
 
-        <button id="exportBtn" class="px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 flex items-center gap-2">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 5 17 10"/>
-          </svg>
-          Exportieren
-        </button>
+        <div class="two-column-grid wide-right">
+          <div>
+            <div id="storesList" class="list-stack"></div>
+          </div>
 
-        <button id="launchBtn" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 flex items-center gap-2 font-semibold shadow-lg">
-          🚀 Simulation starten
-        </button>
-      </div>
-    </div>
+          <form id="storeForm" class="form-card">
+            <h4 id="storeFormTitle">Filiale anlegen</h4>
+            <label>
+              Region
+              <select name="regionId" id="storeRegionInput" required></select>
+            </label>
+            <label>
+              Store-Code
+              <input name="storeCode" maxlength="50" required placeholder="SPAR-LNZ-001" />
+            </label>
+            <label>
+              Name
+              <input name="name" maxlength="150" required placeholder="Spar Linz Nord" />
+            </label>
+            <div class="split-grid">
+              <label>
+                Strasse
+                <input name="street" maxlength="150" required placeholder="Hauptstrasse 1" />
+              </label>
+              <label>
+                PLZ
+                <input name="zipCode" maxlength="20" required placeholder="4020" />
+              </label>
+            </div>
+            <div class="split-grid">
+              <label>
+                Ort
+                <input name="city" maxlength="100" required placeholder="Linz" />
+              </label>
+              <label>
+                Land
+                <input name="country" maxlength="100" required value="Austria" />
+              </label>
+            </div>
+            <label>
+              Notiz
+              <textarea name="notes" rows="4" maxlength="2000" placeholder="Optional"></textarea>
+            </label>
+            <div class="form-actions">
+              <button type="submit" class="primary-button">Speichern</button>
+              <button type="button" id="cancelStoreEditBtn" class="secondary-button">Zuruecksetzen</button>
+            </div>
+          </form>
+        </div>
+      </section>
 
-    <div class="flex-1 overflow-auto bg-gray-100 p-8">
-      <div id="canvasContainer" class="bg-white mx-auto relative canvas-area" style="min-width:200px; min-height:200px;"></div>
-    </div>
+      <section class="panel" id="store-detail">
+        <div class="panel-header">
+          <div>
+            <span class="eyebrow">Fokus</span>
+            <h3>Filialdetail</h3>
+          </div>
+          <div class="inline-actions">
+            <button id="refreshStoreDetailBtn" class="secondary-button" disabled>Neu laden</button>
+            <a id="openEditorLink" class="primary-button disabled-link" href="/admin/editor/">Layout-Editor</a>
+          </div>
+        </div>
 
-    <div class="bg-white border-t border-gray-200 px-4 py-2 flex items-center justify-between text-sm text-gray-600 flex-shrink-0">
-      <div>Elemente: <span id="countElements">0</span></div>
-      <div>Ladenfläche: <span id="areaSize">40</span>m × <span id="areaSizeH">60</span>m</div>
-      <div id="modeLabel">Auswahlmodus</div>
-    </div>
+        <div id="storeDetailEmpty" class="empty-state">
+          Waehle links eine Filiale aus. Dann zeigen wir Stammdaten, zugewiesene Beacons, Layout-Versionen und letzte Aenderungen direkt hier an.
+        </div>
+
+        <div id="storeDetailContent" class="detail-grid hidden">
+          <article class="detail-card">
+            <h4>Stammdaten</h4>
+            <dl id="storeMeta" class="meta-list"></dl>
+          </article>
+
+          <article class="detail-card">
+            <h4>Zugewiesene Beacons</h4>
+            <div id="storeBeaconList" class="list-stack compact"></div>
+          </article>
+
+          <article class="detail-card">
+            <h4>Layout-Versionen</h4>
+            <div id="storeLayoutVersions" class="list-stack compact"></div>
+          </article>
+
+          <article class="detail-card">
+            <h4>Historie</h4>
+            <div id="storeAuditTrail" class="timeline"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" id="beacons">
+        <div class="panel-header">
+          <div>
+            <span class="eyebrow">Hardware</span>
+            <h3>Beacon Verwaltung</h3>
+          </div>
+          <button id="refreshBeaconsBtn" class="secondary-button">Liste neu laden</button>
+        </div>
+
+        <div class="toolbar-row">
+          <label>
+            Ansicht
+            <select id="beaconAssignmentFilter">
+              <option value="all">Alle</option>
+              <option value="free">Nur frei</option>
+              <option value="assigned">Nur zugewiesen</option>
+            </select>
+          </label>
+          <label class="search-field">
+            Suche
+            <input id="beaconQuery" type="search" placeholder="Beacon-Code oder Identity-Key" />
+          </label>
+          <button id="applyBeaconFiltersBtn" class="secondary-button">Filter anwenden</button>
+        </div>
+
+        <div class="three-column-grid">
+          <form id="beaconForm" class="form-card">
+            <h4 id="beaconFormTitle">Beacon anlegen</h4>
+            <label>
+              Beacon-Code
+              <input name="beaconCode" maxlength="60" required placeholder="Indooro1" />
+            </label>
+            <label>
+              UUID
+              <input name="uuid" maxlength="36" required placeholder="123e4567-e89b-12d3-a456-426614174000" />
+            </label>
+            <div class="split-grid">
+              <label>
+                Major
+                <input name="major" type="number" min="0" placeholder="1" />
+              </label>
+              <label>
+                Minor
+                <input name="minor" type="number" min="0" placeholder="1" />
+              </label>
+            </div>
+            <label>
+              Notiz
+              <textarea name="notes" rows="3" maxlength="2000" placeholder="Optional"></textarea>
+            </label>
+            <div class="form-actions">
+              <button type="submit" class="primary-button">Speichern</button>
+              <button type="button" id="cancelBeaconEditBtn" class="secondary-button">Zuruecksetzen</button>
+            </div>
+          </form>
+
+          <form id="beaconBulkForm" class="form-card">
+            <h4>Mehrere Beacons anlegen</h4>
+            <label>
+              UUID
+              <input name="uuid" maxlength="36" required placeholder="123e4567-e89b-12d3-a456-426614174000" />
+            </label>
+            <label>
+              Major
+              <input name="major" type="number" min="0" placeholder="1" />
+            </label>
+            <label>
+              Notiz
+              <input name="notes" maxlength="2000" placeholder="Optional" />
+            </label>
+            <label>
+              Beacons (eine Zeile pro Beacon)
+              <textarea name="items" rows="8" placeholder="Indooro1,1&#10;Indooro2,2&#10;Indooro3,3" required></textarea>
+            </label>
+            <p class="hint">Format pro Zeile: <code>BeaconCode,Minor</code>. Die UUID und Major gelten dann fuer alle Zeilen.</p>
+            <div class="form-actions">
+              <button type="submit" class="primary-button">Bulk anlegen</button>
+            </div>
+          </form>
+
+          <div class="form-card">
+            <h4>Beacon Liste</h4>
+            <div id="beaconsList" class="list-stack compact"></div>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
-
-  <aside id="rightSidebar" class="w-80 bg-white border-l border-gray-200 overflow-y-auto flex-shrink-0">
-    <div class="p-4">
-      <h3 class="font-semibold mb-3">Eigenschaften</h3>
-      <div id="propertiesWrapper" class="text-sm text-gray-500">
-        Wähle ein Element aus, um seine Eigenschaften zu bearbeiten.
-      </div>
-    </div>
-  </aside>
-</div>
-
 </body>
 </html>

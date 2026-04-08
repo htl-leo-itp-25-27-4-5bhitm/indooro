@@ -1,6 +1,6 @@
 # Indooro Deployment
 
-Stand: 2026-03-18
+Stand: 2026-04-08
 
 Dieses Dokument beschreibt den aktuellen LeoCloud-Stand von Indooro und den Weg, wie das Backend unter `https://it220209.cloud.htl-leonding.ac.at/` erreichbar gemacht wird.
 
@@ -31,7 +31,9 @@ Das bedeutet:
 ## Wichtige Repo-Dateien
 
 - `k8s/opensearch.yaml`
+- `k8s/postgres.yaml`
 - `k8s/backend.yaml`
+- `backend/indooro_server/.mvn/jvm.config`
 - `.github/workflows/ci.yaml`
 - `backend/indooro_server/build.sh`
 
@@ -41,12 +43,13 @@ Das bedeutet:
 - Die GitHub Action baut ebenfalls `.../indooro-backend-v2`
 - `k8s/backend.yaml` zeigt ebenfalls auf `.../indooro-backend-v2:latest`
 - Das Backend spricht in Production intern mit dem Kubernetes-Service `opensearch`
+- Das Admin-Datenmodell nutzt PostgreSQL ueber den internen Kubernetes-Service `postgres`
 
 ## Was aktuell nicht sauber zusammenpasst
 
 - `backend/indooro_server/build.sh` pusht noch `ghcr.io/htl-leo-itp-25-27-4-5bhitm/indooro-backend:latest` ohne `-v2`
 - `k8s/volume-claim.yaml` ist sehr wahrscheinlich ein alter Rest, weil `k8s/opensearch.yaml` bereits den aktuell verwendeten PVC `opensearch-data` enthaelt
-- `postgres` laeuft live im Cluster, aber ein passendes Manifest liegt aktuell nicht im Repo
+- `build.sh` kennt den neuen PostgreSQL-/Admin-Stack noch nicht explizit, auch wenn das Quarkus-Backend jetzt darauf vorbereitet ist
 
 ## Wie das Deployment aktuell funktioniert
 
@@ -64,6 +67,7 @@ Relevant ist:
 Die bestehenden Manifeste werden im Namespace `student-it220209` angewendet:
 
 ```bash
+kubectl apply -n student-it220209 -f k8s/postgres.yaml
 kubectl apply -n student-it220209 -f k8s/opensearch.yaml
 kubectl apply -n student-it220209 -f k8s/backend.yaml
 ```
@@ -155,6 +159,38 @@ Damit koennen diese Clients dasselbe Layout verwenden:
 - die gehostete Kundensuche
 - die Swift-App
 
+## Neue Admin-Plattform Grundlage
+
+Das Backend hat jetzt zusaetzlich eine relationale Grundlage fuer die neue Admin-Plattform:
+
+- `regions`
+- `stores`
+- `beacons`
+- `beacon_assignments`
+- `layout_versions`
+- `audit_logs`
+
+Die Datenbank-Migration liegt unter:
+
+- `backend/indooro_server/src/main/resources/db/migration/V1__admin_platform_foundation.sql`
+
+Neue REST-Endpunkte wurden fuer den Sprint vorbereitet:
+
+- `/api/regions`
+- `/api/stores`
+- `/api/beacons`
+- `/api/stores/{storeId}/layout/...`
+- `/api/mobile/stores/...`
+
+Damit ist die Grundlage fuer:
+
+- Filialverwaltung
+- Beacon-Verwaltung
+- filialspezifische Layouts
+- spaetere iOS-Filialerkennung per Beacon
+
+bereits im Backend angelegt.
+
 ## Produktdaten importieren
 
 Damit die App Produkte anzeigen kann, muss der OpenSearch-Index auch wirklich mit Daten befuellt sein.
@@ -209,11 +245,27 @@ Wenn ihr das heute neu oder sauber aufsetzen wollt:
 
 1. Backend-Code auf `main` pushen
 2. Warten, bis GitHub Actions das Image `indooro-backend-v2:latest` gebaut hat
-3. `kubectl apply -n student-it220209 -f k8s/opensearch.yaml`
-4. `kubectl apply -n student-it220209 -f k8s/backend.yaml`
-5. `kubectl apply -n student-it220209 -f k8s/backend-ingress.yaml`
-6. Falls noetig: `kubectl rollout restart deployment/indooro-backend -n student-it220209`
-7. Testen: `https://it220209.cloud.htl-leonding.ac.at/api/admin/health`
+3. `kubectl apply -n student-it220209 -f k8s/postgres.yaml`
+4. `kubectl apply -n student-it220209 -f k8s/opensearch.yaml`
+5. `kubectl apply -n student-it220209 -f k8s/backend.yaml`
+6. `kubectl apply -n student-it220209 -f k8s/backend-ingress.yaml`
+7. Falls noetig: `kubectl rollout restart deployment/indooro-backend -n student-it220209`
+8. Testen: `https://it220209.cloud.htl-leonding.ac.at/api/admin/health`
+
+## Build-Hinweis fuer Java 24
+
+Auf diesem Projekt laeuft Quarkus 3.6 aktuell nicht sauber auf Java 24 ohne Byte-Buddy-Flag.
+Damit `sh mvnw package` lokal trotzdem funktioniert, liegt jetzt diese Datei im Repo:
+
+- `backend/indooro_server/.mvn/jvm.config`
+
+mit folgendem Inhalt:
+
+```text
+-Dnet.bytebuddy.experimental=true
+```
+
+Dadurch koennen lokale Builds auf neueren JDKs laufen, ohne dass bei jedem Aufruf manuell `MAVEN_OPTS` gesetzt werden muss.
 
 ## Muss man das jedes Mal machen
 

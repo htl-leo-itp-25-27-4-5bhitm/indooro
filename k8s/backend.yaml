@@ -21,6 +21,16 @@ spec:
         - name: indooro-backend
           image: ghcr.io/htl-leo-itp-25-27-4-5bhitm/indooro-backend-v2:latest
           env:
+            - name: DB_HOST
+              value: "postgres"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: "indooro"
+            - name: DB_USERNAME
+              value: "indooro"
+            - name: DB_PASSWORD
+              value: "indooro"
             - name: OPENSEARCH_PORT
               value: "9200"
           # command: ["tail", "-f", "/dev/null"] # zum Testen, damit der Container nicht sofort beendet wird

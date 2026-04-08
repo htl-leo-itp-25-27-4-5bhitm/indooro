@@ -1,0 +1,39 @@
+package at.htl.admin.dto;
+
+import com.fasterxml.jackson.databind.JsonNode;
+
+import java.util.UUID;
+
+public final class MobileDtos {
+
+    private MobileDtos() {
+    }
+
+    public record MobileStoreSummary(
+            UUID id,
+            String storeCode,
+            String name,
+            String city
+    ) {
+    }
+
+    public record MatchedBeaconSummary(
+            UUID beaconId,
+            String beaconCode,
+            String identityKey
+    ) {
+    }
+
+    public record StoreByBeaconResponse(
+            MobileStoreSummary store,
+            MatchedBeaconSummary matchedBeacon
+    ) {
+    }
+
+    public record MobileLayoutResponse(
+            UUID storeId,
+            UUID layoutId,
+            JsonNode layout
+    ) {
+    }
+}
