@@ -87,15 +87,17 @@ async function fetchJson(url, options = {}) {
 
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`;
-    try {
-      const payload = await response.json();
-      message = payload.error || payload.message || payload.details || message;
-    } catch (_error) {
-      const text = await response.text();
-      if (text) {
-        message = text;
+    const rawBody = await response.text();
+
+    if (rawBody) {
+      try {
+        const payload = JSON.parse(rawBody);
+        message = payload.error || payload.message || payload.details || rawBody || message;
+      } catch (_error) {
+        message = rawBody;
       }
     }
+
     throw new Error(message);
   }
 
