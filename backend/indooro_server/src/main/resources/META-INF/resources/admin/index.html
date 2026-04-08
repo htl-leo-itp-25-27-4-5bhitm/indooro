@@ -70,10 +70,13 @@
             <span class="eyebrow">Nachvollziehbarkeit</span>
             <h3>Letzte System-Logs</h3>
           </div>
-          <button id="refreshLogsBtn" class="secondary-button">Logs neu laden</button>
+          <div class="inline-actions">
+            <button id="toggleSystemLogsBtn" class="secondary-button">Mehr anzeigen</button>
+            <button id="refreshLogsBtn" class="secondary-button">Logs neu laden</button>
+          </div>
         </div>
         <p class="hint">Hier siehst du die letzten protokollierten Aenderungen aus der Admin-Plattform. Das sind keine rohen Kubernetes-Pod-Logs, sondern die fuer euch relevanten System- und Verwaltungsereignisse.</p>
-        <div id="systemLogs" class="timeline"></div>
+        <div id="systemLogs" class="timeline system-log-preview"></div>
       </section>
 
       <section class="panel" id="regions">

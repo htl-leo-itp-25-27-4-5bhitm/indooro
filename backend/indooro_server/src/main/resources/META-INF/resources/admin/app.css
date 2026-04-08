@@ -435,6 +435,28 @@ button {
   gap: 12px;
 }
 
+.system-log-preview {
+  max-height: 340px;
+  overflow: hidden;
+  position: relative;
+}
+
+.system-log-preview:not(.expanded)::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 88px;
+  background: linear-gradient(to bottom, rgba(244, 242, 234, 0), rgba(244, 242, 234, 0.94) 72%, rgba(244, 242, 234, 1));
+  pointer-events: none;
+}
+
+.system-log-preview.expanded {
+  max-height: none;
+  overflow: visible;
+}
+
 .timeline-entry {
   padding-left: 16px;
   border-left: 3px solid rgba(46, 109, 79, 0.22);

@@ -15,6 +15,7 @@ const state = {
   selectedStoreLayouts: [],
   selectedStoreAudit: [],
   systemLogs: [],
+  systemLogsExpanded: false,
   editingRegionId: null,
   editingStoreId: null,
   editingBeaconId: null,
@@ -36,6 +37,7 @@ const els = {
   statFreeBeacons: document.getElementById('statFreeBeacons'),
   statAssignedBeacons: document.getElementById('statAssignedBeacons'),
   refreshAllBtn: document.getElementById('refreshAllBtn'),
+  toggleSystemLogsBtn: document.getElementById('toggleSystemLogsBtn'),
   refreshLogsBtn: document.getElementById('refreshLogsBtn'),
   refreshBeaconsBtn: document.getElementById('refreshBeaconsBtn'),
   refreshStoreDetailBtn: document.getElementById('refreshStoreDetailBtn'),
@@ -230,6 +232,9 @@ function renderStats() {
 }
 
 function renderSystemLogs() {
+  els.systemLogs.classList.toggle('expanded', state.systemLogsExpanded);
+  els.toggleSystemLogsBtn.textContent = state.systemLogsExpanded ? 'Weniger anzeigen' : 'Mehr anzeigen';
+
   els.systemLogs.innerHTML = state.systemLogs.length
     ? state.systemLogs.map((entry) => `
         <div class="timeline-entry">
@@ -678,6 +683,10 @@ async function activateLayout(layoutId) {
 
 function bindEvents() {
   els.refreshAllBtn.addEventListener('click', () => refreshAll());
+  els.toggleSystemLogsBtn.addEventListener('click', () => {
+    state.systemLogsExpanded = !state.systemLogsExpanded;
+    renderSystemLogs();
+  });
   els.refreshLogsBtn.addEventListener('click', async () => {
     await loadSystemLogs();
     renderSystemLogs();
