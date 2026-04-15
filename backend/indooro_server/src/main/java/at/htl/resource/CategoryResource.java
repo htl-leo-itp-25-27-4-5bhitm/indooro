@@ -1,0 +1,71 @@
+package at.htl.resource;
+
+import at.htl.model.Category;
+import at.htl.service.CategoryService;
+import io.smallrye.common.annotation.Blocking;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DefaultValue;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+
+@Blocking
+@Path("/api/categories")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public class CategoryResource {
+
+    @Inject
+    CategoryService categoryService;
+
+    @GET
+    public Response getAllCategories(@QueryParam("size") @DefaultValue("100") Integer size) {
+        try {
+            return Response.ok(categoryService.getAllCategories(size)).build();
+        } catch (IOException e) {
+            return Response.serverError().entity(Map.of("error", e.getMessage())).build();
+        }
+    }
+
+    @GET
+    @Path("/{categoryCode}")
+    public Response getCategoryByCode(@PathParam("categoryCode") Integer categoryCode) {
+        try {
+            Category category = categoryService.getCategoryByCode(categoryCode);
+            if (category == null) {
+                return Response.status(Response.Status.NOT_FOUND)
+                        .entity(Map.of("error", "Category not found"))
+                        .build();
+            }
+            return Response.ok(category).build();
+        } catch (IOException e) {
+            return Response.serverError().entity(Map.of("error", e.getMessage())).build();
+        }
+    }
+
+    @POST
+    @Path("/bulk")
+    public Response bulkInsert(List<Category> categories) {
+        try {
+            categoryService.bulkInsert(categories);
+            return Response.ok(Map.of(
+                    "message", "Categories indexed",
+                    "count", categories.size()
+            )).build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("error", e.getMessage())).build();
+        } catch (IOException e) {
+            return Response.serverError().entity(Map.of("error", e.getMessage())).build();
+        }
+    }
+}
