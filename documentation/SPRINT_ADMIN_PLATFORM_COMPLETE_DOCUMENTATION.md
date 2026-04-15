@@ -997,7 +997,7 @@ PostgreSQL laeuft mit:
 - Image: `postgres:16-alpine`
 - Datenbankname: `indooro`
 - User: `indooro`
-- Passwort: `indooro`
+- Passwort: -||-
 - PVC: `postgres-data`
 
 ### 16.5 Typischer Deploy-Ablauf
@@ -1150,4 +1150,3 @@ Noch offen bleiben vor allem:
 - Authentifizierung mit Keycloak
 - vollstaendige mobile Integration
 - langfristige Bereinigung der parallelen Layout-Welten
-
