@@ -1,0 +1,46 @@
+{
+  "shopName": "Test-Raum",
+  "gridSize": {
+    "width": 7,
+    "height": 4
+  },
+  "elements": [
+    {
+      "id": 1,
+      "type": "beacon",
+      "beaconId": "Indooro1",
+      "x": 0,
+      "y": 0,
+      "meter": 1,
+      "category": "undefined/1"
+    },
+    {
+      "id": 2,
+      "type": "beacon",
+      "beaconId": "Indooro2",
+      "x": 0,
+      "y": 4,
+      "meter": 4,
+      "category": "undefined/4"
+    },
+    {
+      "id": 3,
+      "type": "beacon",
+      "beaconId": "Indooro3",
+      "x": 6,
+      "y": 1,
+      "meter": 2,
+      "category": "undefined/2"
+    },
+    {
+      "id": 4,
+      "type": "beacon",
+      "beaconId": "Indooro4",
+      "x": 6,
+      "y": 3,
+      "meter": 3,
+      "category": "undefined/3"
+    }
+  ],
+  "exportDate": "2026-03-04T12:06:37.336Z"
+}

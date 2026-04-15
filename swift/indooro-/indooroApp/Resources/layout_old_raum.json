@@ -1,0 +1,11 @@
+{
+  "shopName": "Test-Raum",
+  "gridSize": { "width": 7, "height": 4 },
+  "elements": [
+    { "id": 1, "type": "beacon", "beaconId": "Indooro1", "x": 0, "y": 0 },
+    { "id": 2, "type": "beacon", "beaconId": "Indooro2", "x": 7, "y": 0 },
+    { "id": 3, "type": "beacon", "beaconId": "Indooro3", "x": 0, "y": 4 },
+    { "id": 4, "type": "beacon", "beaconId": "Indooro4", "x": 7, "y": 4 }
+  ],
+  "exportDate": "2026-02-25T00:00:00.000Z"
+}

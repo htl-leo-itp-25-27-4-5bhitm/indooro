@@ -1,0 +1,69 @@
+{
+  "shopName": "Test-Raum",
+  "gridSize": {
+    "width": 7,
+    "height": 5
+  },
+  "elements": [
+    {
+      "id": 1773829334258,
+      "type": "shelf",
+      "category": "310/1",
+      "x": 3,
+      "y": 1,
+      "width": 2,
+      "height": 2,
+      "label": "Obst & Gemüse",
+      "color": "#4CAF50",
+      "rotation": 0,
+      "accessAngle": 90,
+      "locked": false,
+      "meter": 1
+    },
+    {
+      "id": 1773829432138,
+      "type": "beacon",
+      "beaconId": "Indooro1",
+      "x": 0,
+      "y": 4,
+      "meter": 3,
+      "rotation": 0,
+      "accessAngle": 0,
+      "locked": false
+    },
+    {
+      "id": 1773829466010,
+      "type": "beacon",
+      "beaconId": "Indooro2",
+      "x": 0,
+      "y": 0,
+      "meter": 1,
+      "rotation": 0,
+      "accessAngle": 0,
+      "locked": false
+    },
+    {
+      "id": 1773829467564,
+      "type": "beacon",
+      "beaconId": "Indooro3",
+      "x": 7,
+      "y": 4,
+      "meter": 4,
+      "rotation": 0,
+      "accessAngle": 0,
+      "locked": false
+    },
+    {
+      "id": 1773829467865,
+      "type": "beacon",
+      "beaconId": "Indooro4",
+      "x": 7,
+      "y": 0,
+      "meter": 2,
+      "rotation": 0,
+      "accessAngle": 0,
+      "locked": false
+    }
+  ],
+  "exportDate": "2026-03-18T10:25:53.610Z"
+}
