@@ -156,6 +156,14 @@ function getStoreById(storeId) {
   return state.stores.find((store) => store.id === storeId) || null;
 }
 
+function scrollToStoreDetail() {
+  document.getElementById('store-detail')?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start',
+  });
+  history.replaceState(null, '', '#store-detail');
+}
+
 async function loadBootstrapData() {
   const storeQuery = new URLSearchParams({
     status: state.storeFilters.status,
@@ -279,8 +287,8 @@ function renderRegions() {
       </div>
       <p class="subtle">${escapeHtml(region.description || 'Keine Beschreibung hinterlegt.')}</p>
       <div class="item-footer">
-        <button class="action-button" data-action="edit-region" data-id="${region.id}">Bearbeiten</button>
-        <button class="action-button warn" data-action="archive-region" data-id="${region.id}">Archivieren</button>
+        <button type="button" class="action-button" data-action="edit-region" data-id="${region.id}">Bearbeiten</button>
+        <button type="button" class="action-button warn" data-action="archive-region" data-id="${region.id}">Archivieren</button>
       </div>
     </article>
   `).join('');
@@ -307,10 +315,10 @@ function renderStores() {
         ${store.hasActiveLayout ? '<span class="badge">Layout vorhanden</span>' : '<span class="badge warn">Noch kein Layout</span>'}
       </div>
       <div class="item-footer">
-        <button class="action-button" data-action="select-store" data-id="${store.id}">Detail</button>
-        <button class="action-button" data-action="edit-store" data-id="${store.id}">Bearbeiten</button>
+        <button type="button" class="action-button" data-action="select-store" data-id="${store.id}">Detail</button>
+        <button type="button" class="action-button" data-action="edit-store" data-id="${store.id}">Bearbeiten</button>
         <a class="inline-link" href="/admin/editor/?storeId=${store.id}">Editor</a>
-        <button class="action-button warn" data-action="archive-store" data-id="${store.id}">Archivieren</button>
+        <button type="button" class="action-button warn" data-action="archive-store" data-id="${store.id}">Archivieren</button>
       </div>
     </article>
   `).join('');
@@ -352,7 +360,7 @@ function renderStoreDetail() {
           </div>
           <p class="subtle">${escapeHtml(assignment.identityKey)}</p>
           <div class="item-footer">
-            <button class="action-button warn" data-action="release-beacon" data-id="${assignment.beaconId}">Freigeben</button>
+            <button type="button" class="action-button warn" data-action="release-beacon" data-id="${assignment.beaconId}">Freigeben</button>
           </div>
         </article>
       `).join('')
@@ -367,7 +375,7 @@ function renderStoreDetail() {
           </div>
           <div class="item-meta">Version ${layout.versionNo} · ${formatDate(layout.createdAt)}</div>
           <div class="item-footer">
-            ${layout.status === 'ACTIVE' ? '' : `<button class="action-button" data-action="activate-layout" data-layout-id="${layout.layoutId}">Aktivieren</button>`}
+            ${layout.status === 'ACTIVE' ? '' : `<button type="button" class="action-button" data-action="activate-layout" data-layout-id="${layout.layoutId}">Aktivieren</button>`}
             <a class="inline-link" href="/admin/editor/?storeId=${store.id}">Im Editor oeffnen</a>
           </div>
         </article>
@@ -403,11 +411,11 @@ function renderBeacons() {
       <div class="item-meta">UUID ${escapeHtml(beacon.uuid)}${beacon.major !== null && beacon.major !== undefined ? ` · Major ${beacon.major}` : ''}${beacon.minor !== null && beacon.minor !== undefined ? ` · Minor ${beacon.minor}` : ''}</div>
       <p class="subtle">${escapeHtml(beacon.notes || 'Keine Notiz')}</p>
       <div class="item-footer">
-        <button class="action-button" data-action="edit-beacon" data-id="${beacon.id}">Bearbeiten</button>
+        <button type="button" class="action-button" data-action="edit-beacon" data-id="${beacon.id}">Bearbeiten</button>
         ${beacon.currentStore
-          ? `<button class="action-button warn" data-action="release-beacon" data-id="${beacon.id}">Freigeben</button>`
+          ? `<button type="button" class="action-button warn" data-action="release-beacon" data-id="${beacon.id}">Freigeben</button>`
           : renderAssignSelect(beacon.id)}
-        <button class="action-button danger" data-action="archive-beacon" data-id="${beacon.id}">Archivieren</button>
+        <button type="button" class="action-button danger" data-action="archive-beacon" data-id="${beacon.id}">Archivieren</button>
       </div>
     </article>
   `).join('');
@@ -550,6 +558,7 @@ async function handleStoreSubmit(event) {
   await refreshAll();
   await loadStoreDetail(result.id);
   renderStoreDetail();
+  scrollToStoreDetail();
 }
 
 async function handleBeaconSubmit(event) {
@@ -771,9 +780,13 @@ function bindEvents() {
       } else if (action === 'archive-region') {
         await archiveRegion(id);
       } else if (action === 'select-store') {
+        const selectedStore = getStoreById(id);
+        setStatus(`Lade Filialdetail${selectedStore ? ` fuer ${selectedStore.name}` : ''}...`);
         await loadStoreDetail(id);
         renderStores();
         renderStoreDetail();
+        scrollToStoreDetail();
+        setStatus('Filialdetail wurde geladen.', 'success');
       } else if (action === 'edit-store') {
         await populateStoreForm(id);
       } else if (action === 'archive-store') {
