@@ -6,8 +6,6 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 
-import java.util.UUID;
-
 @Entity
 @Table(name = "beacons")
 public class BeaconEntity extends AuditableEntity {
@@ -18,8 +16,8 @@ public class BeaconEntity extends AuditableEntity {
     @Column(name = "identity_key", nullable = false, unique = true, length = 140)
     public String identityKey;
 
-    @Column(nullable = false)
-    public UUID uuid;
+    @Column(nullable = false, length = 32)
+    public String uuid;
 
     public Integer major;
 

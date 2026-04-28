@@ -65,14 +65,14 @@ public class BeaconAdminService {
 
     @Transactional
     public BeaconDtos.BeaconResponse createBeacon(BeaconDtos.BeaconCreateRequest request) {
-        validateIdentity(request.uuid(), request.major(), request.minor());
+        String normalizedUuid = validateAndNormalizeIdentity(request.uuid(), request.major(), request.minor());
         ensureBeaconCodeIsAvailable(request.beaconCode(), null);
-        String identityKey = BeaconIdentityUtil.toIdentityKey(request.uuid(), request.major(), request.minor());
+        String identityKey = BeaconIdentityUtil.toIdentityKey(normalizedUuid, request.major(), request.minor());
         ensureIdentityKeyIsAvailable(identityKey, null);
 
         BeaconEntity beacon = new BeaconEntity();
         beacon.beaconCode = request.beaconCode().trim();
-        beacon.uuid = request.uuid();
+        beacon.uuid = normalizedUuid;
         beacon.major = request.major();
         beacon.minor = request.minor();
         beacon.identityKey = identityKey;
@@ -90,13 +90,13 @@ public class BeaconAdminService {
         BeaconEntity beacon = requireBeacon(beaconId);
         BeaconDtos.BeaconResponse before = toResponse(beacon, beaconAssignmentRepository.findActiveByBeaconId(beaconId).orElse(null));
 
-        validateIdentity(request.uuid(), request.major(), request.minor());
+        String normalizedUuid = validateAndNormalizeIdentity(request.uuid(), request.major(), request.minor());
         ensureBeaconCodeIsAvailable(request.beaconCode(), beaconId);
-        String identityKey = BeaconIdentityUtil.toIdentityKey(request.uuid(), request.major(), request.minor());
+        String identityKey = BeaconIdentityUtil.toIdentityKey(normalizedUuid, request.major(), request.minor());
         ensureIdentityKeyIsAvailable(identityKey, beaconId);
 
         beacon.beaconCode = request.beaconCode().trim();
-        beacon.uuid = request.uuid();
+        beacon.uuid = normalizedUuid;
         beacon.major = request.major();
         beacon.minor = request.minor();
         beacon.identityKey = identityKey;
@@ -215,12 +215,17 @@ public class BeaconAdminService {
         return true;
     }
 
-    private void validateIdentity(UUID uuid, Integer major, Integer minor) {
-        if (uuid == null) {
+    private String validateAndNormalizeIdentity(String uuid, Integer major, Integer minor) {
+        if (uuid == null || uuid.isBlank()) {
             throw new WebApplicationException("Beacon UUID ist erforderlich.", Response.Status.BAD_REQUEST);
         }
         if ((major == null) != (minor == null)) {
             throw new WebApplicationException("Major und Minor muessen entweder beide gesetzt oder beide leer sein.", Response.Status.BAD_REQUEST);
+        }
+        try {
+            return BeaconIdentityUtil.normalizeUuid(uuid);
+        } catch (IllegalArgumentException e) {
+            throw new WebApplicationException("Beacon UUID muss 32 hexadezimale Zeichen enthalten.", Response.Status.BAD_REQUEST);
         }
     }
 

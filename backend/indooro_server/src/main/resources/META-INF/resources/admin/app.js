@@ -134,6 +134,13 @@ function escapeHtml(value) {
   }[char]));
 }
 
+function normalizeBeaconUuid(value) {
+  return String(value ?? '')
+    .trim()
+    .replace(/-/g, '')
+    .toLowerCase();
+}
+
 function statusBadge(status) {
   if (status === 'ARCHIVED') {
     return '<span class="badge warn">Archiviert</span>';
@@ -567,7 +574,7 @@ async function handleBeaconSubmit(event) {
   const minorValue = els.beaconForm.elements.minor.value.trim();
   const payload = {
     beaconCode: els.beaconForm.elements.beaconCode.value.trim(),
-    uuid: els.beaconForm.elements.uuid.value.trim(),
+    uuid: normalizeBeaconUuid(els.beaconForm.elements.uuid.value),
     major: majorValue ? Number(majorValue) : null,
     minor: minorValue ? Number(minorValue) : null,
     notes: els.beaconForm.elements.notes.value.trim() || null,
@@ -600,7 +607,7 @@ async function handleBeaconBulkSubmit(event) {
 
   const majorValue = els.beaconBulkForm.elements.major.value.trim();
   const payload = {
-    uuid: els.beaconBulkForm.elements.uuid.value.trim(),
+    uuid: normalizeBeaconUuid(els.beaconBulkForm.elements.uuid.value),
     major: majorValue ? Number(majorValue) : null,
     notes: els.beaconBulkForm.elements.notes.value.trim() || null,
     items,

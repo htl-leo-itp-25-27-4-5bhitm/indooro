@@ -53,7 +53,7 @@ public final class LayoutDtos {
             UUID beaconId,
             String beaconCode,
             String identityKey,
-            UUID uuid,
+            String uuid,
             Integer major,
             Integer minor
     ) {

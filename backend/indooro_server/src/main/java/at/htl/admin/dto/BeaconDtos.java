@@ -17,7 +17,7 @@ public final class BeaconDtos {
 
     public record BeaconCreateRequest(
             @NotBlank @Size(max = 60) String beaconCode,
-            @NotNull UUID uuid,
+            @NotBlank @Size(max = 40) String uuid,
             Integer major,
             Integer minor,
             @Size(max = 2_000) String notes
@@ -31,7 +31,7 @@ public final class BeaconDtos {
     }
 
     public record BeaconBulkCreateRequest(
-            @NotNull UUID uuid,
+            @NotBlank @Size(max = 40) String uuid,
             Integer major,
             @Size(max = 2_000) String notes,
             @NotEmpty List<@Valid BeaconBulkItemRequest> items
@@ -48,7 +48,7 @@ public final class BeaconDtos {
     public record BeaconResponse(
             UUID id,
             String beaconCode,
-            UUID uuid,
+            String uuid,
             Integer major,
             Integer minor,
             String identityKey,

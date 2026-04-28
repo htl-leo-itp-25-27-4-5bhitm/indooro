@@ -29,7 +29,7 @@ public class MobileStoreResource {
 
     @GET
     @Path("/by-beacon")
-    public MobileDtos.StoreByBeaconResponse findStoreByBeacon(@QueryParam("uuid") UUID uuid,
+    public MobileDtos.StoreByBeaconResponse findStoreByBeacon(@QueryParam("uuid") String uuid,
                                                               @QueryParam("major") Integer major,
                                                               @QueryParam("minor") Integer minor) {
         return mobileStoreService.findStoreByBeacon(uuid, major, minor);

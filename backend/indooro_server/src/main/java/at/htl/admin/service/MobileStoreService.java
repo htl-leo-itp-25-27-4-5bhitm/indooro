@@ -42,8 +42,8 @@ public class MobileStoreService {
                 .toList();
     }
 
-    public MobileDtos.StoreByBeaconResponse findStoreByBeacon(UUID uuid, Integer major, Integer minor) {
-        if (uuid == null) {
+    public MobileDtos.StoreByBeaconResponse findStoreByBeacon(String uuid, Integer major, Integer minor) {
+        if (uuid == null || uuid.isBlank()) {
             throw new WebApplicationException("Beacon UUID ist erforderlich.", Response.Status.BAD_REQUEST);
         }
         if ((major == null) != (minor == null)) {
@@ -75,16 +75,23 @@ public class MobileStoreService {
         return new MobileDtos.MobileLayoutResponse(store.id, layout.layoutId(), layout.layout());
     }
 
-    private BeaconEntity resolveBeacon(UUID uuid, Integer major, Integer minor) {
+    private BeaconEntity resolveBeacon(String uuid, Integer major, Integer minor) {
+        String normalizedUuid;
+        try {
+            normalizedUuid = BeaconIdentityUtil.normalizeUuid(uuid);
+        } catch (IllegalArgumentException e) {
+            throw new WebApplicationException("Beacon UUID muss 32 hexadezimale Zeichen enthalten.", Response.Status.BAD_REQUEST);
+        }
+
         if (major != null && minor != null) {
-            String exactIdentityKey = BeaconIdentityUtil.toIdentityKey(uuid, major, minor);
+            String exactIdentityKey = BeaconIdentityUtil.toIdentityKey(normalizedUuid, major, minor);
             BeaconEntity exactMatch = beaconRepository.findByIdentityKey(exactIdentityKey).orElse(null);
             if (exactMatch != null && exactMatch.status == RecordStatus.ACTIVE) {
                 return exactMatch;
             }
         }
 
-        String uuidOnlyIdentityKey = BeaconIdentityUtil.toIdentityKey(uuid, null, null);
+        String uuidOnlyIdentityKey = BeaconIdentityUtil.toIdentityKey(normalizedUuid, null, null);
         return beaconRepository.findByIdentityKey(uuidOnlyIdentityKey)
                 .filter(beacon -> beacon.status == RecordStatus.ACTIVE)
                 .orElseThrow(() -> new NotFoundException("Kein passender Beacon gefunden."));
