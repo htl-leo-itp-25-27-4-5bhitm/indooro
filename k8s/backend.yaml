@@ -14,12 +14,15 @@ spec:
       labels:
         app: indooro-backend
     spec:
-      # falls das ghcr-Repo privat ist, musst du hier ein imagePullSecret eintragen:
+      # Falls das GHCR-Repo privat ist, musst du hier ein imagePullSecret eintragen:
       # imagePullSecrets:
       #   - name: ghcr-credentials
       containers:
         - name: indooro-backend
           image: ghcr.io/htl-leo-itp-25-27-4-5bhitm/indooro-backend-v2:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
           env:
             - name: DB_HOST
               value: "postgres"
@@ -31,41 +34,27 @@ spec:
               value: "indooro"
             - name: DB_PASSWORD
               value: "indooro"
+
             - name: OPENSEARCH_PORT
               value: "9200"
-            - name: OIDC_AUTH_SERVER_URL
+
+            - name: QUARKUS_OIDC_AUTH_SERVER_URL
               value: "https://it220209.cloud.htl-leonding.ac.at/keycloak/realms/indooro"
-            - name: OIDC_CLIENT_ID
+            - name: QUARKUS_OIDC_CLIENT_ID
               value: "indooro-admin-web"
-            - name: OIDC_CLIENT_SECRET
+            - name: QUARKUS_OIDC_CREDENTIALS_SECRET
               valueFrom:
                 secretKeyRef:
                   name: indooro-keycloak-secret
                   key: admin-web-client-secret
-          # command: ["tail", "-f", "/dev/null"] # zum Testen, damit der Container nicht sofort beendet wird
-          imagePullPolicy: Always
-          ports:
-            - containerPort: 8080
-          # nur wenn du Quarkus Health-Extension hast:
-          # readinessProbe:
-          #   httpGet:
-          #     path: /q/health/ready
-          #     port: 8080
-          #   initialDelaySeconds: 10
-          #   periodSeconds: 10
-          # livenessProbe:
-          #   httpGet:
-          #     path: /q/health/live
-          #     port: 8080
-          #   initialDelaySeconds: 30
-          #   periodSeconds: 30
+
           resources:
             requests:
               cpu: "100m"
               memory: "256Mi"
             limits:
               cpu: "500m"
-              memory: "256Mi"
+              memory: "512Mi"
 ---
 apiVersion: v1
 kind: Service

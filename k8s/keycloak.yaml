@@ -106,7 +106,16 @@ spec:
       containers:
         - name: keycloak
           image: quay.io/keycloak/keycloak:24.0.5
-          args: ["start-dev", "--import-realm"]
+          args:
+            - "start-dev"
+            - "--import-realm"
+            - "--http-enabled=true"
+            - "--http-port=8080"
+            - "--http-relative-path=/keycloak"
+            - "--hostname=it220209.cloud.htl-leonding.ac.at"
+            - "--hostname-strict=false"
+            - "--hostname-strict-https=true"
+            - "--proxy-headers=xforwarded"
           env:
             - name: KEYCLOAK_ADMIN
               valueFrom:
@@ -128,12 +137,6 @@ spec:
                 secretKeyRef:
                   name: indooro-keycloak-secret
                   key: bootstrap-admin-password
-            - name: KC_HOSTNAME
-              value: "https://it220209.cloud.htl-leonding.ac.at/keycloak"
-            - name: KC_PROXY_HEADERS
-              value: "xforwarded"
-            - name: KC_HTTP_ENABLED
-              value: "true"
             - name: KC_DB
               value: "dev-file"
           ports:
@@ -173,16 +176,14 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: indooro-keycloak-ingress
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   ingressClassName: nginx
   rules:
     - host: it220209.cloud.htl-leonding.ac.at
       http:
         paths:
-          - path: /keycloak(/|$)(.*)
-            pathType: ImplementationSpecific
+          - path: /keycloak
+            pathType: Prefix
             backend:
               service:
                 name: indooro-keycloak
