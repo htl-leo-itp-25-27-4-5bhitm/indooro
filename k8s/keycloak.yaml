@@ -126,6 +126,8 @@ spec:
               value: "xforwarded"
             - name: KC_HTTP_ENABLED
               value: "true"
+            - name: KC_DB
+              value: "dev-file"
           ports:
             - containerPort: 8080
           volumeMounts:
@@ -134,11 +136,11 @@ spec:
               readOnly: true
           resources:
             requests:
-              cpu: "100m"
-              memory: "512Mi"
-            limits:
               cpu: "500m"
-              memory: "768Mi"
+              memory: "1024Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1536Mi"
       volumes:
         - name: realm-import
           configMap:
