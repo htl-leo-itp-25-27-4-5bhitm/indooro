@@ -119,7 +119,9 @@ spec:
                   name: indooro-keycloak-secret
                   key: bootstrap-admin-password
             - name: KC_HOSTNAME
-              value: "keycloak-it220209.cloud.htl-leonding.ac.at"
+              value: "it220209.cloud.htl-leonding.ac.at"
+            - name: KC_HTTP_RELATIVE_PATH
+              value: "/keycloak"
             - name: KC_PROXY_HEADERS
               value: "xforwarded"
             - name: KC_HTTP_ENABLED
@@ -165,9 +167,10 @@ spec:
   ingressClassName: nginx
   rules:
     - host: keycloak-it220209.cloud.htl-leonding.ac.at
+    - host: it220209.cloud.htl-leonding.ac.at
       http:
         paths:
-          - path: /
+          - path: /keycloak
             pathType: Prefix
             backend:
               service:

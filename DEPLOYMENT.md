@@ -352,7 +352,7 @@ kubectl rollout status deployment/indooro-keycloak -n student-it220209
 
 Der Backend-Container bekommt die OIDC-Konfiguration ueber `k8s/backend.yaml`:
 
-- `OIDC_AUTH_SERVER_URL=https://keycloak-it220209.cloud.htl-leonding.ac.at/realms/indooro`
+- `OIDC_AUTH_SERVER_URL=https://it220209.cloud.htl-leonding.ac.at/keycloak/realms/indooro`
 - `OIDC_CLIENT_ID=indooro-admin-web`
 - `OIDC_CLIENT_SECRET` aus `indooro-keycloak-secret`
 
