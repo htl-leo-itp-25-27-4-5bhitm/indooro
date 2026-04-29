@@ -334,6 +334,7 @@ function buildLayoutPayload() {
 async function saveLayoutToServer(layoutData) {
   const response = await fetch(getSaveLayoutEndpoint(), {
     method: 'POST',
+    credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json'
     },
@@ -350,6 +351,13 @@ async function saveLayoutToServer(layoutData) {
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      window.location.href = '/admin/';
+      throw new Error('Login erforderlich.');
+    }
+    if (response.status === 403) {
+      throw new Error('Kein Zugriff auf diese Filiale oder dieses Layout.');
+    }
     throw new Error('Layout konnte nicht am Server gespeichert werden.');
   }
 
@@ -361,8 +369,15 @@ async function saveLayoutToServer(layoutData) {
 async function loadSavedLayout() {
   try {
     if (hasStoreContext()) {
-      const response = await fetch(getEditorContextEndpoint());
+      const response = await fetch(getEditorContextEndpoint(), { credentials: 'same-origin' });
       if (!response.ok) {
+        if (response.status === 401) {
+          window.location.href = '/admin/';
+          throw new Error('Login erforderlich.');
+        }
+        if (response.status === 403) {
+          throw new Error('Kein Zugriff auf diese Filiale.');
+        }
         throw new Error('Kein Editor-Kontext gefunden');
       }
 
@@ -389,7 +404,7 @@ async function loadSavedLayout() {
       return;
     }
 
-    const response = await fetch(getCurrentLayoutEndpoint());
+    const response = await fetch(getCurrentLayoutEndpoint(), { credentials: 'same-origin' });
     if (!response.ok) {
       throw new Error('Kein gespeichertes Layout gefunden');
     }

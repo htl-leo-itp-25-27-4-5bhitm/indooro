@@ -1,0 +1,66 @@
+schema: spec-driven
+
+context: |
+  Project: Indooro Admin Platform.
+
+  Stack:
+  - Backend is Quarkus 3.6.0 on Java 17 with RESTEasy Reactive, Hibernate ORM Panache,
+    PostgreSQL, Flyway, OpenSearch, and static admin resources served by Quarkus.
+  - Admin frontend lives in backend/indooro_server/src/main/resources/META-INF/resources/admin.
+  - Deployment target is LeoCloud Kubernetes manifests under k8s/.
+
+  Current admin routes to protect:
+  - /admin and /admin/*
+  - /api/admin/logs
+  - /api/admin/error-logs
+  - /api/regions
+  - /api/stores
+  - /api/beacons
+  - /api/stores/{storeId}/layout/*
+
+  Routes that should remain public unless this change explicitly narrows scope:
+  - /api/mobile/stores
+  - /api/mobile/stores/by-beacon
+  - /api/mobile/stores/{storeId}/layout/current
+  - /api/products
+  - /api/categories
+  - /api/layout
+
+  Roles:
+  - admin: full admin visibility and management.
+  - region-manager: admin access scoped to one assigned region.
+  - store-manager: admin access scoped to one assigned store.
+
+  Architecture direction:
+  - Prefer Quarkus OIDC Authorization Code Flow with quarkus-oidc and application-type=web-app.
+  - Prefer Quarkus-native @Authenticated and @RolesAllowed plus backend scope checks.
+  - Do not start with Keycloak Authorization Services or policy-enforcer unless simple role
+    annotations and app-level scope checks are proven insufficient.
+  - Use a database user access assignment keyed by the stable Keycloak subject claim, not only
+    Keycloak attributes, for region/store scope.
+  - Use modern Keycloak containers and realm import for local/dev/demo setup; do not copy legacy
+    /auth/realms URLs or old jboss/keycloak images from classroom examples.
+
+rules:
+  proposal:
+    - Explain why Keycloak is needed now.
+    - Define protected admin routes and pages.
+    - Define routes that stay public.
+    - Define roles and what the sprint demo proves.
+  specs:
+    - Cover login, logout, unauthorized behavior, role-based access, region/store scope filtering, and deployment expectations.
+    - Use explicit scenarios with observable outcomes.
+  design:
+    - Define Keycloak realm/client setup.
+    - Define Quarkus OIDC web-app strategy.
+    - Define role enforcement strategy.
+    - Define database mapping strategy for user scope.
+    - Define LeoCloud deployment strategy.
+  tasks:
+    - Include OpenSpec setup tasks.
+    - Include Keycloak local setup tasks.
+    - Include backend auth tasks.
+    - Include backend scope tasks.
+    - Include frontend admin auth tasks.
+    - Include deployment tasks.
+    - Include verification tasks.

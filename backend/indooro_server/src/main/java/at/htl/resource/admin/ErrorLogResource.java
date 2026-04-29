@@ -2,6 +2,7 @@ package at.htl.resource.admin;
 
 import at.htl.admin.dto.ErrorLogDtos;
 import at.htl.admin.service.ErrorLogService;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DefaultValue;
@@ -12,6 +13,7 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 
 @Path("/api/admin/error-logs")
+@RolesAllowed("admin")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class ErrorLogResource extends AdminApiSupport {

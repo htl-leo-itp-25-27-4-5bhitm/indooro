@@ -2,6 +2,7 @@ package at.htl.resource.admin;
 
 import at.htl.admin.dto.LayoutDtos;
 import at.htl.admin.service.StoreLayoutAdminService;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Path("/api/stores/{storeId}/layout")
+@RolesAllowed({"admin", "region-manager", "store-manager"})
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class StoreLayoutAdminResource {

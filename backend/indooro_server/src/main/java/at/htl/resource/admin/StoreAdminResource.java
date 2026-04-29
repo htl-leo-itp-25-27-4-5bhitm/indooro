@@ -3,6 +3,7 @@ package at.htl.resource.admin;
 import at.htl.admin.dto.CommonDtos;
 import at.htl.admin.dto.StoreDtos;
 import at.htl.admin.service.StoreAdminService;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
@@ -20,6 +21,7 @@ import jakarta.ws.rs.core.MediaType;
 import java.util.UUID;
 
 @Path("/api/stores")
+@RolesAllowed({"admin", "region-manager", "store-manager"})
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class StoreAdminResource extends AdminApiSupport {

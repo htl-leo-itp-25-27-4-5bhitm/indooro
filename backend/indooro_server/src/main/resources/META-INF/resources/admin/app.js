@@ -1,4 +1,5 @@
 const API = {
+  me: '/api/admin/me',
   adminLogs: '/api/admin/logs',
   regions: '/api/regions',
   stores: '/api/stores',
@@ -9,6 +10,7 @@ const state = {
   regions: [],
   stores: [],
   beacons: [],
+  currentUser: null,
   selectedStoreId: null,
   selectedStoreDetail: null,
   selectedStoreBeacons: [],
@@ -72,6 +74,9 @@ const els = {
   beaconAssignmentFilter: document.getElementById('beaconAssignmentFilter'),
   beaconQuery: document.getElementById('beaconQuery'),
   applyBeaconFiltersBtn: document.getElementById('applyBeaconFiltersBtn'),
+  currentUserName: document.getElementById('currentUserName'),
+  currentUserRole: document.getElementById('currentUserRole'),
+  currentUserScope: document.getElementById('currentUserScope'),
 };
 
 function setStatus(message, tone = 'neutral') {
@@ -84,6 +89,7 @@ function setStatus(message, tone = 'neutral') {
 
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, {
+    credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
       ...(options.headers || {}),
@@ -92,6 +98,11 @@ async function fetchJson(url, options = {}) {
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      window.location.href = '/admin/';
+      throw new Error('Login erforderlich.');
+    }
+
     let message = `Request failed with status ${response.status}`;
     const rawBody = await response.text();
 
@@ -104,7 +115,9 @@ async function fetchJson(url, options = {}) {
       }
     }
 
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   if (response.status === 204) {
@@ -112,6 +125,47 @@ async function fetchJson(url, options = {}) {
   }
 
   return response.json();
+}
+
+async function loadCurrentUser() {
+  state.currentUser = await fetchJson(API.me);
+}
+
+function renderCurrentUser() {
+  if (!state.currentUser) {
+    return;
+  }
+
+  const { username, email, role, scope } = state.currentUser;
+  els.currentUserName.textContent = username || email || 'Admin';
+  els.currentUserRole.textContent = roleLabel(role);
+
+  if (scope?.storeName) {
+    els.currentUserScope.textContent = `Filiale: ${scope.storeName}`;
+  } else if (scope?.regionName) {
+    els.currentUserScope.textContent = `Region: ${scope.regionName}`;
+  } else {
+    els.currentUserScope.textContent = 'Alle Regionen und Filialen';
+  }
+}
+
+function roleLabel(role) {
+  if (role === 'admin') return 'Administrator';
+  if (role === 'region-manager') return 'Region Manager';
+  if (role === 'store-manager') return 'Store Manager';
+  return role || 'Unbekannte Rolle';
+}
+
+function showAccessDenied(message) {
+  setStatus(message || 'Kein Zugriff auf diese Admin-Funktion.', 'error');
+}
+
+function handleUiError(error) {
+  if (error.status === 403) {
+    showAccessDenied(error.message);
+    return;
+  }
+  setStatus(error.message, 'error');
 }
 
 function formatDate(value) {
@@ -511,6 +565,8 @@ async function refreshAll({ keepStatusMessage = false } = {}) {
     setStatus('Synchronisiere Admin-Plattform mit dem Backend...');
   }
 
+  await loadCurrentUser();
+  renderCurrentUser();
   await loadBootstrapData();
   await loadSystemLogs();
   renderRegionOptions();
@@ -724,7 +780,7 @@ function bindEvents() {
     try {
       await handleRegionSubmit(event);
     } catch (error) {
-      setStatus(error.message, 'error');
+      handleUiError(error);
     }
   });
 
@@ -734,7 +790,7 @@ function bindEvents() {
     try {
       await handleStoreSubmit(event);
     } catch (error) {
-      setStatus(error.message, 'error');
+      handleUiError(error);
     }
   });
 
@@ -762,14 +818,14 @@ function bindEvents() {
     try {
       await handleBeaconSubmit(event);
     } catch (error) {
-      setStatus(error.message, 'error');
+      handleUiError(error);
     }
   });
   els.beaconBulkForm.addEventListener('submit', async (event) => {
     try {
       await handleBeaconBulkSubmit(event);
     } catch (error) {
-      setStatus(error.message, 'error');
+      handleUiError(error);
     }
   });
 
@@ -808,7 +864,7 @@ function bindEvents() {
         await activateLayout(layoutId);
       }
     } catch (error) {
-      setStatus(error.message, 'error');
+      handleUiError(error);
     }
   });
 
@@ -821,7 +877,7 @@ function bindEvents() {
     try {
       await assignBeacon(select.dataset.id, select.value);
     } catch (error) {
-      setStatus(error.message, 'error');
+      handleUiError(error);
     } finally {
       select.value = '';
     }
@@ -840,5 +896,9 @@ async function init() {
 }
 
 init().catch((error) => {
-  setStatus(`Admin-Plattform konnte nicht geladen werden: ${error.message}`, 'error');
+  if (error.status === 403) {
+    showAccessDenied(error.message);
+  } else {
+    setStatus(`Admin-Plattform konnte nicht geladen werden: ${error.message}`, 'error');
+  }
 });

@@ -10,7 +10,6 @@ abstract class AdminApiSupport {
         if (rawStatus == null || rawStatus.isBlank()) {
             return null;
         }
-
         try {
             return RecordStatus.valueOf(rawStatus.trim().toUpperCase());
         } catch (IllegalArgumentException exception) {

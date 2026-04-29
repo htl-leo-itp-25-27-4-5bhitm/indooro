@@ -1,0 +1,176 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: indooro-keycloak-secret
+type: Opaque
+stringData:
+  bootstrap-admin-username: admin
+  bootstrap-admin-password: admin
+  admin-web-client-secret: indooro-admin-secret
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: indooro-keycloak-realm
+data:
+  indooro-realm.json: |-
+    {
+      "realm": "indooro",
+      "enabled": true,
+      "registrationAllowed": false,
+      "loginWithEmailAllowed": true,
+      "roles": {
+        "realm": [
+          { "name": "admin" },
+          { "name": "region-manager" },
+          { "name": "store-manager" }
+        ]
+      },
+      "clients": [
+        {
+          "clientId": "indooro-admin-web",
+          "name": "Indooro Admin Web",
+          "enabled": true,
+          "protocol": "openid-connect",
+          "publicClient": false,
+          "secret": "indooro-admin-secret",
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": false,
+          "serviceAccountsEnabled": false,
+          "redirectUris": [
+            "http://localhost:8080/*",
+            "https://it220209.cloud.htl-leonding.ac.at/*"
+          ],
+          "webOrigins": [
+            "http://localhost:8080",
+            "https://it220209.cloud.htl-leonding.ac.at"
+          ],
+          "attributes": {
+            "post.logout.redirect.uris": "http://localhost:8080/*##https://it220209.cloud.htl-leonding.ac.at/*"
+          }
+        }
+      ],
+      "users": [
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "username": "indooro-admin",
+          "email": "admin@indooro.local",
+          "enabled": true,
+          "emailVerified": true,
+          "credentials": [
+            { "type": "password", "value": "admin", "temporary": false }
+          ],
+          "realmRoles": ["admin"]
+        },
+        {
+          "id": "22222222-2222-2222-2222-222222222222",
+          "username": "indooro-region",
+          "email": "region@indooro.local",
+          "enabled": true,
+          "emailVerified": true,
+          "credentials": [
+            { "type": "password", "value": "region", "temporary": false }
+          ],
+          "realmRoles": ["region-manager"]
+        },
+        {
+          "id": "33333333-3333-3333-3333-333333333333",
+          "username": "indooro-store",
+          "email": "store@indooro.local",
+          "enabled": true,
+          "emailVerified": true,
+          "credentials": [
+            { "type": "password", "value": "store", "temporary": false }
+          ],
+          "realmRoles": ["store-manager"]
+        }
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: indooro-keycloak
+  labels:
+    app: indooro-keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: indooro-keycloak
+  template:
+    metadata:
+      labels:
+        app: indooro-keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.2
+          args: ["start-dev", "--import-realm"]
+          env:
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: indooro-keycloak-secret
+                  key: bootstrap-admin-username
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: indooro-keycloak-secret
+                  key: bootstrap-admin-password
+            - name: KC_HOSTNAME
+              value: "keycloak-it220209.cloud.htl-leonding.ac.at"
+            - name: KC_PROXY_HEADERS
+              value: "xforwarded"
+            - name: KC_HTTP_ENABLED
+              value: "true"
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: realm-import
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "768Mi"
+      volumes:
+        - name: realm-import
+          configMap:
+            name: indooro-keycloak-realm
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: indooro-keycloak
+  labels:
+    app: indooro-keycloak
+spec:
+  selector:
+    app: indooro-keycloak
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: indooro-keycloak-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: keycloak-it220209.cloud.htl-leonding.ac.at
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: indooro-keycloak
+                port:
+                  number: 8080

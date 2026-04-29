@@ -33,6 +33,15 @@ spec:
               value: "indooro"
             - name: OPENSEARCH_PORT
               value: "9200"
+            - name: OIDC_AUTH_SERVER_URL
+              value: "https://keycloak-it220209.cloud.htl-leonding.ac.at/realms/indooro"
+            - name: OIDC_CLIENT_ID
+              value: "indooro-admin-web"
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: indooro-keycloak-secret
+                  key: admin-web-client-secret
           # command: ["tail", "-f", "/dev/null"] # zum Testen, damit der Container nicht sofort beendet wird
           imagePullPolicy: Always
           ports:

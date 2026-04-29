@@ -39,7 +39,11 @@ public class StoreLayoutAdminService {
     @Inject
     AuditLogService auditLogService;
 
+    @Inject
+    AdminAccessService adminAccessService;
+
     public LayoutDtos.StoreLayoutResponse getCurrentLayout(UUID storeId) {
+        adminAccessService.requireStoreAccess(storeId);
         StoreEntity store = storeAdminService.requireStore(storeId);
         return layoutVersionRepository.findActiveByStoreId(storeId)
                 .map(this::toLayoutResponse)
@@ -55,6 +59,7 @@ public class StoreLayoutAdminService {
     }
 
     public List<LayoutDtos.LayoutVersionSummary> listLayoutVersions(UUID storeId) {
+        adminAccessService.requireStoreAccess(storeId);
         storeAdminService.requireStore(storeId);
         return layoutVersionRepository.listByStoreId(storeId)
                 .stream()
@@ -63,6 +68,7 @@ public class StoreLayoutAdminService {
     }
 
     public LayoutDtos.StoreLayoutResponse getLayoutVersion(UUID storeId, UUID layoutId) {
+        adminAccessService.requireStoreAccess(storeId);
         storeAdminService.requireStore(storeId);
         LayoutVersionEntity entity = layoutVersionRepository.findByStoreAndId(storeId, layoutId)
                 .orElseThrow(() -> new NotFoundException("Layout-Version nicht gefunden."));
@@ -71,6 +77,7 @@ public class StoreLayoutAdminService {
 
     @Transactional
     public LayoutDtos.StoreLayoutResponse saveLayoutVersion(UUID storeId, LayoutDtos.LayoutSaveRequest request) {
+        adminAccessService.requireStoreAccess(storeId);
         StoreEntity store = storeAdminService.requireStore(storeId);
         LayoutVersionEntity activeLayout = layoutVersionRepository.findActiveByStoreId(storeId).orElse(null);
         boolean shouldActivate = Boolean.TRUE.equals(request.activate()) || activeLayout == null;
@@ -98,6 +105,7 @@ public class StoreLayoutAdminService {
 
     @Transactional
     public LayoutDtos.StoreLayoutResponse activateLayoutVersion(UUID storeId, UUID layoutId) {
+        adminAccessService.requireStoreAccess(storeId);
         storeAdminService.requireStore(storeId);
         LayoutVersionEntity entity = layoutVersionRepository.findByStoreAndId(storeId, layoutId)
                 .orElseThrow(() -> new NotFoundException("Layout-Version nicht gefunden."));
@@ -114,6 +122,7 @@ public class StoreLayoutAdminService {
     }
 
     public LayoutDtos.EditorContextResponse getEditorContext(UUID storeId) {
+        adminAccessService.requireStoreAccess(storeId);
         StoreEntity store = storeAdminService.requireStore(storeId);
         List<LayoutDtos.EditorBeaconResponse> beacons = beaconAssignmentRepository.listActiveByStoreId(storeId)
                 .stream()

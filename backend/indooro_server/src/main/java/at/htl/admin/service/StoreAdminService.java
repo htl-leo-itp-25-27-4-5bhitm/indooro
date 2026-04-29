@@ -51,6 +51,9 @@ public class StoreAdminService {
     @Inject
     AuditLogService auditLogService;
 
+    @Inject
+    AdminAccessService adminAccessService;
+
     public CommonDtos.PageResponse<StoreDtos.StoreSummaryResponse> listStores(String query,
                                                                              UUID regionId,
                                                                              RecordStatus status,
@@ -63,9 +66,17 @@ public class StoreAdminService {
         hql.append(" and status = :status");
         params.put("status", effectiveStatus);
 
-        if (regionId != null) {
+        UUID effectiveRegionId = adminAccessService.effectiveRegionFilter(regionId);
+        UUID effectiveStoreId = adminAccessService.effectiveStoreFilter(null);
+
+        if (effectiveRegionId != null) {
             hql.append(" and region.id = :regionId");
-            params.put("regionId", regionId);
+            params.put("regionId", effectiveRegionId);
+        }
+
+        if (effectiveStoreId != null) {
+            hql.append(" and id = :storeId");
+            params.put("storeId", effectiveStoreId);
         }
 
         if (query != null && !query.isBlank()) {
@@ -85,11 +96,13 @@ public class StoreAdminService {
     }
 
     public StoreDtos.StoreDetailResponse getStore(UUID storeId) {
+        adminAccessService.requireStoreAccess(storeId);
         return toDetailResponse(requireStore(storeId));
     }
 
     @Transactional
     public StoreDtos.StoreDetailResponse createStore(StoreDtos.StoreUpsertRequest request) {
+        adminAccessService.requireStoreCreateAccess(request.regionId());
         String normalizedStoreCode = request.storeCode().trim();
         storeRepository.findByStoreCode(normalizedStoreCode).ifPresent(existing -> {
             throw conflict("Eine Filiale mit diesem Store-Code existiert bereits.");
@@ -109,6 +122,7 @@ public class StoreAdminService {
 
     @Transactional
     public StoreDtos.StoreDetailResponse updateStore(UUID storeId, StoreDtos.StoreUpsertRequest request) {
+        adminAccessService.requireStoreMutationAccess(storeId, request.regionId());
         StoreEntity store = requireStore(storeId);
         StoreDtos.StoreDetailResponse before = toDetailResponse(store);
 
@@ -129,6 +143,7 @@ public class StoreAdminService {
 
     @Transactional
     public StoreDtos.StoreDetailResponse archiveStore(UUID storeId) {
+        adminAccessService.requireStoreAccess(storeId);
         StoreEntity store = requireStore(storeId);
         StoreDtos.StoreDetailResponse before = toDetailResponse(store);
 
@@ -147,6 +162,7 @@ public class StoreAdminService {
     }
 
     public List<StoreDtos.AuditLogResponse> getStoreAudit(UUID storeId) {
+        adminAccessService.requireStoreAccess(storeId);
         requireStore(storeId);
         return auditLogRepository.listByEntity("STORE", storeId)
                 .stream()
@@ -155,6 +171,7 @@ public class StoreAdminService {
     }
 
     public List<at.htl.admin.dto.BeaconDtos.BeaconAssignmentResponse> getStoreBeacons(UUID storeId) {
+        adminAccessService.requireStoreAccess(storeId);
         StoreEntity store = requireStore(storeId);
         return beaconAssignmentRepository.listActiveByStoreId(storeId)
                 .stream()

@@ -15,10 +15,14 @@ function setStatus(message, tone = 'neutral') {
 }
 
 async function fetchJson(url) {
-  const response = await fetch(url);
+  const response = await fetch(url, { credentials: 'same-origin' });
   const rawBody = await response.text();
 
   if (!response.ok) {
+    if (response.status === 401) {
+      window.location.href = '/admin/';
+      throw new Error('Login erforderlich.');
+    }
     throw new Error(rawBody || `Request failed with status ${response.status}`);
   }
 

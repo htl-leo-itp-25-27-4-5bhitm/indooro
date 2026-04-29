@@ -2,6 +2,7 @@ package at.htl.resource.admin;
 
 import at.htl.admin.dto.BeaconDtos;
 import at.htl.admin.service.BeaconAdminService;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
@@ -19,6 +20,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @Path("/api/beacons")
+@RolesAllowed({"admin", "region-manager", "store-manager"})
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class BeaconAdminResource extends AdminApiSupport {

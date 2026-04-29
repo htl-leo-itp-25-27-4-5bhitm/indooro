@@ -1,6 +1,17 @@
 version: "3.9"
 
 services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2
+    command: ["start-dev", "--import-realm"]
+    environment:
+      - KC_BOOTSTRAP_ADMIN_USERNAME=admin
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=admin
+    ports:
+      - "8180:8080"
+    volumes:
+      - ./keycloak/realm:/opt/keycloak/data/import:ro
+
   opensearch:
     image: opensearchproject/opensearch:2.9.0
     environment:

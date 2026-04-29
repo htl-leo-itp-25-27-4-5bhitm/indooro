@@ -123,6 +123,36 @@ button {
   gap: 10px;
 }
 
+.user-panel {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+}
+
+.user-panel strong {
+  font-size: 18px;
+}
+
+.user-panel span {
+  color: rgba(246, 242, 232, 0.82);
+  font-size: 14px;
+}
+
+.user-panel .user-kicker {
+  color: rgba(246, 242, 232, 0.58);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.logout-link {
+  margin-top: 6px;
+  text-align: center;
+}
+
 .content {
   padding: 28px;
 }

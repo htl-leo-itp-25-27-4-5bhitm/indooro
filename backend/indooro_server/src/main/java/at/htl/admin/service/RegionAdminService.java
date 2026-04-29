@@ -23,21 +23,29 @@ public class RegionAdminService {
     @Inject
     AuditLogService auditLogService;
 
+    @Inject
+    AdminAccessService adminAccessService;
+
     public List<RegionDtos.RegionResponse> listRegions(RecordStatus status) {
         RecordStatus effectiveStatus = status == null ? RecordStatus.ACTIVE : status;
-        return regionRepository.find("status", effectiveStatus)
-                .list()
-                .stream()
+        UUID scopedRegionId = adminAccessService.effectiveRegionFilter(null);
+        List<RegionEntity> regions = scopedRegionId == null
+                ? regionRepository.find("status", effectiveStatus).list()
+                : regionRepository.find("id = ?1 and status = ?2", scopedRegionId, effectiveStatus).list();
+
+        return regions.stream()
                 .map(this::toResponse)
                 .toList();
     }
 
     public RegionDtos.RegionResponse getRegion(UUID regionId) {
+        adminAccessService.requireRegionAccess(regionId);
         return toResponse(requireRegion(regionId));
     }
 
     @Transactional
     public RegionDtos.RegionResponse createRegion(RegionDtos.RegionUpsertRequest request) {
+        adminAccessService.requireAdmin();
         String normalizedCode = request.code().trim();
         regionRepository.findByCode(normalizedCode).ifPresent(existing -> {
             throw conflict("Eine Region mit diesem Code existiert bereits.");
@@ -57,6 +65,7 @@ public class RegionAdminService {
 
     @Transactional
     public RegionDtos.RegionResponse updateRegion(UUID regionId, RegionDtos.RegionUpsertRequest request) {
+        adminAccessService.requireAdmin();
         RegionEntity region = requireRegion(regionId);
         RegionDtos.RegionResponse before = toResponse(region);
 
@@ -78,6 +87,7 @@ public class RegionAdminService {
 
     @Transactional
     public RegionDtos.RegionResponse archiveRegion(UUID regionId) {
+        adminAccessService.requireAdmin();
         RegionEntity region = requireRegion(regionId);
         RegionDtos.RegionResponse before = toResponse(region);
         region.status = RecordStatus.ARCHIVED;

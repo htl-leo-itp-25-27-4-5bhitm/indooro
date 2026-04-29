@@ -247,10 +247,141 @@ Wenn ihr das heute neu oder sauber aufsetzen wollt:
 2. Warten, bis GitHub Actions das Image `indooro-backend-v2:latest` gebaut hat
 3. `kubectl apply -n student-it220209 -f k8s/postgres.yaml`
 4. `kubectl apply -n student-it220209 -f k8s/opensearch.yaml`
-5. `kubectl apply -n student-it220209 -f k8s/backend.yaml`
-6. `kubectl apply -n student-it220209 -f k8s/backend-ingress.yaml`
-7. Falls noetig: `kubectl rollout restart deployment/indooro-backend -n student-it220209`
-8. Testen: `https://it220209.cloud.htl-leonding.ac.at/api/admin/health`
+5. `kubectl apply -n student-it220209 -f k8s/keycloak.yaml`
+6. `kubectl apply -n student-it220209 -f k8s/backend.yaml`
+7. `kubectl apply -n student-it220209 -f k8s/backend-ingress.yaml`
+8. Falls noetig: `kubectl rollout restart deployment/indooro-backend -n student-it220209`
+9. Testen: `https://it220209.cloud.htl-leonding.ac.at/api/mobile/stores`
+
+## Keycloak Admin Login
+
+Der Admin-Bereich ist ab dem Keycloak-Sprint nicht mehr anonym nutzbar.
+
+Geschuetzte Pfade:
+
+- `https://it220209.cloud.htl-leonding.ac.at/admin/`
+- `https://it220209.cloud.htl-leonding.ac.at/admin/editor/`
+- `https://it220209.cloud.htl-leonding.ac.at/admin/server-logs/`
+- `/api/admin/logs`
+- `/api/admin/error-logs`
+- `/api/admin/me`
+- `/api/regions`
+- `/api/stores`
+- `/api/beacons`
+- `/api/stores/{storeId}/layout/...`
+
+Oeffentliche Pfade bleiben fuer App/Kundensicht erreichbar:
+
+- `/api/mobile/stores`
+- `/api/mobile/stores/by-beacon`
+- `/api/mobile/stores/{storeId}/layout/current`
+- `/api/products`
+- `/api/categories`
+- `/api/layout`
+
+### Lokaler Keycloak-Start
+
+Der lokale Realm liegt unter:
+
+- `keycloak/realm/indooro-realm.json`
+
+Start mit Docker Compose:
+
+```bash
+docker compose up keycloak
+```
+
+Keycloak ist lokal unter `http://localhost:8180/` erreichbar. Der Realm ist:
+
+- Realm: `indooro`
+- Client: `indooro-admin-web`
+- Client Secret: `indooro-admin-secret`
+- Auth Server URL fuer Quarkus: `http://localhost:8180/realms/indooro`
+
+Demo-Benutzer:
+
+| Benutzer | Passwort | Keycloak-Rolle | Subject |
+| --- | --- | --- | --- |
+| `indooro-admin` | `admin` | `admin` | `11111111-1111-1111-1111-111111111111` |
+| `indooro-region` | `region` | `region-manager` | `22222222-2222-2222-2222-222222222222` |
+| `indooro-store` | `store` | `store-manager` | `33333333-3333-3333-3333-333333333333` |
+
+Die Migration `V4__user_access_assignments.sql` legt den Admin-Demozugang automatisch an. Fuer `region-manager` und `store-manager` muessen nach dem Anlegen von Region und Filiale passende Indooro-Scope-Zuordnungen gesetzt werden, weil diese Rollen echte Domain-IDs brauchen.
+
+Beispiel-SQL fuer eine Region und eine Filiale:
+
+```sql
+INSERT INTO user_access_assignments (
+  id, keycloak_subject, username, email, role, region_id, store_id, status, created_at, updated_at
+)
+SELECT gen_random_uuid(), '22222222-2222-2222-2222-222222222222',
+       'indooro-region', 'region@indooro.local', 'region-manager',
+       r.id, NULL, 'ACTIVE', NOW(), NOW()
+FROM regions r
+WHERE r.code = 'AT-NORD'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO user_access_assignments (
+  id, keycloak_subject, username, email, role, region_id, store_id, status, created_at, updated_at
+)
+SELECT gen_random_uuid(), '33333333-3333-3333-3333-333333333333',
+       'indooro-store', 'store@indooro.local', 'store-manager',
+       NULL, s.id, 'ACTIVE', NOW(), NOW()
+FROM stores s
+WHERE s.store_code = 'SPAR-LNZ-001'
+ON CONFLICT DO NOTHING;
+```
+
+Wenn Benutzer im Keycloak Admin UI neu angelegt werden, ist der stabile Wert fuer Indooro die Keycloak User-ID beziehungsweise der OIDC `sub` Claim. Die Admin UI zeigt den aktuell angemeldeten Benutzer ueber `/api/admin/me`.
+
+### LeoCloud Keycloak
+
+Das Manifest `k8s/keycloak.yaml` erstellt:
+
+- `Secret` `indooro-keycloak-secret`
+- `ConfigMap` `indooro-keycloak-realm`
+- Deployment/Service `indooro-keycloak`
+- Ingress `keycloak-it220209.cloud.htl-leonding.ac.at`
+
+Anwenden:
+
+```bash
+kubectl apply -n student-it220209 -f k8s/keycloak.yaml
+kubectl rollout status deployment/indooro-keycloak -n student-it220209
+```
+
+Der Backend-Container bekommt die OIDC-Konfiguration ueber `k8s/backend.yaml`:
+
+- `OIDC_AUTH_SERVER_URL=https://keycloak-it220209.cloud.htl-leonding.ac.at/realms/indooro`
+- `OIDC_CLIENT_ID=indooro-admin-web`
+- `OIDC_CLIENT_SECRET` aus `indooro-keycloak-secret`
+
+Fuer echte Deployments sollten die Werte in `indooro-keycloak-secret` vor dem Anwenden angepasst werden.
+
+### Auth-Verifikation
+
+Oeffentliche Route ohne Login:
+
+```bash
+curl -i https://it220209.cloud.htl-leonding.ac.at/api/mobile/stores
+```
+
+Admin-Route ohne Browser-Session:
+
+```bash
+curl -i https://it220209.cloud.htl-leonding.ac.at/api/regions
+```
+
+Erwartung: Die mobile Route bleibt ohne Keycloak-Login erreichbar. Die Admin-Route liefert keinen Admin-Datenbestand ohne gueltige Anmeldung.
+
+Browser-Demo:
+
+1. `https://it220209.cloud.htl-leonding.ac.at/admin/` oeffnen
+2. Mit `indooro-admin` anmelden
+3. Benutzerbox in der Admin UI pruefen
+4. Regionen/Filialen/Beacons laden
+5. `Logout` klicken
+6. `/admin/` erneut oeffnen und den neuen Login-Flow pruefen
 
 ## Build-Hinweis fuer Java 24
 

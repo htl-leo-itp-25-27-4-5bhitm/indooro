@@ -41,7 +41,11 @@ public class BeaconAdminService {
     @Inject
     AuditLogService auditLogService;
 
+    @Inject
+    AdminAccessService adminAccessService;
+
     public List<BeaconDtos.BeaconResponse> listBeacons(RecordStatus status, Boolean assigned, UUID storeId, String query) {
+        UUID effectiveStoreId = adminAccessService.effectiveStoreFilter(storeId);
         List<BeaconEntity> candidates = listBeaconCandidates(status, query);
         Map<UUID, BeaconAssignmentEntity> activeAssignments = beaconAssignmentRepository.listActiveAssignments()
                 .stream()
@@ -49,7 +53,8 @@ public class BeaconAdminService {
 
         return candidates.stream()
                 .map(beacon -> toResponse(beacon, activeAssignments.get(beacon.id)))
-                .filter(response -> filterAssigned(response, assigned, storeId))
+                .filter(response -> filterAssigned(response, assigned, effectiveStoreId))
+                .filter(this::filterVisible)
                 .sorted(Comparator.comparing(BeaconDtos.BeaconResponse::beaconCode, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
@@ -60,11 +65,14 @@ public class BeaconAdminService {
 
     public BeaconDtos.BeaconResponse getBeacon(UUID beaconId) {
         BeaconEntity beacon = requireBeacon(beaconId);
-        return toResponse(beacon, beaconAssignmentRepository.findActiveByBeaconId(beaconId).orElse(null));
+        BeaconAssignmentEntity assignment = beaconAssignmentRepository.findActiveByBeaconId(beaconId).orElse(null);
+        requireBeaconAccess(assignment);
+        return toResponse(beacon, assignment);
     }
 
     @Transactional
     public BeaconDtos.BeaconResponse createBeacon(BeaconDtos.BeaconCreateRequest request) {
+        adminAccessService.requireAdmin();
         String normalizedUuid = validateAndNormalizeIdentity(request.uuid(), request.major(), request.minor());
         ensureBeaconCodeIsAvailable(request.beaconCode(), null);
         String identityKey = BeaconIdentityUtil.toIdentityKey(normalizedUuid, request.major(), request.minor());
@@ -88,7 +96,9 @@ public class BeaconAdminService {
     @Transactional
     public BeaconDtos.BeaconResponse updateBeacon(UUID beaconId, BeaconDtos.BeaconCreateRequest request) {
         BeaconEntity beacon = requireBeacon(beaconId);
-        BeaconDtos.BeaconResponse before = toResponse(beacon, beaconAssignmentRepository.findActiveByBeaconId(beaconId).orElse(null));
+        BeaconAssignmentEntity assignment = beaconAssignmentRepository.findActiveByBeaconId(beaconId).orElse(null);
+        requireBeaconAccess(assignment);
+        BeaconDtos.BeaconResponse before = toResponse(beacon, assignment);
 
         String normalizedUuid = validateAndNormalizeIdentity(request.uuid(), request.major(), request.minor());
         ensureBeaconCodeIsAvailable(request.beaconCode(), beaconId);
@@ -110,12 +120,15 @@ public class BeaconAdminService {
     @Transactional
     public BeaconDtos.BeaconResponse archiveBeacon(UUID beaconId) {
         BeaconEntity beacon = requireBeacon(beaconId);
-        BeaconDtos.BeaconResponse before = toResponse(beacon, beaconAssignmentRepository.findActiveByBeaconId(beaconId).orElse(null));
+        BeaconAssignmentEntity activeAssignment = beaconAssignmentRepository.findActiveByBeaconId(beaconId).orElse(null);
+        requireBeaconAccess(activeAssignment);
+        BeaconDtos.BeaconResponse before = toResponse(beacon, activeAssignment);
 
-        beaconAssignmentRepository.findActiveByBeaconId(beaconId).ifPresent(assignment -> {
+        if (activeAssignment != null) {
+            BeaconAssignmentEntity assignment = activeAssignment;
             assignment.isActive = false;
             assignment.releasedAt = Instant.now();
-        });
+        }
 
         beacon.status = RecordStatus.ARCHIVED;
         BeaconDtos.BeaconResponse after = toResponse(beacon, null);
@@ -125,6 +138,7 @@ public class BeaconAdminService {
 
     @Transactional
     public BeaconDtos.BeaconBulkCreateResponse bulkCreate(BeaconDtos.BeaconBulkCreateRequest request) {
+        adminAccessService.requireAdmin();
         if (request.items() == null || request.items().isEmpty()) {
             throw new WebApplicationException("Mindestens ein Beacon muss angelegt werden.", Response.Status.BAD_REQUEST);
         }
@@ -148,8 +162,10 @@ public class BeaconAdminService {
     public BeaconDtos.BeaconAssignmentResponse assignBeacon(UUID beaconId, UUID storeId) {
         BeaconEntity beacon = requireActiveBeacon(beaconId);
         StoreEntity store = requireActiveStore(storeId);
+        adminAccessService.requireStoreAccess(store.id);
 
         BeaconAssignmentEntity currentAssignment = beaconAssignmentRepository.findActiveByBeaconId(beaconId).orElse(null);
+        requireBeaconAccess(currentAssignment, true);
         if (currentAssignment != null && currentAssignment.store.id.equals(storeId)) {
             return toAssignmentResponse(currentAssignment);
         }
@@ -175,8 +191,10 @@ public class BeaconAdminService {
         BeaconEntity beacon = requireBeacon(beaconId);
         BeaconAssignmentEntity assignment = beaconAssignmentRepository.findActiveByBeaconId(beaconId).orElse(null);
         if (assignment == null) {
+            adminAccessService.requireAdmin();
             return Map.of("beaconId", beacon.id, "released", false);
         }
+        requireBeaconAccess(assignment);
 
         assignment.isActive = false;
         assignment.releasedAt = Instant.now();
@@ -213,6 +231,30 @@ public class BeaconAdminService {
         }
 
         return true;
+    }
+
+    private boolean filterVisible(BeaconDtos.BeaconResponse response) {
+        if (response.currentStore() == null) {
+            return adminAccessService.canSeeBeaconStore(null);
+        }
+        StoreEntity store = storeRepository.findByIdOptional(response.currentStore().id()).orElse(null);
+        return adminAccessService.canSeeBeaconStore(store);
+    }
+
+    private void requireBeaconAccess(BeaconAssignmentEntity assignment) {
+        requireBeaconAccess(assignment, false);
+    }
+
+    private void requireBeaconAccess(BeaconAssignmentEntity assignment, boolean allowUnassignedForScopedStoreAction) {
+        if (assignment == null) {
+            if (allowUnassignedForScopedStoreAction) {
+                adminAccessService.currentUser();
+                return;
+            }
+            adminAccessService.requireAdmin();
+            return;
+        }
+        adminAccessService.requireStoreAccess(assignment.store.id);
     }
 
     private String validateAndNormalizeIdentity(String uuid, Integer major, Integer minor) {
