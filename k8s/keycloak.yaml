@@ -105,11 +105,19 @@ spec:
     spec:
       containers:
         - name: keycloak
-          image: quay.io/keycloak/keycloak:26.2
-          command: ["/bin/sh", "-c"]
-          args:
-            - /opt/keycloak/bin/kc.sh build && /opt/keycloak/bin/kc.sh start-dev --import-realm --optimized
+          image: quay.io/keycloak/keycloak:24.0.5
+          args: ["start-dev", "--import-realm"]
           env:
+            - name: KEYCLOAK_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: indooro-keycloak-secret
+                  key: bootstrap-admin-username
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: indooro-keycloak-secret
+                  key: bootstrap-admin-password
             - name: KC_BOOTSTRAP_ADMIN_USERNAME
               valueFrom:
                 secretKeyRef:
