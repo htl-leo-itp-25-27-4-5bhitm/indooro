@@ -77,6 +77,7 @@ const els = {
   currentUserName: document.getElementById('currentUserName'),
   currentUserRole: document.getElementById('currentUserRole'),
   currentUserScope: document.getElementById('currentUserScope'),
+  logoutLink: document.getElementById('logoutLink'),
 };
 
 function setStatus(message, tone = 'neutral') {
@@ -96,6 +97,11 @@ async function fetchJson(url, options = {}) {
     },
     ...options,
   });
+
+  if (response.redirected && response.url.includes('/keycloak/')) {
+    window.location.href = '/admin/';
+    throw new Error('Login erforderlich.');
+  }
 
   if (!response.ok) {
     if (response.status === 401) {
@@ -124,6 +130,12 @@ async function fetchJson(url, options = {}) {
     return null;
   }
 
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    window.location.href = '/admin/';
+    throw new Error('Login erforderlich.');
+  }
+
   return response.json();
 }
 
@@ -147,6 +159,33 @@ function renderCurrentUser() {
   } else {
     els.currentUserScope.textContent = 'Alle Regionen und Filialen';
   }
+}
+
+function isAdmin() {
+  return state.currentUser?.role === 'admin';
+}
+
+function isRegionManager() {
+  return state.currentUser?.role === 'region-manager';
+}
+
+function isStoreManager() {
+  return state.currentUser?.role === 'store-manager';
+}
+
+function canCreateStore() {
+  return isAdmin() || isRegionManager();
+}
+
+function applyRoleUi() {
+  const systemLogsPanel = document.getElementById('system-logs');
+  systemLogsPanel?.classList.toggle('hidden', !isAdmin());
+  document.querySelector('a[href="#system-logs"]')?.classList.toggle('hidden', !isAdmin());
+  document.querySelector('a[href="/admin/server-logs/"]')?.classList.toggle('hidden', !isAdmin());
+  els.resetRegionFormBtn.classList.toggle('hidden', !isAdmin());
+  els.regionForm.classList.toggle('hidden', !isAdmin());
+  els.resetStoreFormBtn.classList.toggle('hidden', !canCreateStore());
+  els.storeForm.classList.toggle('hidden', !canCreateStore());
 }
 
 function roleLabel(role) {
@@ -262,6 +301,11 @@ async function loadBootstrapData() {
 }
 
 async function loadSystemLogs() {
+  if (!isAdmin()) {
+    state.systemLogs = [];
+    return;
+  }
+
   const payload = await fetchJson(`${API.adminLogs}?limit=20`);
   state.systemLogs = payload.entries || [];
 }
@@ -348,8 +392,8 @@ function renderRegions() {
       </div>
       <p class="subtle">${escapeHtml(region.description || 'Keine Beschreibung hinterlegt.')}</p>
       <div class="item-footer">
-        <button type="button" class="action-button" data-action="edit-region" data-id="${region.id}">Bearbeiten</button>
-        <button type="button" class="action-button warn" data-action="archive-region" data-id="${region.id}">Archivieren</button>
+        ${isAdmin() ? `<button type="button" class="action-button" data-action="edit-region" data-id="${region.id}">Bearbeiten</button>` : ''}
+        ${isAdmin() ? `<button type="button" class="action-button warn" data-action="archive-region" data-id="${region.id}">Archivieren</button>` : ''}
       </div>
     </article>
   `).join('');
@@ -379,7 +423,7 @@ function renderStores() {
         <button type="button" class="action-button" data-action="select-store" data-id="${store.id}">Detail</button>
         <button type="button" class="action-button" data-action="edit-store" data-id="${store.id}">Bearbeiten</button>
         <a class="inline-link" href="/admin/editor/?storeId=${store.id}">Editor</a>
-        <button type="button" class="action-button warn" data-action="archive-store" data-id="${store.id}">Archivieren</button>
+        ${isStoreManager() ? '' : `<button type="button" class="action-button warn" data-action="archive-store" data-id="${store.id}">Archivieren</button>`}
       </div>
     </article>
   `).join('');
@@ -567,6 +611,7 @@ async function refreshAll({ keepStatusMessage = false } = {}) {
 
   await loadCurrentUser();
   renderCurrentUser();
+  applyRoleUi();
   await loadBootstrapData();
   await loadSystemLogs();
   renderRegionOptions();
@@ -760,9 +805,20 @@ function bindEvents() {
     renderSystemLogs();
   });
   els.refreshLogsBtn.addEventListener('click', async () => {
+    if (!isAdmin()) {
+      return;
+    }
     await loadSystemLogs();
     renderSystemLogs();
     setStatus('System-Logs wurden aktualisiert.', 'success');
+  });
+  els.logoutLink?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.currentTarget.textContent = 'Logout...';
+    event.currentTarget.setAttribute('aria-disabled', 'true');
+    window.sessionStorage.clear();
+    window.localStorage.removeItem('indooro-admin-state');
+    window.location.assign(`/admin/logout?ts=${Date.now()}`);
   });
   els.refreshBeaconsBtn.addEventListener('click', () => refreshAll());
   els.refreshStoreDetailBtn.addEventListener('click', async () => {

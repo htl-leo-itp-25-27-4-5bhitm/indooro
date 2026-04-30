@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Indooro Admin Plattform</title>
   <link rel="stylesheet" href="app.css" />
-  <script defer src="app.js?v=20260415-store-detail"></script>
+  <script defer src="app.js?v=20260430-auth-ui"></script>
 </head>
 <body>
   <div class="admin-shell">
@@ -31,7 +31,7 @@
           <strong id="currentUserName">...</strong>
           <span id="currentUserRole">Rolle wird geladen</span>
           <span id="currentUserScope">Scope wird geladen</span>
-          <a class="ghost-button logout-link" href="/admin/logout">Logout</a>
+          <a id="logoutLink" class="ghost-button logout-link" href="/admin/logout">Logout</a>
         </div>
         <a class="ghost-button" href="/admin/editor/">Globalen Editor oeffnen</a>
         <a class="ghost-button" href="/admin/server-logs/">Server Fehlerlog</a>
