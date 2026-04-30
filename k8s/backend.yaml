@@ -23,6 +23,17 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 12
+          startupProbe:
+            tcpSocket:
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 24
           env:
             - name: DB_HOST
               value: "postgres"
@@ -47,6 +58,14 @@ spec:
                 secretKeyRef:
                   name: indooro-keycloak-secret
                   key: admin-web-client-secret
+            - name: QUARKUS_OIDC_ROLES_SOURCE
+              value: "idtoken"
+            - name: QUARKUS_HTTP_PROXY_PROXY_ADDRESS_FORWARDING
+              value: "true"
+            - name: QUARKUS_OIDC_TOKEN_STATE_MANAGER_STRATEGY
+              value: "id-refresh-tokens"
+            - name: QUARKUS_OIDC_TOKEN_STATE_MANAGER_SPLIT_TOKENS
+              value: "true"
 
           resources:
             requests:
