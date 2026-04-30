@@ -42,15 +42,12 @@ public class MobileStoreService {
                 .toList();
     }
 
-    public MobileDtos.StoreByBeaconResponse findStoreByBeacon(String uuid, Integer major, Integer minor) {
+    public MobileDtos.StoreByBeaconResponse findStoreByBeacon(String uuid) {
         if (uuid == null || uuid.isBlank()) {
             throw new WebApplicationException("Beacon UUID ist erforderlich.", Response.Status.BAD_REQUEST);
         }
-        if ((major == null) != (minor == null)) {
-            throw new WebApplicationException("Major und Minor muessen entweder beide gesetzt oder beide leer sein.", Response.Status.BAD_REQUEST);
-        }
 
-        BeaconEntity beacon = resolveBeacon(uuid, major, minor);
+        BeaconEntity beacon = resolveBeacon(uuid);
         BeaconAssignmentEntity assignment = beaconAssignmentRepository.findActiveByBeaconId(beacon.id)
                 .orElseThrow(() -> new NotFoundException("Keiner aktiven Filiale ist dieser Beacon zugeordnet."));
 
@@ -75,20 +72,12 @@ public class MobileStoreService {
         return new MobileDtos.MobileLayoutResponse(store.id, layout.layoutId(), layout.layout());
     }
 
-    private BeaconEntity resolveBeacon(String uuid, Integer major, Integer minor) {
+    private BeaconEntity resolveBeacon(String uuid) {
         String normalizedUuid;
         try {
             normalizedUuid = BeaconIdentityUtil.normalizeUuid(uuid);
         } catch (IllegalArgumentException e) {
             throw new WebApplicationException("Beacon UUID muss 32 hexadezimale Zeichen enthalten.", Response.Status.BAD_REQUEST);
-        }
-
-        if (major != null && minor != null) {
-            String exactIdentityKey = BeaconIdentityUtil.toIdentityKey(normalizedUuid, major, minor);
-            BeaconEntity exactMatch = beaconRepository.findByIdentityKey(exactIdentityKey).orElse(null);
-            if (exactMatch != null && exactMatch.status == RecordStatus.ACTIVE) {
-                return exactMatch;
-            }
         }
 
         String uuidOnlyIdentityKey = BeaconIdentityUtil.toIdentityKey(normalizedUuid, null, null);
