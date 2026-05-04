@@ -1,9 +1,11 @@
 package at.htl.admin.repository;
 
 import at.htl.admin.entity.BeaconEntity;
+import at.htl.admin.entity.RecordStatus;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,5 +18,9 @@ public class BeaconRepository implements PanacheRepositoryBase<BeaconEntity, UUI
 
     public Optional<BeaconEntity> findByIdentityKey(String identityKey) {
         return find("identityKey", identityKey).firstResultOptional();
+    }
+
+    public List<BeaconEntity> listActiveByUuid(String uuid) {
+        return list("uuid = ?1 and status = ?2", uuid, RecordStatus.ACTIVE);
     }
 }
