@@ -1,21 +1,27 @@
 package at.htl.admin.service;
 
 import at.htl.admin.dto.MobileDtos;
-import at.htl.admin.dto.LayoutDtos;
 import at.htl.admin.entity.BeaconAssignmentEntity;
 import at.htl.admin.entity.BeaconEntity;
+import at.htl.admin.entity.LayoutVersionEntity;
 import at.htl.admin.entity.RecordStatus;
 import at.htl.admin.entity.StoreEntity;
 import at.htl.admin.repository.BeaconAssignmentRepository;
 import at.htl.admin.repository.BeaconRepository;
+import at.htl.admin.repository.LayoutVersionRepository;
 import at.htl.admin.repository.StoreRepository;
 import at.htl.admin.util.BeaconIdentityUtil;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -34,7 +40,10 @@ public class MobileStoreService {
     StoreRepository storeRepository;
 
     @Inject
-    StoreLayoutAdminService storeLayoutAdminService;
+    LayoutVersionRepository layoutVersionRepository;
+
+    @Inject
+    ObjectMapper objectMapper;
 
     public List<MobileDtos.MobileStoreSummary> listStores() {
         return storeRepository.find("status = ?1 order by name", RecordStatus.ACTIVE)
@@ -73,8 +82,12 @@ public class MobileStoreService {
             throw new NotFoundException("Filiale ist nicht aktiv.");
         }
 
-        LayoutDtos.StoreLayoutResponse layout = storeLayoutAdminService.getCurrentLayout(storeId);
-        return new MobileDtos.MobileLayoutResponse(store.id, layout.layoutId(), layout.layout());
+        LayoutVersionEntity activeLayout = layoutVersionRepository.findActiveByStoreId(storeId).orElse(null);
+        if (activeLayout != null) {
+            return new MobileDtos.MobileLayoutResponse(store.id, activeLayout.id, activeLayout.layoutJson);
+        }
+
+        return new MobileDtos.MobileLayoutResponse(store.id, null, loadDefaultLayout(store.name));
     }
 
     private BeaconEntity resolveBeacon(String uuid, Integer major, Integer minor) {
@@ -128,5 +141,20 @@ public class MobileStoreService {
 
     private MobileDtos.MobileStoreSummary toStoreSummary(StoreEntity store) {
         return new MobileDtos.MobileStoreSummary(store.id, store.storeCode, store.name, store.city);
+    }
+
+    private JsonNode loadDefaultLayout(String storeName) {
+        try (InputStream input = Thread.currentThread().getContextClassLoader().getResourceAsStream("default-layout.json")) {
+            if (input == null) {
+                ObjectNode fallback = objectMapper.createObjectNode();
+                fallback.put("shopName", storeName);
+                return fallback;
+            }
+            ObjectNode layout = (ObjectNode) objectMapper.readTree(input);
+            layout.put("shopName", storeName);
+            return layout;
+        } catch (IOException e) {
+            throw new IllegalStateException("Standard-Layout konnte nicht geladen werden.", e);
+        }
     }
 }
