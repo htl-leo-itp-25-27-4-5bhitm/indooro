@@ -28,6 +28,12 @@ public class MobileStoreResource {
     }
 
     @GET
+    @Path("/beacon-identities")
+    public MobileDtos.BeaconIdentitiesResponse listBeaconIdentities() {
+        return mobileStoreService.listBeaconIdentities();
+    }
+
+    @GET
     @Path("/by-beacon")
     public MobileDtos.StoreByBeaconResponse findStoreByBeacon(@QueryParam("uuid") String uuid,
                                                               @QueryParam("major") Integer major,

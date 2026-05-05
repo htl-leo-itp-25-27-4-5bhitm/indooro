@@ -2,6 +2,7 @@ package at.htl.admin.dto;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import java.util.List;
 import java.util.UUID;
 
 public final class MobileDtos {
@@ -14,6 +15,11 @@ public final class MobileDtos {
             String storeCode,
             String name,
             String city
+    ) {
+    }
+
+    public record BeaconIdentitiesResponse(
+            List<String> uuids
     ) {
     }
 

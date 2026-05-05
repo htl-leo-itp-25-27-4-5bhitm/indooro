@@ -23,4 +23,21 @@ public class BeaconRepository implements PanacheRepositoryBase<BeaconEntity, UUI
     public List<BeaconEntity> listActiveByUuid(String uuid) {
         return list("uuid = ?1 and status = ?2", uuid, RecordStatus.ACTIVE);
     }
+
+    public List<String> listActiveAssignedMobileUuids() {
+        return getEntityManager()
+                .createQuery("""
+                        select distinct b.uuid
+                        from BeaconAssignmentEntity assignment
+                        join assignment.beacon b
+                        join assignment.store s
+                        where assignment.isActive = true
+                          and b.status = :activeStatus
+                          and s.status = :activeStatus
+                          and b.uuid is not null
+                        order by b.uuid
+                        """, String.class)
+                .setParameter("activeStatus", RecordStatus.ACTIVE)
+                .getResultList();
+    }
 }

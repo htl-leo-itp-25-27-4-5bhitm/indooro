@@ -53,6 +53,10 @@ public class MobileStoreService {
                 .toList();
     }
 
+    public MobileDtos.BeaconIdentitiesResponse listBeaconIdentities() {
+        return new MobileDtos.BeaconIdentitiesResponse(beaconRepository.listActiveAssignedMobileUuids());
+    }
+
     public MobileDtos.StoreByBeaconResponse findStoreByBeacon(String uuid, Integer major, Integer minor) {
         if (uuid == null || uuid.isBlank()) {
             throw new WebApplicationException("Beacon UUID ist erforderlich.", Response.Status.BAD_REQUEST);
