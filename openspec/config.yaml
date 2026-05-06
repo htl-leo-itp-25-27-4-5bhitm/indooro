@@ -1,66 +1,283 @@
 schema: spec-driven
 
 context: |
-  Project: Indooro Admin Platform.
+  Project: Indooro.
 
-  Stack:
-  - Backend is Quarkus 3.6.0 on Java 17 with RESTEasy Reactive, Hibernate ORM Panache,
-    PostgreSQL, Flyway, OpenSearch, and static admin resources served by Quarkus.
-  - Admin frontend lives in backend/indooro_server/src/main/resources/META-INF/resources/admin.
-  - Deployment target is LeoCloud Kubernetes manifests under k8s/.
+  OpenSpec operating model:
+  - This repository uses OpenSpec with the experimental OPSX workflow and the
+    spec-driven schema.
+  - Permanent behavior belongs in openspec/specs/<capability>/spec.md.
+  - Proposed changes belong in openspec/changes/<change-name>/ with proposal,
+    specs, design, and tasks artifacts.
+  - The required artifact flow is proposal -> specs -> design -> tasks ->
+    implementation -> verification -> archive.
+  - OpenSpec is action-based, not a rigid phase gate. Artifacts may be refined
+    during implementation when new facts are discovered, but implementation
+    must remain reviewable and traceable to specs.
+  - Use `npx -y @fission-ai/openspec@1.3.1 ...` in this workspace because the
+    openspec binary may not be installed globally.
+  - Validate with `npx -y @fission-ai/openspec@1.3.1 validate --all --strict`
+    before considering a change done.
 
-  Current admin routes to protect:
-  - /admin and /admin/*
-  - /api/admin/logs
-  - /api/admin/error-logs
-  - /api/regions
-  - /api/stores
-  - /api/beacons
-  - /api/stores/{storeId}/layout/*
+  Source documentation imported into this OpenSpec context:
+  - README.md: product vision, scope, team, target users, mobile app goals,
+    risks, and high-level technology choices.
+  - DEPLOYMENT.md: LeoCloud namespace, public host, GHCR image, Kubernetes
+    resources, rollout commands, Keycloak setup, URLs, and operational checks.
+  - documentation/API_DOCUMENTATION.md: OpenSearch setup, product/category
+    endpoints, product search, layout code format, and sample payloads.
+  - documentation/SPRINT_ADMIN_PLATFORM_COMPLETE_DOCUMENTATION.md: Admin
+    Platform architecture, data model, static admin UI, REST APIs, migrations,
+    layout editor, logs, deployment, and known limitations.
+  - documentation/RUNTIME_OBJECT_DIAGRAM_DATABASE.md: live domain object model
+    and example runtime data for regions, stores, beacons, layouts, audit logs,
+    and error logs.
+  - documentation/KEYCLOAK_SPRINT_CONCEPT_OPENSPEC.md: Keycloak sprint concept,
+    protected/public route split, role model, scope mapping, OpenSpec workflow,
+    and definition of done.
+  - documentation/KEYCLOAK_AUTH_VERIFICATION.md: local auth prerequisites and
+    verification checklist for login, logout, roles, scopes, and public routes.
+  - documentation/KEYCLOAK_NEW_CHAT_OPENSPEC_PROMPT.md: continuation prompt for
+    the Keycloak sprint.
+  - documentation/fsd_fragerunde1.md: Functional Specification Discovery
+    answers for full-system behavior, non-goals, mobile routing, BLE, layout,
+    product search, PDF import, REST boundaries, deployment, and quality needs.
+  - documentation/CODEX_FSD_QUESTIONS_TEMPLATE.md: mandatory FSD approach for
+    ambiguous future work.
+  - documentation/Layoutplan-Testraum.pdf is a supporting one-page test-room
+    sketch containing shelf/beacon labels and approximate dimensions (`~5`,
+    `~9`). Translate it into explicit layout JSON/test data before using it as
+    implementation input.
+  - documentation/IndooroScrumRetrospektive4Ls.pdf contains process
+    retrospection about beacon-task structure and communication. It does not
+    add durable runtime requirements, but it reinforces keeping OpenSpec tasks
+    explicit and reviewable.
 
-  Routes that should remain public unless this change explicitly narrows scope:
-  - /api/mobile/stores
-  - /api/mobile/stores/by-beacon
-  - /api/mobile/stores/{storeId}/layout/current
-  - /api/products
-  - /api/categories
-  - /api/layout
+  Product mission:
+  - Indooro helps supermarket customers find products inside a specific store.
+  - The mobile app should detect or select the active store, let a customer
+    search for products, show the product location on a store map, and guide the
+    customer along walkable paths.
+  - The system is not intended to track customers server-side, analyze customer
+    identities, or provide live indoor surveillance.
+  - The Admin Platform lets authorized store or organization staff manage
+    regions, stores, beacons, layouts, and operational logs.
+  - The MVP prioritizes one-store-at-a-time product search, 2D map guidance,
+    anonymous customer use, and authenticated admin management. Current iOS app
+    code also contains local shopping-list and AR route-preview features; those
+    are documented capabilities but do not imply shared backend customer
+    accounts, Android parity, analytics, live inventory, or production-grade PDF
+    ingestion unless a future change explicitly scopes them.
 
-  Roles:
-  - admin: full admin visibility and management.
-  - region-manager: admin access scoped to one assigned region.
-  - store-manager: admin access scoped to one assigned store.
+  Stakeholders and user groups:
+  - Customer/mobile user: anonymous user of the iOS app, expects store search,
+    product lookup, layout display, and route guidance without login.
+  - Admin: full Indooro operator, manages all regions, stores, beacons, layouts,
+    audit logs, and error logs.
+  - Region manager: authenticated admin user scoped to one assigned region.
+  - Store manager: authenticated admin user scoped to one assigned store.
+  - Store employee or branch manager: likely human operator for layout/editor
+    workflows, initially represented by region-manager/store-manager roles.
+  - Developer/operator: runs local Quarkus/PostgreSQL/OpenSearch/Keycloak and
+    deploys to LeoCloud Kubernetes.
 
-  Architecture direction:
-  - Prefer Quarkus OIDC Authorization Code Flow with quarkus-oidc and application-type=web-app.
-  - Prefer Quarkus-native @Authenticated and @RolesAllowed plus backend scope checks.
-  - Do not start with Keycloak Authorization Services or policy-enforcer unless simple role
-    annotations and app-level scope checks are proven insufficient.
-  - Use a database user access assignment keyed by the stable Keycloak subject claim, not only
-    Keycloak attributes, for region/store scope.
-  - Use modern Keycloak containers and realm import for local/dev/demo setup; do not copy legacy
-    /auth/realms URLs or old jboss/keycloak images from classroom examples.
+  Core architecture:
+  - Backend: Quarkus 3 on Java 17, RESTEasy Reactive, Hibernate ORM Panache,
+    PostgreSQL, Flyway, OpenSearch REST client, and Keycloak/OIDC.
+  - Database: PostgreSQL stores operational entities such as regions, stores,
+    beacons, beacon assignments, layout versions, audit logs, error logs, and
+    user access assignments.
+  - Search: OpenSearch stores product, category, and legacy/current layout
+    search documents. Product search remains public for mobile/customer use.
+  - Admin frontend: static HTML/CSS/JavaScript served by Quarkus from
+    backend/indooro_server/src/main/resources/META-INF/resources/admin.
+  - Mobile frontend: Swift/SwiftUI iOS app code exists under
+    swift/indooro-/indooroApp (feature-rich current app with BLE positioning,
+    shopping lists, AR, layout version selection, map display, and routing) and
+    swift/indooroApp/indooroApp (older/smaller app copy). Prefer the
+    feature-rich tree for current capability analysis unless a future change
+    explicitly targets the older copy.
+  - Deployment: LeoCloud Kubernetes manifests live under k8s/. Local developer
+    orchestration is done with docker-compose.yml and Quarkus dev tooling.
+  - Container registry: backend images use
+    ghcr.io/htl-leo-itp-25-27-4-5bhitm/indooro-backend-v2:latest unless changed
+    by a specific deployment change.
+
+  Backend code map:
+  - backend/indooro_server/src/main/java/at/htl/resource/admin contains Admin
+    REST resources for regions, stores, beacons, layouts, audit logs, error
+    logs, and user/session-facing admin endpoints.
+  - backend/indooro_server/src/main/java/at/htl/resource/mobile contains public
+    mobile-facing store and layout detection routes.
+  - backend/indooro_server/src/main/java/at/htl/admin/entity contains
+    PostgreSQL entities for regions, stores, beacons, assignments, layout
+    versions, logs, and user access assignments.
+  - backend/indooro_server/src/main/java/at/htl/admin/repository contains
+    Panache repositories for admin domain persistence.
+  - backend/indooro_server/src/main/java/at/htl/admin/service contains domain
+    services for admin workflows, scope enforcement, logs, and mobile store
+    discovery support.
+  - backend/indooro_server/src/main/resources/db/migration contains Flyway
+    migrations. Existing migrations include the core admin schema, error logs,
+    beacon UUID normalization, user access assignments, and demo auth
+    assignments.
+  - backend/indooro_server/src/main/resources/application.properties contains
+    Quarkus datasource, OpenSearch, OIDC, auth permission, logging, and test
+    profile configuration.
+
+  Domain model:
+  - Region represents a business/geographic grouping of stores.
+  - Store belongs to a region and has public/mobile metadata plus operational
+    admin metadata.
+  - Beacon represents a physical BLE beacon identity. Beacon UUIDs are stored
+    normalized as 32 lowercase hexadecimal characters without hyphens where the
+    backend normalization migration applies. Exposed responses may use either
+    normalized no-hyphen values or valid UUID strings, depending on route
+    contract.
+  - Beacon assignment links a beacon to a store for a validity period and status.
+  - Layout version stores the editable store map/layout for a store and marks
+    one version active for mobile/admin current-layout use.
+  - Audit log records admin actions for traceability.
+  - Error log records backend/client/admin operational errors for debugging.
+  - User access assignment maps a stable Keycloak subject (`sub`) to an Indooro
+    role and optional region/store scope.
+  - Product and category search data is stored in OpenSearch and uses
+    store-aware product documents for customer search.
+
+  Product/catalog search:
+  - Public product endpoints include `/api/products`, `/api/products/{id}`,
+    `/api/products/search`, `/api/categories`, `/api/categories/{categoryCode}`,
+    and related query parameters as documented in
+    documentation/API_DOCUMENTATION.md.
+  - Catalog maintenance/write utilities include `POST /api/products`,
+    `POST /api/products/bulk`, `POST /api/categories/bulk`,
+    `POST /api/admin/index/create`, `DELETE /api/admin/index`,
+    `POST /api/convert/pdf-to-json`, and `POST /api/export/pdf`. Future changes
+    must verify the current auth boundary before assuming these are public or
+    protected.
+  - Product documents contain at least id, name, price, and layoutCode. Store
+    scoping is expected for multi-store correctness.
+  - The documented layoutCode format is a four-part slash-separated code
+    composed of category code, meter, fach, and reihe/slot, for example
+    `310/1/1/1`.
+  - Product search should support fuzzy and colloquial search over time, but
+    popularity-based ranking is not required for the MVP.
+  - There is currently no confirmed dedicated route for "products by category
+    code" unless a future change adds or documents one explicitly.
+
+  Layout and routing:
+  - Admin layout editing supports store-specific layouts with objects such as
+    walls, shelves, aisles, cashiers, entrances, and points of interest.
+  - Layouts are versioned. Mobile should consume the active/current layout for a
+    store.
+  - Routing is expected to use A* or an equivalent proven pathfinding algorithm
+    over walkable areas. The target point should be near the shelf or slot, not
+    necessarily inside a blocked shelf object.
+  - Layout JSON preserves `shopName`, `gridSize`, `elements`, coordinates,
+    dimensions, category/meter, beacon identifiers, rotation, accessAngle, and
+    locked state where present. Store-specific layout versions and legacy global
+    layouts currently coexist.
+  - Initial MVP assumptions include one floor per store, one product target at a
+    time for baseline navigation, a route line rather than turn-by-turn
+    instructions, and nearby walkable access points for shelf targets. The iOS
+    app contains local multi-stop shopping assistance, but backend/shared
+    shopping-list workflows remain future scope.
+
+  BLE/mobile store detection:
+  - Mobile/customer APIs stay anonymous by default.
+  - Mobile store detection uses active, non-archived beacon identities and active
+    assignments to infer the current store.
+  - The anonymous route `/api/mobile/stores/beacon-identities` returns unique
+    active beacon UUIDs relevant for mobile store detection.
+  - Mobile clients should still support manual store selection or non-BLE flows
+    for search and map display.
+  - iOS positioning is client-side. The FSD target is iBeacon/iBKS USB beacon
+    scanning with about one-meter practical accuracy, no trusted Blue Dot under
+    three usable beacons, low jitter, sensor fusion where useful, and live
+    rerouting only after sustained off-route evidence.
+  - Server-side customer position storage is out of scope for the MVP.
+
+  Admin authentication and authorization:
+  - Admin Platform login uses Keycloak with Quarkus OIDC Authorization Code Flow
+    (`quarkus-oidc`, `application-type=web-app`).
+  - Admin pages under `/admin` and `/admin/*` require authentication.
+  - Protected admin APIs include `/api/admin/logs`, `/api/admin/error-logs`,
+    `/api/regions`, `/api/stores`, `/api/beacons`, and
+    `/api/stores/{storeId}/layout/*`.
+  - Public routes stay public unless a future OpenSpec change explicitly changes
+    them: `/api/mobile/*`, `/api/products`, `/api/categories`, and `/api/layout`.
+  - Roles are `admin`, `region-manager`, and `store-manager`.
+  - Authorization uses Quarkus-native annotations and backend scope checks.
+    Keycloak Authorization Services/policy-enforcer are not the default and
+    should only be introduced if role annotations plus application scope checks
+    are proven insufficient.
+  - The stable Keycloak subject (`sub`) is the durable join key between Keycloak
+    identity and Indooro user access assignment.
+
+  Current Keycloak/deployment assumptions:
+  - Local Keycloak can run through docker-compose with a modern Keycloak image
+    and realm import.
+  - LeoCloud Keycloak runs under the public host with relative path `/keycloak`.
+  - Local OIDC auth-server URL defaults to
+    `http://localhost:8180/realms/indooro`.
+  - LeoCloud OIDC auth-server URL is expected to be
+    `https://it220209.cloud.htl-leonding.ac.at/keycloak/realms/indooro`.
+  - Do not use legacy `/auth/realms/...` URLs or old `jboss/keycloak:15.0.2`
+    examples from classroom notes as direct implementation templates.
+
+  LeoCloud operational context:
+  - Namespace: student-it220209.
+  - Public host: it220209.cloud.htl-leonding.ac.at.
+  - Kubernetes manifests live in k8s/.
+  - Main components are PostgreSQL, OpenSearch, OpenSearch Dashboards,
+    Keycloak, and the Indooro backend.
+  - Typical rollout uses `kubectl -n student-it220209 apply -f k8s/...` and
+    `kubectl -n student-it220209 rollout restart deployment/indooro-backend-v2`
+    when the backend image is updated.
+  - Any future deployment change must state exactly which image tag, manifests,
+    secrets, routes, and verification commands were used.
+
+  FSD and ambiguity rules:
+  - For ambiguous implementation work, first perform Functional Specification
+    Discovery using documentation/CODEX_FSD_QUESTIONS_TEMPLATE.md and record
+    assumptions/non-goals in OpenSpec before coding.
+  - Prefer Markdown plus OpenAPI/ADR-style detail for large functional specs.
+  - Do not invent business rules when the FSD explicitly says a decision is open.
+  - Use existing project patterns and keep changes small enough to review.
+
+  Known open points:
+  - Exact production PDF import pipeline is still future/planned. The current
+    code supports utility PDF-to-JSON conversion and PDF export, but production
+    ingestion still requires validation, review, persistence, rollback, no
+    partial half-imports, and audit logging.
+  - Products-by-category-code lookup is not confirmed as an implemented
+    dedicated route, although category-by-code lookup exists.
+  - Android support, production multilingual UX, multi-floor routing, backend
+    shopping-list sync, analytics, and live ERP/POS inventory are not MVP
+    commitments unless a future OpenSpec change adds them.
+  - If legacy documentation and current code disagree, record the conflict in
+    design.md and verify actual runtime behavior before changing code.
 
 rules:
   proposal:
-    - Explain why Keycloak is needed now.
-    - Define protected admin routes and pages.
-    - Define routes that stay public.
-    - Define roles and what the sprint demo proves.
+    - State the project problem and why the change is needed now.
+    - List new and modified capabilities using exact kebab-case spec names.
+    - Define protected pages/routes, public pages/routes, roles, and demo proof whenever auth is touched.
+    - State documentation sources and impacted systems when a change updates project knowledge.
   specs:
-    - Cover login, logout, unauthorized behavior, role-based access, region/store scope filtering, and deployment expectations.
-    - Use explicit scenarios with observable outcomes.
+    - Use `## ADDED Requirements`, `## MODIFIED Requirements`, `## REMOVED Requirements`, or `## RENAMED Requirements` in change specs.
+    - Use `## Requirements` in permanent specs.
+    - Each requirement must use `### Requirement: <name>`.
+    - Each requirement must have at least one `#### Scenario: <name>`.
+    - Scenarios must use observable GIVEN/WHEN/THEN style where preconditions
+      matter, and always include observable WHEN/THEN outcomes.
+    - Normative behavior must use SHALL or MUST.
+    - Cover login, logout, unauthorized behavior, role-based access, region/store scope filtering, and deployment expectations when auth is touched.
   design:
-    - Define Keycloak realm/client setup.
-    - Define Quarkus OIDC web-app strategy.
-    - Define role enforcement strategy.
-    - Define database mapping strategy for user scope.
-    - Define LeoCloud deployment strategy.
+    - Explain relevant current state, constraints, decisions, alternatives, risks, and migration/rollback path.
+    - Define Keycloak realm/client setup, Quarkus OIDC web-app strategy, role enforcement strategy, database scope strategy, and LeoCloud deployment strategy when auth is touched.
+    - Separate implemented behavior from planned/future behavior.
   tasks:
-    - Include OpenSpec setup tasks.
-    - Include Keycloak local setup tasks.
-    - Include backend auth tasks.
-    - Include backend scope tasks.
-    - Include frontend admin auth tasks.
-    - Include deployment tasks.
-    - Include verification tasks.
+    - Use checkbox tasks in the exact `- [ ] X.Y Task description` format.
+    - Include OpenSpec setup/artifact tasks, implementation tasks, documentation tasks, deployment tasks, and verification tasks as applicable.
+    - Keep tasks small enough to complete and verify in one session.

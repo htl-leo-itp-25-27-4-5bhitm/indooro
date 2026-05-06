@@ -1,23 +1,17 @@
-# keycloak-deployment Specification
+## MODIFIED Requirements
 
-## Purpose
-Defines the Keycloak realm/client, modern container import behavior, Quarkus OIDC configuration, local development setup, LeoCloud URL strategy, and authentication verification expectations for Indooro.
-## Requirements
 ### Requirement: Local Keycloak dev setup is reproducible
 The system SHALL provide a local Keycloak dev/demo setup with an `indooro` realm, an `indooro-admin-web` OIDC client, realm roles `admin`, `region-manager`, and `store-manager`, and demo users suitable for local role/scope verification.
 
 #### Scenario: Developer starts local Keycloak
-- **GIVEN** the documented Keycloak and Quarkus OIDC setup is in scope
 - **WHEN** a developer starts the documented local Keycloak setup
 - **THEN** Keycloak imports the Indooro realm and exposes it without using legacy `/auth/realms/...` URLs
 
 #### Scenario: Demo user logs in locally
-- **GIVEN** the documented Keycloak and Quarkus OIDC setup is in scope
 - **WHEN** a demo admin user logs in through local Keycloak
 - **THEN** Quarkus accepts the authorization code flow for the `indooro-admin-web` client
 
 #### Scenario: Role-specific demo user logs in locally
-- **GIVEN** the documented Keycloak and Quarkus OIDC setup is in scope
 - **WHEN** a local demo user with `region-manager` or `store-manager` logs in
 - **THEN** the backend can evaluate the user's Keycloak role together with the seeded Indooro access assignment
 
@@ -25,12 +19,10 @@ The system SHALL provide a local Keycloak dev/demo setup with an `indooro` realm
 The system SHALL use a modern Keycloak container image and startup import from `/opt/keycloak/data/import` with the Keycloak `--import-realm` behavior.
 
 #### Scenario: Realm JSON mounted for startup
-- **GIVEN** the documented Keycloak and Quarkus OIDC setup is in scope
 - **WHEN** the Keycloak container starts with the realm JSON mounted in the import directory
 - **THEN** the container imports regular `.json` realm files from that directory at startup
 
 #### Scenario: Classroom example uses old image
-- **GIVEN** the documented Keycloak and Quarkus OIDC setup is in scope
 - **WHEN** a reference example uses `jboss/keycloak:15.0.2` or legacy `/auth/realms/...` URLs
 - **THEN** the Indooro implementation treats it as conceptual guidance only and uses modern Keycloak server behavior
 
@@ -38,17 +30,14 @@ The system SHALL use a modern Keycloak container image and startup import from `
 The system SHALL configure OIDC through environment-overridable properties for auth server URL, client id, client secret, application URL behavior, logout path, token/session behavior, and public/protected path policies.
 
 #### Scenario: LeoCloud sets OIDC environment
-- **GIVEN** the documented Keycloak and Quarkus OIDC setup is in scope
 - **WHEN** the backend runs in LeoCloud with OIDC environment variables set
 - **THEN** Quarkus uses the LeoCloud Keycloak endpoint and client secret without code changes
 
 #### Scenario: Local developer uses defaults
-- **GIVEN** the documented Keycloak and Quarkus OIDC setup is in scope
 - **WHEN** the backend runs locally with no deployment overrides
 - **THEN** Quarkus uses the documented local Keycloak realm and client defaults
 
 #### Scenario: Public routes are configured
-- **GIVEN** the documented Keycloak and Quarkus OIDC setup is in scope
 - **WHEN** OIDC path permissions are evaluated
 - **THEN** public mobile/customer routes remain anonymous while protected admin routes require authentication
 
@@ -56,12 +45,10 @@ The system SHALL configure OIDC through environment-overridable properties for a
 The system SHALL document the Keycloak realm/client settings, redirect URIs, logout URIs, secrets, Kubernetes resources, and verification steps needed for LeoCloud.
 
 #### Scenario: Operator follows deployment docs
-- **GIVEN** the documented Keycloak and Quarkus OIDC setup is in scope
 - **WHEN** an operator follows the updated deployment instructions
 - **THEN** they can configure Keycloak and backend OIDC settings consistently for the Admin Platform
 
 #### Scenario: Keycloak is hosted behind relative path
-- **GIVEN** the documented Keycloak and Quarkus OIDC setup is in scope
 - **WHEN** Keycloak is deployed under `/keycloak` on the LeoCloud public host
 - **THEN** the realm and redirect URLs use that path consistently and do not produce malformed duplicate schemes such as `https://https://...`
 
@@ -69,29 +56,26 @@ The system SHALL document the Keycloak realm/client settings, redirect URIs, log
 The system SHALL include verification steps that demonstrate login, logout, role-based access, scope filtering, unauthorized failures, and unchanged public route accessibility.
 
 #### Scenario: Verification checks admin protection
-- **GIVEN** the documented Keycloak and Quarkus OIDC setup is in scope
 - **WHEN** verification is run before archive
 - **THEN** it includes evidence that protected admin pages and APIs require login and roles
 
 #### Scenario: Verification checks public routes
-- **GIVEN** the documented Keycloak and Quarkus OIDC setup is in scope
 - **WHEN** verification is run before archive
 - **THEN** it includes evidence that selected mobile/customer routes remain public
 
 #### Scenario: Verification checks logout
-- **GIVEN** the documented Keycloak and Quarkus OIDC setup is in scope
 - **WHEN** verification is run after auth changes
 - **THEN** it includes a logout/re-login check that confirms the Admin UI does not reuse stale user state
+
+## ADDED Requirements
 
 ### Requirement: LeoCloud Keycloak URL is canonical
 The system SHALL use `https://it220209.cloud.htl-leonding.ac.at/keycloak/realms/indooro` as the LeoCloud auth-server URL unless a future deployment change explicitly updates the host or Keycloak relative path.
 
 #### Scenario: Backend runs in LeoCloud
-- **GIVEN** the documented Keycloak and Quarkus OIDC setup is in scope
 - **WHEN** the backend reads OIDC auth-server URL configuration in LeoCloud
 - **THEN** the URL points to the public host, `/keycloak`, and the `indooro` realm exactly once
 
 #### Scenario: URL is assembled from variables
-- **GIVEN** the documented Keycloak and Quarkus OIDC setup is in scope
 - **WHEN** deployment variables are combined into an OIDC URL
 - **THEN** the result must not contain duplicated schemes, duplicated hosts, or legacy `/auth` path segments
