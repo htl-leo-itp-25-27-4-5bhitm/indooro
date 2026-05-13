@@ -11,9 +11,9 @@
   <div class="admin-shell">
     <aside class="sidebar">
       <div>
-        <div class="brand-pill">Indooro Admin</div>
-        <h1>Filialen, Beacons und Layouts</h1>
-        <p class="lead">Die neue Admin-Plattform verbindet Filialstammdaten, Beacon-Zuordnung und den bestehenden Layout-Editor in einem durchgehenden Flow.</p>
+        <div class="brand-pill">Indooro</div>
+        <h1>Admin Dashboard</h1>
+        <p class="lead">Zentrale Verwaltung fuer Filialen, Beacons, Layouts und operative Systemereignisse.</p>
       </div>
 
       <nav class="nav-links">
@@ -33,9 +33,9 @@
           <span id="currentUserScope">Scope wird geladen</span>
           <a id="logoutLink" class="ghost-button logout-link" href="/admin/logout">Logout</a>
         </div>
-        <a class="ghost-button" href="/admin/editor/">Globalen Editor oeffnen</a>
-        <a class="ghost-button" href="/admin/server-logs/">Server Fehlerlog</a>
-        <a class="ghost-button" href="/customer/">Kundenansicht</a>
+        <a class="ghost-button" href="/admin/editor/">Globaler Layout-Editor</a>
+        <a class="ghost-button" href="/admin/server-logs/">Server-Fehlerlog</a>
+        <a class="ghost-button" href="/customer/">Kundenansicht pruefen</a>
         <a class="ghost-button" href="/">LeoCloud Startseite</a>
       </div>
     </aside>
@@ -43,12 +43,12 @@
     <main class="content">
       <header class="page-header" id="dashboard">
         <div>
-          <span class="eyebrow">Sprint Verwaltung</span>
-          <h2>Admin Plattform</h2>
+          <span class="eyebrow">Uebersicht</span>
+          <h2>Indooro Betriebszentrale</h2>
           <p id="pageStatus">Lade Regionen, Filialen und Beacons...</p>
         </div>
         <div class="page-actions">
-          <button id="refreshAllBtn" class="primary-button">Neu laden</button>
+          <button id="refreshAllBtn" class="primary-button">Daten aktualisieren</button>
         </div>
       </header>
 
@@ -71,6 +71,24 @@
         </article>
       </section>
 
+      <section class="workflow-grid" aria-label="Wichtige Arbeitsbereiche">
+        <a class="workflow-card primary-workflow" href="#stores">
+          <span class="workflow-kicker">Prioritaet 1</span>
+          <strong>Filialen verwalten</strong>
+          <span>Stammdaten pruefen, filtern und Detailansicht oeffnen.</span>
+        </a>
+        <a class="workflow-card" href="#store-detail">
+          <span class="workflow-kicker">Prioritaet 2</span>
+          <strong>Layout bearbeiten</strong>
+          <span>Aktive Layout-Versionen sehen und den Editor starten.</span>
+        </a>
+        <a class="workflow-card" href="#beacons">
+          <span class="workflow-kicker">Prioritaet 3</span>
+          <strong>Beacons zuweisen</strong>
+          <span>Freie Hardware erkennen und Filialen zuordnen.</span>
+        </a>
+      </section>
+
       <section class="panel" id="system-logs">
         <div class="panel-header">
           <div>
@@ -79,10 +97,10 @@
           </div>
           <div class="inline-actions">
             <button id="toggleSystemLogsBtn" class="secondary-button">Mehr anzeigen</button>
-            <button id="refreshLogsBtn" class="secondary-button">Logs neu laden</button>
+            <button id="refreshLogsBtn" class="secondary-button">Logs aktualisieren</button>
           </div>
         </div>
-        <p class="hint">Hier siehst du die letzten protokollierten Aenderungen aus der Admin-Plattform. Das sind keine rohen Kubernetes-Pod-Logs, sondern die fuer euch relevanten System- und Verwaltungsereignisse.</p>
+        <p class="hint">Die Liste zeigt relevante Verwaltungsereignisse aus der Admin-Plattform, keine rohen Kubernetes-Pod-Logs.</p>
         <div id="systemLogs" class="timeline system-log-preview"></div>
       </section>
 
@@ -92,7 +110,7 @@
             <span class="eyebrow">Grundlage</span>
             <h3>Regionen</h3>
           </div>
-          <button id="resetRegionFormBtn" class="secondary-button">Neue Region</button>
+          <button id="resetRegionFormBtn" class="secondary-button">Region anlegen</button>
         </div>
 
         <div class="two-column-grid">
@@ -128,7 +146,7 @@
             <span class="eyebrow">Kernobjekt</span>
             <h3>Filialen</h3>
           </div>
-          <button id="resetStoreFormBtn" class="secondary-button">Neue Filiale</button>
+          <button id="resetStoreFormBtn" class="secondary-button">Filiale anlegen</button>
         </div>
 
         <div class="toolbar-row">
@@ -216,7 +234,7 @@
         </div>
 
         <div id="storeDetailEmpty" class="empty-state">
-          Waehle links eine Filiale aus. Dann zeigen wir Stammdaten, zugewiesene Beacons, Layout-Versionen und letzte Aenderungen direkt hier an.
+          Waehle eine Filiale aus. Danach erscheinen Stammdaten, zugewiesene Beacons, Layout-Versionen und letzte Aenderungen direkt hier.
         </div>
 
         <div id="storeDetailContent" class="detail-grid hidden">
@@ -248,7 +266,7 @@
             <span class="eyebrow">Hardware</span>
             <h3>Beacon Verwaltung</h3>
           </div>
-          <button id="refreshBeaconsBtn" class="secondary-button">Liste neu laden</button>
+          <button id="refreshBeaconsBtn" class="secondary-button">Liste aktualisieren</button>
         </div>
 
         <div class="toolbar-row">
