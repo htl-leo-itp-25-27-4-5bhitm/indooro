@@ -4,6 +4,14 @@
   "type": "module",
   "scripts": {
     "start:a": "node scripts/orchestrator.js start-a",
-    "start:b": "node scripts/orchestrator.js start-b"
+    "start:b": "node scripts/orchestrator.js start-b",
+    "api:test": "npx -y httpyac send api-tests/httpyac/00-auth.http api-tests/httpyac/01-public-routes.http api-tests/httpyac/02-admin-rbac.http api-tests/httpyac/03-maintenance-smoke.http api-tests/httpyac/04-role-route-matrix.http --all --bail",
+    "api:test:public": "npx -y httpyac send api-tests/httpyac/01-public-routes.http --all --bail",
+    "api:test:rbac": "npx -y httpyac send api-tests/httpyac/00-auth.http api-tests/httpyac/02-admin-rbac.http --all --bail",
+    "api:test:rbac:tokens": "npx -y httpyac send api-tests/httpyac/00-auth-env-tokens.http api-tests/httpyac/02-admin-rbac.http --all --bail",
+    "api:test:roles": "npx -y httpyac send api-tests/httpyac/00-auth.http api-tests/httpyac/04-role-route-matrix.http --all --bail",
+    "api:test:roles:tokens": "npx -y httpyac send api-tests/httpyac/00-auth-env-tokens.http api-tests/httpyac/04-role-route-matrix.http --all --bail",
+    "api:test:maintenance": "npx -y httpyac send api-tests/httpyac/00-auth.http api-tests/httpyac/03-maintenance-smoke.http --all --bail",
+    "api:test:maintenance:tokens": "npx -y httpyac send api-tests/httpyac/00-auth-env-tokens.http api-tests/httpyac/03-maintenance-smoke.http --all --bail"
   }
 }

@@ -1,0 +1,333 @@
+/*
+# Indooro Role Route Matrix
+
+Non-destructive route checks for all three configured users. This complements
+02-admin-rbac.http with broader GET coverage across admin resources.
+*/
+
+@baseUrl={{BASE_URL}}
+
+###
+# Admin: /api/admin/me
+GET {{baseUrl}}/api/admin/me
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+?? body role == admin
+
+###
+# Region manager: /api/admin/me
+GET {{baseUrl}}/api/admin/me
+Accept: application/json
+Authorization: Bearer {{$global.regionToken}}
+
+?? status == 200
+?? body role == region-manager
+
+###
+# Store manager: /api/admin/me
+GET {{baseUrl}}/api/admin/me
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 200
+?? body role == store-manager
+
+###
+# Admin: audit logs allowed
+GET {{baseUrl}}/api/admin/logs?limit=5
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+
+###
+# Region manager: audit logs denied
+GET {{baseUrl}}/api/admin/logs?limit=5
+Accept: application/json
+Authorization: Bearer {{$global.regionToken}}
+
+?? status == 403
+
+###
+# Store manager: audit logs denied
+GET {{baseUrl}}/api/admin/logs?limit=5
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 403
+
+###
+# Admin: error logs allowed
+GET {{baseUrl}}/api/admin/error-logs?limit=5
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+
+###
+# Region manager: error logs denied
+GET {{baseUrl}}/api/admin/error-logs?limit=5
+Accept: application/json
+Authorization: Bearer {{$global.regionToken}}
+
+?? status == 403
+
+###
+# Store manager: error logs denied
+GET {{baseUrl}}/api/admin/error-logs?limit=5
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 403
+
+###
+# Admin: regions visible
+GET {{baseUrl}}/api/regions
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+?? header content-type includes json
+
+###
+# Region manager: scoped regions visible
+GET {{baseUrl}}/api/regions
+Accept: application/json
+Authorization: Bearer {{$global.regionToken}}
+
+?? status == 200
+?? header content-type includes json
+
+###
+# Store manager: assigned-store region visible
+GET {{baseUrl}}/api/regions
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 200
+?? header content-type includes json
+
+###
+# Admin: stores visible
+GET {{baseUrl}}/api/stores?size=20
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+?? body content exists
+
+###
+# Region manager: stores scoped
+GET {{baseUrl}}/api/stores?size=20
+Accept: application/json
+Authorization: Bearer {{$global.regionToken}}
+
+?? status == 200
+?? body content exists
+
+###
+# Store manager: stores scoped to assigned store
+GET {{baseUrl}}/api/stores?size=20
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 200
+?? body content exists
+
+###
+# Admin: store detail allowed
+GET {{baseUrl}}/api/stores/{{ACTIVE_STORE_ID}}
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+
+###
+# Region manager: allowed store detail
+GET {{baseUrl}}/api/stores/{{REGION_ALLOWED_STORE_ID}}
+Accept: application/json
+Authorization: Bearer {{$global.regionToken}}
+
+?? status == 200
+
+###
+# Region manager: forbidden store detail
+GET {{baseUrl}}/api/stores/{{REGION_FORBIDDEN_STORE_ID}}
+Accept: application/json
+Authorization: Bearer {{$global.regionToken}}
+
+?? status matches ^(403|404)$
+
+###
+# Store manager: assigned store detail
+GET {{baseUrl}}/api/stores/{{STORE_ALLOWED_STORE_ID}}
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 200
+
+###
+# Store manager: forbidden store detail
+GET {{baseUrl}}/api/stores/{{STORE_FORBIDDEN_STORE_ID}}
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 403
+
+###
+# Admin: beacons visible
+GET {{baseUrl}}/api/beacons
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+?? header content-type includes json
+
+###
+# Region manager: beacons visible within scope
+GET {{baseUrl}}/api/beacons
+Accept: application/json
+Authorization: Bearer {{$global.regionToken}}
+
+?? status == 200
+?? header content-type includes json
+
+###
+# Store manager: beacons visible within assigned store scope
+GET {{baseUrl}}/api/beacons
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 200
+?? header content-type includes json
+
+###
+# Admin: free beacons route
+GET {{baseUrl}}/api/beacons/free
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+
+###
+# Region manager: free beacons route
+GET {{baseUrl}}/api/beacons/free
+Accept: application/json
+Authorization: Bearer {{$global.regionToken}}
+
+?? status == 200
+
+###
+# Store manager: free beacons route is allowed but scoped
+GET {{baseUrl}}/api/beacons/free
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 200
+
+###
+# Admin: store audit
+GET {{baseUrl}}/api/stores/{{ACTIVE_STORE_ID}}/audit
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+
+###
+# Store manager: assigned store audit
+GET {{baseUrl}}/api/stores/{{STORE_ALLOWED_STORE_ID}}/audit
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 200
+
+###
+# Store manager: forbidden store audit
+GET {{baseUrl}}/api/stores/{{STORE_FORBIDDEN_STORE_ID}}/audit
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 403
+
+###
+# Admin: store beacons
+GET {{baseUrl}}/api/stores/{{ACTIVE_STORE_ID}}/beacons
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+
+###
+# Store manager: assigned store beacons
+GET {{baseUrl}}/api/stores/{{STORE_ALLOWED_STORE_ID}}/beacons
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 200
+
+###
+# Store manager: forbidden store beacons
+GET {{baseUrl}}/api/stores/{{STORE_FORBIDDEN_STORE_ID}}/beacons
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 403
+
+###
+# Admin: admin layout current
+GET {{baseUrl}}/api/stores/{{ACTIVE_STORE_ID}}/layout/current
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+
+###
+# Store manager: assigned admin layout current
+GET {{baseUrl}}/api/stores/{{STORE_ALLOWED_STORE_ID}}/layout/current
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 200
+
+###
+# Store manager: forbidden admin layout current
+GET {{baseUrl}}/api/stores/{{STORE_FORBIDDEN_STORE_ID}}/layout/current
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 403
+
+###
+# Store manager: assigned layout versions
+GET {{baseUrl}}/api/stores/{{STORE_ALLOWED_STORE_ID}}/layout/versions
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 200
+?? js Array.isArray(response.parsedBody) == true
+
+###
+# Store manager: forbidden layout versions
+GET {{baseUrl}}/api/stores/{{STORE_FORBIDDEN_STORE_ID}}/layout/versions
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 403
+
+###
+# Store manager: assigned editor context
+GET {{baseUrl}}/api/stores/{{STORE_ALLOWED_STORE_ID}}/layout/editor-context
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 200
+
+###
+# Store manager: forbidden editor context
+GET {{baseUrl}}/api/stores/{{STORE_FORBIDDEN_STORE_ID}}/layout/editor-context
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 403

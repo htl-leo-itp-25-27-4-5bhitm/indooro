@@ -1,0 +1,57 @@
+/*
+# Indooro API Auth Bootstrap
+
+Run this file first, or run all files in lexical order. It obtains Keycloak
+access tokens for the three Indooro test users and stores them globally for the
+following httpYac requests.
+
+Requires Keycloak Direct Access Grants / password grant for the configured
+client. If this is disabled, use manually generated bearer tokens instead.
+*/
+
+@baseUrl={{BASE_URL}}
+@tokenUrl={{KEYCLOAK_TOKEN_URL}}
+@clientId={{OIDC_CLIENT_ID}}
+@clientSecret={{OIDC_CLIENT_SECRET}}
+
+###
+# @name token_admin
+POST {{tokenUrl}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id={{clientId}}&client_secret={{clientSecret}}&username={{ADMIN_USERNAME}}&password={{ADMIN_PASSWORD}}
+
+?? status == 200
+?? body access_token exists
+
+{{
+  $global.adminToken = response.parsedBody.access_token;
+}}
+
+###
+# @name token_region
+POST {{tokenUrl}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id={{clientId}}&client_secret={{clientSecret}}&username={{REGION_USERNAME}}&password={{REGION_PASSWORD}}
+
+?? status == 200
+?? body access_token exists
+
+{{
+  $global.regionToken = response.parsedBody.access_token;
+}}
+
+###
+# @name token_store
+POST {{tokenUrl}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id={{clientId}}&client_secret={{clientSecret}}&username={{STORE_USERNAME}}&password={{STORE_PASSWORD}}
+
+?? status == 200
+?? body access_token exists
+
+{{
+  $global.storeToken = response.parsedBody.access_token;
+}}

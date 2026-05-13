@@ -1,0 +1,45 @@
+/*
+# Indooro Auth Bootstrap from Environment Tokens
+
+Use this when the Keycloak client does not allow Direct Access Grants.
+Fill ADMIN_TOKEN, REGION_TOKEN, and STORE_TOKEN in api-tests/httpyac/.env.
+*/
+
+{{
+  const assert = require('assert');
+
+  assert.ok(ADMIN_TOKEN, 'ADMIN_TOKEN is required');
+  assert.ok(REGION_TOKEN, 'REGION_TOKEN is required');
+  assert.ok(STORE_TOKEN, 'STORE_TOKEN is required');
+
+  $global.adminToken = ADMIN_TOKEN;
+  $global.regionToken = REGION_TOKEN;
+  $global.storeToken = STORE_TOKEN;
+}}
+
+###
+# Validate admin token
+GET {{BASE_URL}}/api/admin/me
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+?? body role == admin
+
+###
+# Validate region token
+GET {{BASE_URL}}/api/admin/me
+Accept: application/json
+Authorization: Bearer {{$global.regionToken}}
+
+?? status == 200
+?? body role == region-manager
+
+###
+# Validate store token
+GET {{BASE_URL}}/api/admin/me
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 200
+?? body role == store-manager

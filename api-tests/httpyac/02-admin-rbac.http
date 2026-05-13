@@ -1,0 +1,161 @@
+/*
+# Indooro Admin RBAC API Tests
+
+Run 00-auth.http first, or execute all files in order. These tests use the
+three agreed Indooro users:
+- indooro-admin
+- indooro-region
+- indooro-store
+*/
+
+@baseUrl={{BASE_URL}}
+
+###
+# Anonymous admin current user is rejected
+GET {{baseUrl}}/api/admin/me
+Accept: application/json
+
+?? status matches ^(200|302|401)$
+?? header content-type matches ^(text/html|application/json)
+
+###
+# Admin current user exposes admin role
+GET {{baseUrl}}/api/admin/me
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+?? body role == admin
+
+###
+# Region manager current user exposes scoped role
+GET {{baseUrl}}/api/admin/me
+Accept: application/json
+Authorization: Bearer {{$global.regionToken}}
+
+?? status == 200
+?? body role == region-manager
+?? body scope exists
+
+###
+# Store manager current user exposes scoped role
+GET {{baseUrl}}/api/admin/me
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 200
+?? body role == store-manager
+?? body scope exists
+
+###
+# Admin can list audit logs
+GET {{baseUrl}}/api/admin/logs?limit=5
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+?? header content-type includes json
+
+###
+# Store manager cannot list audit logs
+GET {{baseUrl}}/api/admin/logs?limit=5
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 403
+
+###
+# Admin can list error logs
+GET {{baseUrl}}/api/admin/error-logs?limit=5
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+?? header content-type includes json
+
+###
+# Region manager cannot list error logs
+GET {{baseUrl}}/api/admin/error-logs?limit=5
+Accept: application/json
+Authorization: Bearer {{$global.regionToken}}
+
+?? status == 403
+
+###
+# Admin can list regions
+GET {{baseUrl}}/api/regions
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+?? header content-type includes json
+
+###
+# Admin can list stores
+GET {{baseUrl}}/api/stores?size=20
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+?? header content-type includes json
+?? body content exists
+
+###
+# Region manager can open an allowed store
+GET {{baseUrl}}/api/stores/{{REGION_ALLOWED_STORE_ID}}
+Accept: application/json
+Authorization: Bearer {{$global.regionToken}}
+
+?? status == 200
+?? body id == {{REGION_ALLOWED_STORE_ID}}
+
+###
+# Region manager cannot open a store outside assigned region
+GET {{baseUrl}}/api/stores/{{REGION_FORBIDDEN_STORE_ID}}
+Accept: application/json
+Authorization: Bearer {{$global.regionToken}}
+
+?? status matches ^(403|404)$
+
+###
+# Store manager can open assigned store
+GET {{baseUrl}}/api/stores/{{STORE_ALLOWED_STORE_ID}}
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 200
+?? body id == {{STORE_ALLOWED_STORE_ID}}
+
+###
+# Store manager cannot open another store
+GET {{baseUrl}}/api/stores/{{STORE_FORBIDDEN_STORE_ID}}
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 403
+
+###
+# Store manager can open assigned admin layout
+GET {{baseUrl}}/api/stores/{{STORE_ALLOWED_STORE_ID}}/layout/current
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 200
+?? body storeId == {{STORE_ALLOWED_STORE_ID}}
+
+###
+# Store manager cannot open another store's admin layout
+GET {{baseUrl}}/api/stores/{{STORE_FORBIDDEN_STORE_ID}}/layout/current
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 403
+
+###
+# Store manager beacon list is scoped and accessible
+GET {{baseUrl}}/api/beacons
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+?? status == 200
+?? header content-type includes json

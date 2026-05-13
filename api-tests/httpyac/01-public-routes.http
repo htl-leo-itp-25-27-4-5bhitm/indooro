@@ -1,0 +1,100 @@
+/*
+# Indooro Public API Smoke Tests
+
+These routes must stay anonymous according to OpenSpec:
+- catalog read APIs
+- mobile store detection APIs
+- mobile/current layout APIs
+*/
+
+@baseUrl={{BASE_URL}}
+
+###
+# Public product list stays anonymous
+GET {{baseUrl}}/api/products?size=5
+Accept: application/json
+
+?? status startsWith 20
+?? header content-type includes json
+
+###
+# Public product search rejects missing q
+GET {{baseUrl}}/api/products/search
+Accept: application/json
+
+?? status == 400
+?? body includes Query parameter
+
+###
+# Public product search accepts bounded q
+GET {{baseUrl}}/api/products/search?q=milch&size=5
+Accept: application/json
+
+?? status startsWith 20
+?? header content-type includes json
+
+###
+# Public product by id uses normal lookup semantics
+GET {{baseUrl}}/api/products/{{TEST_PRODUCT_ID}}
+Accept: application/json
+
+?? status matches ^(200|404)$
+?? header content-type includes json
+
+###
+# Public categories list stays anonymous
+GET {{baseUrl}}/api/categories?size=20
+Accept: application/json
+
+?? status startsWith 20
+?? header content-type includes json
+
+###
+# Public category by code stays anonymous
+GET {{baseUrl}}/api/categories/{{TEST_CATEGORY_CODE}}
+Accept: application/json
+
+?? status matches ^(200|404)$
+?? header content-type includes json
+
+###
+# Public mobile stores list stays anonymous
+GET {{baseUrl}}/api/mobile/stores
+Accept: application/json
+
+?? status == 200
+?? header content-type includes json
+?? js Array.isArray(response.parsedBody) == true
+
+###
+# Public mobile beacon identities stay anonymous
+GET {{baseUrl}}/api/mobile/stores/beacon-identities
+Accept: application/json
+
+?? status == 200
+?? header content-type includes json
+?? body uuids isArray
+
+###
+# Public mobile store lookup rejects missing uuid explicitly
+GET {{baseUrl}}/api/mobile/stores/by-beacon
+Accept: application/json
+
+?? status == 400
+?? header content-type includes json
+
+###
+# Public mobile store lookup by uuid
+GET {{baseUrl}}/api/mobile/stores/by-beacon?uuid={{ACTIVE_BEACON_UUID}}
+Accept: application/json
+
+?? status matches ^(200|404|409)$
+?? header content-type includes json
+
+###
+# Public mobile current layout stays anonymous
+GET {{baseUrl}}/api/mobile/stores/{{ACTIVE_STORE_ID}}/layout/current
+Accept: application/json
+
+?? status matches ^(200|404)$
+?? header content-type includes json

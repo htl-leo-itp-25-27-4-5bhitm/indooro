@@ -58,8 +58,8 @@ spec:
                 secretKeyRef:
                   name: indooro-keycloak-secret
                   key: admin-web-client-secret
-            - name: QUARKUS_OIDC_ROLES_SOURCE
-              value: "idtoken"
+            - name: QUARKUS_OIDC_APPLICATION_TYPE
+              value: "hybrid"
             - name: QUARKUS_HTTP_PROXY_PROXY_ADDRESS_FORWARDING
               value: "true"
             - name: QUARKUS_OIDC_TOKEN_STATE_MANAGER_STRATEGY
