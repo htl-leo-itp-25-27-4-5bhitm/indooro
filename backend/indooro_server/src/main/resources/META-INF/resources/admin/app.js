@@ -337,7 +337,7 @@ async function loadProducts() {
     return;
   }
 
-  state.products = await fetchJson(`${API.products}?size=100`);
+  state.products = await fetchJson(`${API.products}?size=500`);
 }
 
 async function loadStoreDetail(storeId) {
@@ -571,7 +571,9 @@ function renderProducts() {
     return;
   }
 
-  els.productsList.innerHTML = state.products.map((product) => `
+  const products = [...state.products].sort((a, b) => Number(b.id) - Number(a.id));
+
+  els.productsList.innerHTML = products.map((product) => `
     <article class="list-item">
       <div class="item-header">
         <div>
@@ -585,6 +587,18 @@ function renderProducts() {
       </div>
     </article>
   `).join('');
+}
+
+function parseDecimalInput(value) {
+  const normalized = String(value ?? '').trim().replace(',', '.');
+  return normalized ? Number(normalized) : Number.NaN;
+}
+
+function upsertProductInState(product) {
+  state.products = [
+    product,
+    ...state.products.filter((entry) => String(entry.id) !== String(product.id)),
+  ];
 }
 
 function renderAssignSelect(beaconId) {
@@ -809,7 +823,7 @@ async function handleProductSubmit(event) {
   event.preventDefault();
 
   const id = Number(els.productForm.elements.id.value);
-  const price = Number(els.productForm.elements.price.value);
+  const price = parseDecimalInput(els.productForm.elements.price.value);
   const payload = {
     id,
     name: els.productForm.elements.name.value.trim(),
@@ -830,13 +844,13 @@ async function handleProductSubmit(event) {
     throw new Error('Layout-Code ist erforderlich.');
   }
 
-  await fetchJson(API.products, {
+  const savedProduct = await fetchJson(API.products, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 
   resetProductForm();
-  await loadProducts();
+  upsertProductInState(savedProduct);
   renderProducts();
   setStatus('Produkt wurde im Katalog gespeichert.', 'success');
 }

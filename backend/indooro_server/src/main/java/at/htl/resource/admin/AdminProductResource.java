@@ -38,7 +38,7 @@ public class AdminProductResource extends AdminApiSupport {
         adminAccessService.requireAdmin();
 
         try {
-            return openSearchService.getAllProducts(normalizeSize(size == null ? 100 : size));
+            return openSearchService.getAllProducts(normalizeProductListSize(size));
         } catch (IOException exception) {
             LOG.error("Error loading admin products", exception);
             throw new WebApplicationException(
@@ -88,5 +88,15 @@ public class AdminProductResource extends AdminApiSupport {
 
     private WebApplicationException badRequest(String message) {
         return new WebApplicationException(message, Response.Status.BAD_REQUEST);
+    }
+
+    private int normalizeProductListSize(Integer size) {
+        if (size == null) {
+            return 500;
+        }
+        if (size < 1) {
+            return 1;
+        }
+        return Math.min(size, 1000);
     }
 }
