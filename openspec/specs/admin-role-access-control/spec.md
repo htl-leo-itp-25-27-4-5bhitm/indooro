@@ -4,7 +4,7 @@
 Defines role-based and scope-based access control for protected Indooro admin workflows, including the `admin`, `region-manager`, and `store-manager` roles and their database-backed region/store assignments.
 ## Requirements
 ### Requirement: Admin role has full admin access
-The system SHALL allow users with the `admin` role and an active Indooro access assignment to view and manage all regions, stores, beacons, layouts, audit logs, and error logs in the protected Admin Platform.
+The system SHALL allow users with the `admin` role and an active Indooro access assignment to view and manage all regions, stores, beacons, layouts, product catalog maintenance, audit logs, and error logs in the protected Admin Platform.
 
 #### Scenario: Admin lists all stores
 - **GIVEN** Keycloak authentication and Indooro access assignments are configured
@@ -20,6 +20,11 @@ The system SHALL allow users with the `admin` role and an active Indooro access 
 - **GIVEN** Keycloak authentication and Indooro access assignments are configured
 - **WHEN** an authenticated `admin` requests admin layout management for any store
 - **THEN** the system allows access if the requested layout operation passes existing validation
+
+#### Scenario: Admin manages product catalog
+- **GIVEN** Keycloak authentication and Indooro access assignments are configured
+- **WHEN** an authenticated `admin` creates or updates a product through `/api/admin/products`
+- **THEN** the system allows the mutation if product validation passes
 
 ### Requirement: Region manager access is scoped to assigned region
 The system SHALL limit users with the `region-manager` role to data and actions for the region assigned in the Indooro user access table.
@@ -104,7 +109,7 @@ The system SHALL store access assignments by the stable Keycloak subject claim a
 - **THEN** the assignment records a region identifier that can be used for backend scope checks
 
 ### Requirement: Admin data mutations respect scope
-The system SHALL apply scope checks to protected admin mutations as well as reads.
+The system SHALL apply scope checks to protected admin mutations as well as reads, and SHALL reserve global product catalog mutations for the `admin` role.
 
 #### Scenario: Region manager creates store outside assigned region
 - **GIVEN** Keycloak authentication and Indooro access assignments are configured
@@ -120,6 +125,11 @@ The system SHALL apply scope checks to protected admin mutations as well as read
 - **GIVEN** Keycloak authentication and Indooro access assignments are configured
 - **WHEN** a `store-manager` mutates an allowed resource inside the assigned store
 - **THEN** the system allows the mutation only if the existing domain validation rules allow that action
+
+#### Scenario: Non-admin attempts product mutation
+- **GIVEN** Keycloak authentication and Indooro access assignments are configured
+- **WHEN** an authenticated `region-manager` or `store-manager` calls `/api/admin/products`, `POST /api/products`, or `POST /api/products/bulk`
+- **THEN** the system rejects the mutation without changing product catalog data
 
 ### Requirement: Public customer routes do not use admin scope filtering
 The system SHALL NOT require Keycloak admin roles or Indooro user access assignments for public customer/mobile routes.

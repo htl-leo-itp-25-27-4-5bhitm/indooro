@@ -1,8 +1,10 @@
 package at.htl.resource;
 
 
+import at.htl.admin.service.AdminAccessService;
 import at.htl.model.Product;
 import at.htl.service.OpenSearchService;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -21,6 +23,9 @@ public class ProductResource {
 
     @Inject
     OpenSearchService openSearchService;
+
+    @Inject
+    AdminAccessService adminAccessService;
 
     /**
      * Suche nach Produkten
@@ -96,7 +101,11 @@ public class ProductResource {
      * POST /api/products
      */
     @POST
+    @RolesAllowed("admin")
     public Response indexProduct(Product product) {
+        adminAccessService.requireAdmin();
+        validateProduct(product);
+
         try {
             String result = openSearchService.indexProduct(product);
             return Response.ok("{\"result\": \"" + result + "\"}").build();
@@ -114,7 +123,14 @@ public class ProductResource {
      */
     @POST
     @Path("/bulk")
+    @RolesAllowed("admin")
     public Response indexProducts(List<Product> products) {
+        adminAccessService.requireAdmin();
+        if (products == null || products.isEmpty()) {
+            throw new WebApplicationException("Produktliste ist erforderlich.", Response.Status.BAD_REQUEST);
+        }
+        products.forEach(this::validateProduct);
+
         try {
             openSearchService.indexProducts(products);
             return Response.ok("{\"message\": \"Successfully indexed " + products.size() + " products\"}").build();
@@ -123,6 +139,24 @@ public class ProductResource {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity("{\"error\": \"" + e.getMessage() + "\"}")
                     .build();
+        }
+    }
+
+    private void validateProduct(Product product) {
+        if (product == null) {
+            throw new WebApplicationException("Produktdaten fehlen.", Response.Status.BAD_REQUEST);
+        }
+        if (product.getId() == null) {
+            throw new WebApplicationException("Produkt-ID ist erforderlich.", Response.Status.BAD_REQUEST);
+        }
+        if (product.getName() == null || product.getName().isBlank()) {
+            throw new WebApplicationException("Produktname ist erforderlich.", Response.Status.BAD_REQUEST);
+        }
+        if (product.getPrice() == null || product.getPrice() < 0) {
+            throw new WebApplicationException("Preis ist erforderlich und darf nicht negativ sein.", Response.Status.BAD_REQUEST);
+        }
+        if (product.getLayoutCode() == null || product.getLayoutCode().isBlank()) {
+            throw new WebApplicationException("Layout-Code ist erforderlich.", Response.Status.BAD_REQUEST);
         }
     }
 }

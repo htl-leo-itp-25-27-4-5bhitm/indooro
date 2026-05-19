@@ -1,0 +1,92 @@
+package at.htl.resource.admin;
+
+import at.htl.admin.service.AdminAccessService;
+import at.htl.model.Product;
+import at.htl.service.OpenSearchService;
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.jboss.logging.Logger;
+
+import java.io.IOException;
+import java.util.List;
+
+@Path("/api/admin/products")
+@RolesAllowed("admin")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public class AdminProductResource extends AdminApiSupport {
+
+    private static final Logger LOG = Logger.getLogger(AdminProductResource.class);
+
+    @Inject
+    AdminAccessService adminAccessService;
+
+    @Inject
+    OpenSearchService openSearchService;
+
+    @GET
+    public List<Product> listProducts(@QueryParam("size") Integer size) {
+        adminAccessService.requireAdmin();
+
+        try {
+            return openSearchService.getAllProducts(normalizeSize(size == null ? 100 : size));
+        } catch (IOException exception) {
+            LOG.error("Error loading admin products", exception);
+            throw new WebApplicationException(
+                    "Produktliste konnte nicht geladen werden.",
+                    Response.Status.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    @POST
+    public Product upsertProduct(Product product) {
+        adminAccessService.requireAdmin();
+        validateProduct(product);
+
+        product.setName(product.getName().trim());
+        product.setLayoutCode(product.getLayoutCode().trim());
+
+        try {
+            openSearchService.indexProduct(product);
+            return product;
+        } catch (IOException exception) {
+            LOG.error("Error indexing admin product", exception);
+            throw new WebApplicationException(
+                    "Produkt konnte nicht gespeichert werden.",
+                    Response.Status.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    private void validateProduct(Product product) {
+        if (product == null) {
+            throw badRequest("Produktdaten fehlen.");
+        }
+        if (product.getId() == null) {
+            throw badRequest("Produkt-ID ist erforderlich.");
+        }
+        if (product.getName() == null || product.getName().isBlank()) {
+            throw badRequest("Produktname ist erforderlich.");
+        }
+        if (product.getPrice() == null || product.getPrice() < 0) {
+            throw badRequest("Preis ist erforderlich und darf nicht negativ sein.");
+        }
+        if (product.getLayoutCode() == null || product.getLayoutCode().isBlank()) {
+            throw badRequest("Layout-Code ist erforderlich.");
+        }
+    }
+
+    private WebApplicationException badRequest(String message) {
+        return new WebApplicationException(message, Response.Status.BAD_REQUEST);
+    }
+}

@@ -177,6 +177,7 @@ a {
 .nav-links a[href="#stores"]::before { content: "ST"; }
 .nav-links a[href="#store-detail"]::before { content: "DT"; }
 .nav-links a[href="#beacons"]::before { content: "BC"; }
+.nav-links a[href="#products"]::before { content: "PR"; }
 .ghost-button[href="/admin/logout"]::before { content: "LO"; }
 .ghost-button[href="/admin/editor/"]::before { content: "ED"; }
 .ghost-button[href="/admin/server-logs/"]::before { content: "ER"; }
@@ -432,7 +433,7 @@ a:focus-visible {
 
 .workflow-grid {
   display: grid;
-  grid-template-columns: 1.2fr repeat(2, 1fr);
+  grid-template-columns: 1.2fr repeat(3, 1fr);
   gap: 14px;
   margin-bottom: 18px;
 }

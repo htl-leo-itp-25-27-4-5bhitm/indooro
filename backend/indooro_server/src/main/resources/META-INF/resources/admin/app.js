@@ -4,12 +4,14 @@ const API = {
   regions: '/api/regions',
   stores: '/api/stores',
   beacons: '/api/beacons',
+  products: '/api/admin/products',
 };
 
 const state = {
   regions: [],
   stores: [],
   beacons: [],
+  products: [],
   currentUser: null,
   selectedStoreId: null,
   selectedStoreDetail: null,
@@ -21,6 +23,7 @@ const state = {
   editingRegionId: null,
   editingStoreId: null,
   editingBeaconId: null,
+  editingProductId: null,
   storeFilters: {
     query: '',
     status: 'ACTIVE',
@@ -74,6 +77,10 @@ const els = {
   beaconAssignmentFilter: document.getElementById('beaconAssignmentFilter'),
   beaconQuery: document.getElementById('beaconQuery'),
   applyBeaconFiltersBtn: document.getElementById('applyBeaconFiltersBtn'),
+  refreshProductsBtn: document.getElementById('refreshProductsBtn'),
+  productsList: document.getElementById('productsList'),
+  productForm: document.getElementById('productForm'),
+  resetProductFormBtn: document.getElementById('resetProductFormBtn'),
   currentUserName: document.getElementById('currentUserName'),
   currentUserRole: document.getElementById('currentUserRole'),
   currentUserScope: document.getElementById('currentUserScope'),
@@ -182,6 +189,9 @@ function applyRoleUi() {
   systemLogsPanel?.classList.toggle('hidden', !isAdmin());
   document.querySelector('a[href="#system-logs"]')?.classList.toggle('hidden', !isAdmin());
   document.querySelector('a[href="/admin/server-logs/"]')?.classList.toggle('hidden', !isAdmin());
+  document.querySelectorAll('.admin-only').forEach((element) => {
+    element.classList.toggle('hidden', !isAdmin());
+  });
   els.resetRegionFormBtn.classList.toggle('hidden', !isAdmin());
   els.regionForm.classList.toggle('hidden', !isAdmin());
   els.resetStoreFormBtn.classList.toggle('hidden', !canCreateStore());
@@ -215,6 +225,17 @@ function formatDate(value) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
+}
+
+function formatPrice(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return '-';
+  }
+
+  return new Intl.NumberFormat('de-AT', {
+    style: 'currency',
+    currency: 'EUR',
+  }).format(Number(value));
 }
 
 function escapeHtml(value) {
@@ -308,6 +329,15 @@ async function loadSystemLogs() {
 
   const payload = await fetchJson(`${API.adminLogs}?limit=20`);
   state.systemLogs = payload.entries || [];
+}
+
+async function loadProducts() {
+  if (!isAdmin()) {
+    state.products = [];
+    return;
+  }
+
+  state.products = await fetchJson(`${API.products}?size=100`);
 }
 
 async function loadStoreDetail(storeId) {
@@ -526,6 +556,37 @@ function renderBeacons() {
   `).join('');
 }
 
+function renderProducts() {
+  if (!els.productsList) {
+    return;
+  }
+
+  if (!isAdmin()) {
+    els.productsList.innerHTML = '';
+    return;
+  }
+
+  if (!state.products.length) {
+    els.productsList.innerHTML = '<div class="empty-state">Noch keine Produkte geladen. Lege ein Produkt an oder pruefe, ob der OpenSearch-Index bereits Daten enthaelt.</div>';
+    return;
+  }
+
+  els.productsList.innerHTML = state.products.map((product) => `
+    <article class="list-item">
+      <div class="item-header">
+        <div>
+          <h4>${escapeHtml(product.name)}</h4>
+          <div class="item-meta">ID ${escapeHtml(product.id)} · ${escapeHtml(product.layoutCode)}</div>
+        </div>
+        <span class="badge neutral">${escapeHtml(formatPrice(product.price))}</span>
+      </div>
+      <div class="item-footer">
+        <button type="button" class="action-button" data-action="edit-product" data-id="${escapeHtml(product.id)}">Bearbeiten</button>
+      </div>
+    </article>
+  `).join('');
+}
+
 function renderAssignSelect(beaconId) {
   const activeStores = state.stores.filter((store) => store.status === 'ACTIVE');
   if (!activeStores.length) {
@@ -562,6 +623,11 @@ function resetBeaconForm() {
   state.editingBeaconId = null;
   els.beaconForm.reset();
   els.beaconFormTitle.textContent = 'Beacon anlegen';
+}
+
+function resetProductForm() {
+  state.editingProductId = null;
+  els.productForm?.reset();
 }
 
 function populateRegionForm(regionId) {
@@ -604,6 +670,20 @@ async function populateBeaconForm(beaconId) {
   els.beaconForm.elements.notes.value = beacon.notes || '';
 }
 
+function populateProductForm(productId) {
+  const product = state.products.find((entry) => String(entry.id) === String(productId));
+  if (!product || !els.productForm) {
+    return;
+  }
+
+  state.editingProductId = product.id;
+  els.productForm.elements.id.value = product.id;
+  els.productForm.elements.name.value = product.name || '';
+  els.productForm.elements.price.value = product.price ?? '';
+  els.productForm.elements.layoutCode.value = product.layoutCode || '';
+  document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 async function refreshAll({ keepStatusMessage = false } = {}) {
   if (!keepStatusMessage) {
     setStatus('Synchronisiere Admin-Plattform mit dem Backend...');
@@ -614,12 +694,14 @@ async function refreshAll({ keepStatusMessage = false } = {}) {
   applyRoleUi();
   await loadBootstrapData();
   await loadSystemLogs();
+  await loadProducts();
   renderRegionOptions();
   renderStats();
   renderSystemLogs();
   renderRegions();
   renderStores();
   renderBeacons();
+  renderProducts();
 
   if (state.selectedStoreId) {
     await loadStoreDetail(state.selectedStoreId);
@@ -721,6 +803,42 @@ async function handleBeaconBulkSubmit(event) {
 
   els.beaconBulkForm.reset();
   await refreshAll();
+}
+
+async function handleProductSubmit(event) {
+  event.preventDefault();
+
+  const id = Number(els.productForm.elements.id.value);
+  const price = Number(els.productForm.elements.price.value);
+  const payload = {
+    id,
+    name: els.productForm.elements.name.value.trim(),
+    price,
+    layoutCode: els.productForm.elements.layoutCode.value.trim(),
+  };
+
+  if (!Number.isInteger(id) || id < 1) {
+    throw new Error('Produkt-ID muss eine positive ganze Zahl sein.');
+  }
+  if (!payload.name) {
+    throw new Error('Produktname ist erforderlich.');
+  }
+  if (!Number.isFinite(price) || price < 0) {
+    throw new Error('Preis ist erforderlich und darf nicht negativ sein.');
+  }
+  if (!payload.layoutCode) {
+    throw new Error('Layout-Code ist erforderlich.');
+  }
+
+  await fetchJson(API.products, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+  resetProductForm();
+  await loadProducts();
+  renderProducts();
+  setStatus('Produkt wurde im Katalog gespeichert.', 'success');
 }
 
 async function archiveRegion(regionId) {
@@ -885,6 +1003,24 @@ function bindEvents() {
     }
   });
 
+  els.refreshProductsBtn?.addEventListener('click', async () => {
+    try {
+      await loadProducts();
+      renderProducts();
+      setStatus('Produktliste wurde aktualisiert.', 'success');
+    } catch (error) {
+      handleUiError(error);
+    }
+  });
+  els.resetProductFormBtn?.addEventListener('click', resetProductForm);
+  els.productForm?.addEventListener('submit', async (event) => {
+    try {
+      await handleProductSubmit(event);
+    } catch (error) {
+      handleUiError(error);
+    }
+  });
+
   document.body.addEventListener('click', async (event) => {
     const button = event.target.closest('[data-action]');
     if (!button) {
@@ -918,6 +1054,8 @@ function bindEvents() {
         await archiveBeacon(id);
       } else if (action === 'activate-layout') {
         await activateLayout(layoutId);
+      } else if (action === 'edit-product') {
+        populateProductForm(id);
       }
     } catch (error) {
       handleUiError(error);
@@ -949,6 +1087,7 @@ async function init() {
   resetRegionForm();
   resetStoreForm();
   resetBeaconForm();
+  resetProductForm();
 }
 
 init().catch((error) => {
