@@ -21,10 +21,15 @@ The system SHALL allow users with the `admin` role and an active Indooro access 
 - **WHEN** an authenticated `admin` requests admin layout management for any store
 - **THEN** the system allows access if the requested layout operation passes existing validation
 
-#### Scenario: Admin manages product catalog
+#### Scenario: Admin creates or updates product catalog
 - **GIVEN** Keycloak authentication and Indooro access assignments are configured
 - **WHEN** an authenticated `admin` creates or updates a product through `/api/admin/products`
 - **THEN** the system allows the mutation if product validation passes
+
+#### Scenario: Admin deletes product catalog entry
+- **GIVEN** Keycloak authentication and Indooro access assignments are configured
+- **WHEN** an authenticated `admin` deletes a product through `/api/admin/products/{id}`
+- **THEN** the system removes that product document from the catalog if it exists
 
 ### Requirement: Region manager access is scoped to assigned region
 The system SHALL limit users with the `region-manager` role to data and actions for the region assigned in the Indooro user access table.
@@ -128,7 +133,7 @@ The system SHALL apply scope checks to protected admin mutations as well as read
 
 #### Scenario: Non-admin attempts product mutation
 - **GIVEN** Keycloak authentication and Indooro access assignments are configured
-- **WHEN** an authenticated `region-manager` or `store-manager` calls `/api/admin/products`, `POST /api/products`, or `POST /api/products/bulk`
+- **WHEN** an authenticated `region-manager` or `store-manager` calls `/api/admin/products`, `/api/admin/products/{id}`, `POST /api/products`, or `POST /api/products/bulk` for a product mutation
 - **THEN** the system rejects the mutation without changing product catalog data
 
 ### Requirement: Public customer routes do not use admin scope filtering

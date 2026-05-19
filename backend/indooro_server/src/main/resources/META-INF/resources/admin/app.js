@@ -592,6 +592,7 @@ function renderProducts() {
       </div>
       <div class="item-footer">
         <button type="button" class="action-button" data-action="edit-product" data-id="${escapeHtml(product.id)}">Bearbeiten</button>
+        <button type="button" class="action-button danger" data-action="delete-product" data-id="${escapeHtml(product.id)}">Loeschen</button>
       </div>
     </article>
   `).join('');
@@ -612,6 +613,10 @@ function upsertProductInState(product) {
     product,
     ...state.products.filter((entry) => String(entry.id) !== String(product.id)),
   ];
+}
+
+function removeProductFromState(productId) {
+  state.products = state.products.filter((entry) => String(entry.id) !== String(productId));
 }
 
 function renderAssignSelect(beaconId) {
@@ -882,6 +887,24 @@ async function handleProductSubmit(event) {
   setStatus('Produkt wurde im Katalog gespeichert.', 'success');
 }
 
+async function deleteProduct(productId) {
+  const product = state.products.find((entry) => String(entry.id) === String(productId));
+  const productLabel = product ? `${product.name} (ID ${product.id})` : `ID ${productId}`;
+
+  if (!window.confirm(`Willst du das Produkt ${productLabel} wirklich loeschen?`)) {
+    return;
+  }
+
+  await fetchJson(`${API.products}/${encodeURIComponent(productId)}`, { method: 'DELETE' });
+
+  if (String(state.editingProductId) === String(productId)) {
+    resetProductForm();
+  }
+  removeProductFromState(productId);
+  renderProducts();
+  setStatus('Produkt wurde aus dem Katalog geloescht.', 'success');
+}
+
 async function archiveRegion(regionId) {
   if (!window.confirm('Willst du diese Region wirklich archivieren?')) {
     return;
@@ -1097,6 +1120,8 @@ function bindEvents() {
         await activateLayout(layoutId);
       } else if (action === 'edit-product') {
         populateProductForm(id);
+      } else if (action === 'delete-product') {
+        await deleteProduct(id);
       }
     } catch (error) {
       handleUiError(error);

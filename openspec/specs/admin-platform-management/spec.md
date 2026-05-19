@@ -207,12 +207,17 @@ The Admin UI SHALL handle API error response bodies without consuming the same r
 - **THEN** it reads and presents the error without triggering body-consumed failures
 
 ### Requirement: Admin product management is available in the Admin Platform
-The Admin Platform SHALL provide a product management surface that lets authorized admins create or update product catalog documents with product id, name, price, and layout code.
+The Admin Platform SHALL provide a product management surface that lets authorized admins create, update, or delete product catalog documents with product id, name, price, and layout code.
 
 #### Scenario: Admin creates product
 - **GIVEN** an authenticated user with the `admin` role and an active Indooro admin assignment opens the Admin Platform
 - **WHEN** the user submits a valid product with id, name, price, and layout code
 - **THEN** the Admin Platform sends the product to the protected admin product API and shows a success state after the product is indexed
+
+#### Scenario: Admin deletes product
+- **GIVEN** an authenticated user with the `admin` role sees a product in the Admin Platform product list
+- **WHEN** the user confirms deletion for that product
+- **THEN** the Admin Platform sends a delete request to the protected admin product API and removes the product from the list after the product document is deleted
 
 #### Scenario: Product form is incomplete
 - **GIVEN** an authenticated admin is using the product management form

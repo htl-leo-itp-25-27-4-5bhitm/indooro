@@ -6,9 +6,11 @@ import at.htl.service.OpenSearchService;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.WebApplicationException;
@@ -63,6 +65,30 @@ public class AdminProductResource extends AdminApiSupport {
             LOG.error("Error indexing admin product", exception);
             throw new WebApplicationException(
                     "Produkt konnte nicht gespeichert werden.",
+                    Response.Status.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    @DELETE
+    @Path("/{id}")
+    public Response deleteProduct(@PathParam("id") Integer id) {
+        adminAccessService.requireAdmin();
+
+        if (id == null || id < 1) {
+            throw badRequest("Produkt-ID muss eine positive ganze Zahl sein.");
+        }
+
+        try {
+            boolean deleted = openSearchService.deleteProduct(id);
+            if (!deleted) {
+                throw new WebApplicationException("Produkt wurde nicht gefunden.", Response.Status.NOT_FOUND);
+            }
+            return Response.noContent().build();
+        } catch (IOException exception) {
+            LOG.error("Error deleting admin product", exception);
+            throw new WebApplicationException(
+                    "Produkt konnte nicht geloescht werden.",
                     Response.Status.INTERNAL_SERVER_ERROR
             );
         }

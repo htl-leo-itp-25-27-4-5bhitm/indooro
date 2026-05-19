@@ -7,6 +7,7 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.opensearch._types.FieldValue;
+import org.opensearch.client.opensearch._types.Result;
 import org.opensearch.client.opensearch._types.query_dsl.Operator;
 import org.opensearch.client.opensearch._types.query_dsl.Query;
 import org.opensearch.client.opensearch.core.*;
@@ -131,6 +132,27 @@ public List<Product> searchProducts(String query, Integer size) throws IOExcepti
         LOG.info("Indexed product: " + product.getName() + " with result: " + response.result());
 
         return response.result().toString();
+    }
+
+    /**
+     * Loescht ein einzelnes Produkt anhand der ID.
+     */
+    public boolean deleteProduct(Integer id) throws IOException {
+        DeleteRequest request = DeleteRequest.of(d -> d
+                .index(indexName)
+                .id(String.valueOf(id))
+        );
+
+        DeleteResponse response = client.delete(request);
+        boolean deleted = response.result() == Result.Deleted;
+
+        if (deleted) {
+            LOG.info("Deleted product with id: " + id);
+        } else {
+            LOG.info("Product with id " + id + " was not deleted. Result: " + response.result());
+        }
+
+        return deleted;
     }
 
     /**
