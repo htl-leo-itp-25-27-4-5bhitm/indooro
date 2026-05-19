@@ -144,7 +144,19 @@ public class MobileStoreService {
     }
 
     private MobileDtos.MobileStoreSummary toStoreSummary(StoreEntity store) {
-        return new MobileDtos.MobileStoreSummary(store.id, store.storeCode, store.name, store.city);
+        return new MobileDtos.MobileStoreSummary(
+                store.id,
+                store.storeCode,
+                store.name,
+                store.city,
+                address(store),
+                store.latitude,
+                store.longitude
+        );
+    }
+
+    private String address(StoreEntity store) {
+        return String.format("%s, %s %s", store.street, store.zipCode, store.city);
     }
 
     private JsonNode loadDefaultLayout(String storeName) {

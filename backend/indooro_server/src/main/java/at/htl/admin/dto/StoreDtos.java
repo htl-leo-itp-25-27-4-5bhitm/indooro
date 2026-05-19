@@ -2,6 +2,8 @@ package at.htl.admin.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
@@ -21,6 +23,8 @@ public final class StoreDtos {
             @NotBlank @Size(max = 20) String zipCode,
             @NotBlank @Size(max = 100) String city,
             @NotBlank @Size(max = 100) String country,
+            @DecimalMin("-90.0") @DecimalMax("90.0") Double latitude,
+            @DecimalMin("-180.0") @DecimalMax("180.0") Double longitude,
             @Size(max = 2_000) String notes
     ) {
     }
@@ -44,6 +48,8 @@ public final class StoreDtos {
             String storeCode,
             String name,
             String city,
+            Double latitude,
+            Double longitude,
             String status,
             StoreRegionSummary region,
             long activeBeaconCount,
@@ -59,6 +65,8 @@ public final class StoreDtos {
             String zipCode,
             String city,
             String country,
+            Double latitude,
+            Double longitude,
             String notes,
             String status,
             Instant archivedAt,

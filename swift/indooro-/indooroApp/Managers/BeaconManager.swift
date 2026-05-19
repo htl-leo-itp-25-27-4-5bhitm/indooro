@@ -142,6 +142,7 @@ final class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate,
     @Published private(set) var selectedLayoutName = "Aktuelles Server-Layout"
     @Published private(set) var activeLayoutDescription = "Bundle-Layout aktiv"
     @Published private(set) var layoutRevision = 0
+    @Published private(set) var activeMobileStore: MobileStoreSummary?
 
     // MARK: - Config
 
@@ -323,8 +324,47 @@ final class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate,
         selectedLayoutMode = .currentServer
         selectedLayoutId = nil
         selectedLayoutName = "Aktuelles Server-Layout"
+        activeMobileStore = nil
         persistLayoutSelection()
         loadCurrentServerLayout()
+    }
+
+    func loadStoreLayout(for store: MobileStoreSummary, source: StoreLayoutSelectionSource) {
+        guard let url = mobileStoreLayoutURL(storeId: store.id) else {
+            loadBundleLayoutFallback(reason: "Store-Layout-URL ungueltig")
+            return
+        }
+
+        isLoadingLayout = true
+        performRequest(url: url) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self else { return }
+
+                switch result {
+                case .success(let data):
+                    do {
+                        let layout = try self.decodeLayout(from: data)
+                        self.applyLayout(layout)
+                        self.selectedLayoutMode = .currentServer
+                        self.selectedLayoutId = nil
+                        self.selectedLayoutName = store.name
+                        self.activeMobileStore = store
+                        self.activeLayoutDescription = self.storeLayoutDescription(for: store, source: source, layout: layout)
+                        self.isLoadingLayout = false
+
+                        if source == .beacon {
+                            self.persistLayoutSelection()
+                        }
+                    } catch {
+                        print("❌ Store-Layout konnte nicht decodiert werden: \(error.localizedDescription)")
+                        self.loadLatestHistoryVersionFallback(reason: "Store-Layout nicht lesbar")
+                    }
+                case .failure(let error):
+                    print("❌ Store-Layout konnte nicht geladen werden: \(error.localizedDescription)")
+                    self.loadLatestHistoryVersionFallback(reason: "Store-Layout nicht erreichbar")
+                }
+            }
+        }
     }
 
     func selectLayoutVersion(_ layoutId: String) {
@@ -332,6 +372,7 @@ final class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate,
         selectedLayoutId = layoutId
         selectedLayoutName = layoutHistory.first(where: { $0.layoutId == layoutId })?.displayName
             ?? "Version \(layoutId.prefix(8))"
+        activeMobileStore = nil
         persistLayoutSelection()
         loadLayoutVersion(withId: layoutId)
     }
@@ -1149,6 +1190,7 @@ final class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate,
             selectedLayoutMode = .currentServer
             selectedLayoutId = nil
             selectedLayoutName = "Aktuelles Server-Layout"
+            activeMobileStore = nil
             loadCurrentServerLayout()
         }
     }
@@ -1188,6 +1230,7 @@ final class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate,
                         self.selectedLayoutMode = .currentServer
                         self.selectedLayoutId = nil
                         self.selectedLayoutName = "Aktuelles Server-Layout"
+                        self.activeMobileStore = nil
                         self.activeLayoutDescription = self.currentLayoutDescription(for: layout)
                         self.isLoadingLayout = false
                         self.persistLayoutSelection()
@@ -1223,6 +1266,7 @@ final class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate,
                         self.selectedLayoutId = layoutId
                         self.selectedLayoutName = self.layoutHistory.first(where: { $0.layoutId == layoutId })?.displayName
                             ?? self.fallbackVersionName(for: layout, layoutId: layoutId)
+                        self.activeMobileStore = nil
                         self.activeLayoutDescription = self.versionLayoutDescription(for: layout, layoutId: layoutId)
                         self.isLoadingLayout = false
                         self.persistLayoutSelection()
@@ -1242,6 +1286,7 @@ final class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate,
         selectedLayoutMode = .currentServer
         selectedLayoutId = nil
         selectedLayoutName = "Aktuelles Server-Layout"
+        activeMobileStore = nil
         persistLayoutSelection()
         loadCurrentServerLayout()
 
@@ -1381,6 +1426,7 @@ final class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate,
                         self.selectedLayoutMode = .currentServer
                         self.selectedLayoutId = nil
                         self.selectedLayoutName = "Aktuelles Server-Layout"
+                        self.activeMobileStore = nil
                         self.activeLayoutDescription = self.currentLayoutFallbackDescription(for: layout)
                         self.isLoadingLayout = false
                         self.persistLayoutSelection()
@@ -1468,8 +1514,26 @@ final class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate,
         return URL(string: "\(apiBase)/layout/versions/\(encodedLayoutId)")
     }
 
+    private func mobileStoreLayoutURL(storeId: String) -> URL? {
+        let encodedStoreId = storeId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? storeId
+        return URL(string: "\(apiBase)/mobile/stores/\(encodedStoreId)/layout/current")
+    }
+
     private func currentLayoutDescription(for layout: LayoutData) -> String {
         var parts = [layout.shopName, "Live aus LeoCloud"]
+        if let timestamp = LayoutTimestampFormatter.display(layout.savedAt ?? layout.exportDate) {
+            parts.append(timestamp)
+        }
+        return parts.joined(separator: " • ")
+    }
+
+    private func storeLayoutDescription(
+        for store: MobileStoreSummary,
+        source: StoreLayoutSelectionSource,
+        layout: LayoutData
+    ) -> String {
+        let sourceLabel = source == .beacon ? "Beacon Store" : "Manuell gewaehlt"
+        var parts = [store.name, sourceLabel]
         if let timestamp = LayoutTimestampFormatter.display(layout.savedAt ?? layout.exportDate) {
             parts.append(timestamp)
         }

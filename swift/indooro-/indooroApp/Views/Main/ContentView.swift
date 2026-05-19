@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var targetProduct: Product? = nil
     @State private var showARRoute = false
     @State private var showLayoutSelector = false
+    @State private var showStoreMap = false
     @State private var showShoppingSheet = false
     @State private var mapScale: Double = 1.0
     @State private var showSettings = false
@@ -85,6 +86,9 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showLayoutSelector) {
                 LayoutSelectionSheet(beaconManager: beaconManager)
+            }
+            .sheet(isPresented: $showStoreMap) {
+                StoreMapPage(beaconManager: beaconManager)
             }
             .sheet(isPresented: $showShoppingSheet) {
                 ShoppingListsSheet(
@@ -187,6 +191,20 @@ struct ContentView: View {
                                 Image(systemName: "map")
                             }
                             Text(layoutPillLabel)
+                                .lineLimit(1)
+                        }
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                    }
+                    .background(.regularMaterial, in: Capsule())
+                    .shadow(color: .black.opacity(0.05), radius: 3, y: 1)
+
+                    Button { showStoreMap = true } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "mappin.and.ellipse")
+                            Text("Filialen")
                                 .lineLimit(1)
                         }
                         .font(.caption.weight(.medium))

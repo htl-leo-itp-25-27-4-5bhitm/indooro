@@ -238,6 +238,13 @@ function formatPrice(value) {
   }).format(Number(value));
 }
 
+function formatCoordinates(latitude, longitude) {
+  if (latitude === null || latitude === undefined || longitude === null || longitude === undefined) {
+    return 'Nicht hinterlegt';
+  }
+  return `${Number(latitude).toFixed(7)}, ${Number(longitude).toFixed(7)}`;
+}
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;',
@@ -480,6 +487,7 @@ function renderStoreDetail() {
     <dt>Name</dt><dd>${escapeHtml(store.name)}</dd>
     <dt>Store-Code</dt><dd>${escapeHtml(store.storeCode)}</dd>
     <dt>Adresse</dt><dd>${escapeHtml(store.street)}, ${escapeHtml(store.zipCode)} ${escapeHtml(store.city)}, ${escapeHtml(store.country)}</dd>
+    <dt>Koordinaten</dt><dd>${escapeHtml(formatCoordinates(store.latitude, store.longitude))}</dd>
     <dt>Region</dt><dd>${escapeHtml(store.region.name)} (${escapeHtml(store.region.code)})</dd>
     <dt>Status</dt><dd>${escapeHtml(store.status)}</dd>
     <dt>Aktives Layout</dt><dd>${store.activeLayout ? `Version ${store.activeLayout.versionNo} · ${formatDate(store.activeLayout.createdAt)}` : 'Noch keines gespeichert'}</dd>
@@ -594,6 +602,11 @@ function parseDecimalInput(value) {
   return normalized ? Number(normalized) : Number.NaN;
 }
 
+function parseOptionalDecimalInput(value) {
+  const normalized = String(value ?? '').trim().replace(',', '.');
+  return normalized ? Number(normalized) : null;
+}
+
 function upsertProductInState(product) {
   state.products = [
     product,
@@ -670,6 +683,8 @@ async function populateStoreForm(storeId) {
   els.storeForm.elements.zipCode.value = store.zipCode;
   els.storeForm.elements.city.value = store.city;
   els.storeForm.elements.country.value = store.country;
+  els.storeForm.elements.latitude.value = store.latitude ?? '';
+  els.storeForm.elements.longitude.value = store.longitude ?? '';
   els.storeForm.elements.notes.value = store.notes || '';
 }
 
@@ -744,6 +759,16 @@ async function handleRegionSubmit(event) {
 
 async function handleStoreSubmit(event) {
   event.preventDefault();
+  const latitude = parseOptionalDecimalInput(els.storeForm.elements.latitude.value);
+  const longitude = parseOptionalDecimalInput(els.storeForm.elements.longitude.value);
+
+  if (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) {
+    throw new Error('Latitude muss zwischen -90 und 90 liegen.');
+  }
+  if (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180)) {
+    throw new Error('Longitude muss zwischen -180 und 180 liegen.');
+  }
+
   const payload = {
     regionId: els.storeForm.elements.regionId.value,
     storeCode: els.storeForm.elements.storeCode.value.trim(),
@@ -752,6 +777,8 @@ async function handleStoreSubmit(event) {
     zipCode: els.storeForm.elements.zipCode.value.trim(),
     city: els.storeForm.elements.city.value.trim(),
     country: els.storeForm.elements.country.value.trim(),
+    latitude,
+    longitude,
     notes: els.storeForm.elements.notes.value.trim() || null,
   };
 

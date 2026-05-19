@@ -14,7 +14,10 @@ public final class MobileDtos {
             UUID id,
             String storeCode,
             String name,
-            String city
+            String city,
+            String address,
+            Double latitude,
+            Double longitude
     ) {
     }
 

@@ -56,7 +56,7 @@ The system SHALL resolve beacon-based store detection only through active, non-a
 - **THEN** the system does not return a false store match
 
 ### Requirement: Manual store selection remains possible
-The mobile experience SHALL support store search or selection flows that do not depend on BLE detection so customers can still search products and view maps when beacon detection fails.
+The mobile experience SHALL support store search or selection flows that do not depend on BLE detection so customers can still search products and view maps when beacon detection fails. Store selection maps SHALL use real persisted store coordinates only.
 
 #### Scenario: BLE signal is unavailable
 - **GIVEN** active store, beacon, and assignment data are available as described
@@ -67,6 +67,16 @@ The mobile experience SHALL support store search or selection flows that do not 
 - **GIVEN** active store, beacon, and assignment data are available as described
 - **WHEN** a customer manually selects a store
 - **THEN** product search and current layout retrieval can proceed for that store
+
+#### Scenario: Store map uses persisted coordinates
+- **GIVEN** active stores have persisted latitude and longitude values
+- **WHEN** the mobile store map renders store pins
+- **THEN** the pins are placed at those persisted coordinates without city-based or deterministic-offset fallback
+
+#### Scenario: Store has no coordinates
+- **GIVEN** an active store lacks latitude or longitude
+- **WHEN** the mobile store map renders
+- **THEN** that store is omitted from the map or handled as a non-production debug case instead of being shown at a fake coordinate
 
 ### Requirement: Customer position is not stored server-side for MVP
 The system SHALL NOT require server-side storage of anonymous customer positions for MVP store detection, search, map display, or routing.
@@ -95,7 +105,7 @@ The mobile store lookup route SHALL accept beacon identity input with UUID and o
 - **THEN** the backend can resolve it if the stored identity and active assignment match UUID-only semantics
 
 ### Requirement: Mobile store list includes active stores only
-The mobile store listing route SHALL expose stores that are active and suitable for anonymous customer selection.
+The mobile store listing route SHALL expose stores that are active and suitable for anonymous customer selection, including address and coordinate fields needed by the mobile store map.
 
 #### Scenario: Active stores are requested
 - **GIVEN** active and archived stores exist
@@ -106,6 +116,11 @@ The mobile store listing route SHALL expose stores that are active and suitable 
 - **GIVEN** a store is active but lacks active/current layout data
 - **WHEN** it appears in mobile selection flows
 - **THEN** clients must still handle missing layout as a separate no-layout state
+
+#### Scenario: Store coordinates are returned
+- **GIVEN** an active store has latitude and longitude
+- **WHEN** an anonymous mobile client requests `/api/mobile/stores`
+- **THEN** the response includes `address`, `latitude`, and `longitude` for that store
 
 ### Requirement: Mobile store detection does not require exact customer position
 Beacon-based store detection SHALL identify the active store context and SHALL NOT require computing or uploading the customer's exact indoor coordinates.

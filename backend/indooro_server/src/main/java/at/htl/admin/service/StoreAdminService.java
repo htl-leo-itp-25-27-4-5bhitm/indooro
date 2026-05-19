@@ -207,6 +207,8 @@ public class StoreAdminService {
         store.zipCode = request.zipCode().trim();
         store.city = request.city().trim();
         store.country = request.country().trim();
+        store.latitude = request.latitude();
+        store.longitude = request.longitude();
         store.notes = trimToNull(request.notes());
     }
 
@@ -219,6 +221,8 @@ public class StoreAdminService {
                 entity.storeCode,
                 entity.name,
                 entity.city,
+                entity.latitude,
+                entity.longitude,
                 entity.status.name(),
                 toRegionSummary(entity.region),
                 activeBeaconCount,
@@ -236,6 +240,8 @@ public class StoreAdminService {
                 entity.zipCode,
                 entity.city,
                 entity.country,
+                entity.latitude,
+                entity.longitude,
                 entity.notes,
                 entity.status.name(),
                 entity.archivedAt,

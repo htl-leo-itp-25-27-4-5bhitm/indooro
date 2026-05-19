@@ -37,6 +37,12 @@ public class StoreEntity extends AuditableEntity {
     @Column(nullable = false, length = 100)
     public String country;
 
+    @Column
+    public Double latitude;
+
+    @Column
+    public Double longitude;
+
     @Column(columnDefinition = "TEXT")
     public String notes;
 
