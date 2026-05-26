@@ -1,0 +1,46 @@
+{
+  "shopName": "Mein Supermarkt",
+  "gridSize": {
+    "width": 7,
+    "height": 5
+  },
+  "elements": [
+    {
+      "id": 1769594969950,
+      "type": "beacon",
+      "beaconId": "Indooro1",
+      "x": 0,
+      "y": 5,
+      "meter": 3,
+      "category": "undefined/3"
+    },
+    {
+      "id": 1769594972651,
+      "type": "beacon",
+      "beaconId": "Indooro2",
+      "x": 7,
+      "y": 5,
+      "meter": 4,
+      "category": "undefined/4"
+    },
+    {
+      "id": 1769594974416,
+      "type": "beacon",
+      "beaconId": "Indooro3",
+      "x": 7,
+      "y": 0,
+      "meter": 2,
+      "category": "undefined/2"
+    },
+    {
+      "id": 1769594975925,
+      "type": "beacon",
+      "beaconId": "Indooro4",
+      "x": 0,
+      "y": 0,
+      "meter": 1,
+      "category": "undefined/1"
+    }
+  ],
+  "exportDate": "2026-02-24T14:05:18.595Z"
+}
