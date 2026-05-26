@@ -18,6 +18,7 @@ Use these checks for the `keycloak-user-management` sprint demo.
 - Anonymous browser request to `/admin/` redirects to Keycloak login.
 - Login as `indooro-admin` with password `admin` opens the Admin Platform.
 - `/api/admin/me` returns subject `11111111-1111-1111-1111-111111111111`, role `admin`, and empty region/store scope.
+- `/api/admin/me` intentionally exposes the resolved Indooro role/scope contract only. Raw Keycloak role arrays are used internally for agreement checks and are not part of the response contract.
 - Logout through `/admin/logout` returns to `/`.
 - Reopening `/admin/` after logout starts a fresh login flow.
 
@@ -41,6 +42,13 @@ curl -i http://localhost:8080/api/mobile/stores/by-beacon
 curl -i http://localhost:8080/api/products
 curl -i http://localhost:8080/api/categories
 curl -i http://localhost:8080/api/layout/current
+```
+
+Category reads stay public, but category bulk import is an admin-only maintenance write:
+
+```bash
+curl -i http://localhost:8080/api/categories
+curl -i -X POST http://localhost:8080/api/categories/bulk
 ```
 
 ## Build Verification

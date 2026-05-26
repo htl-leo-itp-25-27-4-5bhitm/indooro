@@ -2,6 +2,8 @@
 
 Stand: 2026-04-08
 
+> Historischer Hinweis (2026-05-26): Dieses Sprint-Dokument bleibt als Rueckblick nuetzlich, ist aber nicht der aktuelle Umsetzungsstand. Keycloak/Rollen, echte Scope-Pruefungen, geschuetzte Maintenance-Writes und iOS-Beacon-Store-Erkennung wurden danach weitergefuehrt. Fuer neue agentische Arbeit gilt OpenSpec plus aktueller Source Code.
+
 ## 1. Ziel dieses Dokuments
 
 Dieses Dokument beschreibt den kompletten aktuellen Stand der im Sprint umgesetzten Admin-Plattform fuer Indooro.

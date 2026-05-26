@@ -88,10 +88,22 @@ public class MobileStoreService {
 
         LayoutVersionEntity activeLayout = layoutVersionRepository.findActiveByStoreId(storeId).orElse(null);
         if (activeLayout != null) {
-            return new MobileDtos.MobileLayoutResponse(store.id, activeLayout.id, activeLayout.layoutJson);
+            return new MobileDtos.MobileLayoutResponse(
+                    store.id,
+                    activeLayout.id,
+                    "ACTIVE",
+                    false,
+                    activeLayout.layoutJson
+            );
         }
 
-        return new MobileDtos.MobileLayoutResponse(store.id, null, loadDefaultLayout(store.name));
+        return new MobileDtos.MobileLayoutResponse(
+                store.id,
+                null,
+                "DEFAULT",
+                true,
+                loadDefaultLayout(store.name)
+        );
     }
 
     private BeaconEntity resolveBeacon(String uuid, Integer major, Integer minor) {

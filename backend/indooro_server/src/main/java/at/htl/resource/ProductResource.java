@@ -35,7 +35,9 @@ public class ProductResource {
     @Path("/search")
     public Response searchProducts(
             @QueryParam("q") String query,
-            @QueryParam("size") @DefaultValue("10") Integer size) {
+            @QueryParam("size") @DefaultValue("10") Integer size,
+            @QueryParam("storeId") String storeId,
+            @QueryParam("storeCode") String storeCode) {
 
         if (query == null || query.trim().isEmpty()) {
             return Response.status(Response.Status.BAD_REQUEST)
@@ -44,7 +46,7 @@ public class ProductResource {
         }
 
         try {
-            List<Product> products = openSearchService.searchProducts(query, size);
+            List<Product> products = openSearchService.searchProducts(query, size, storeId, storeCode);
             LOG.info("Search for '" + query + "' returned " + products.size() + " results");
             return Response.ok(products).build();
         } catch (IOException e) {
@@ -105,6 +107,7 @@ public class ProductResource {
     public Response indexProduct(Product product) {
         adminAccessService.requireAdmin();
         validateProduct(product);
+        normalizeProductScope(product);
 
         try {
             String result = openSearchService.indexProduct(product);
@@ -130,6 +133,7 @@ public class ProductResource {
             throw new WebApplicationException("Produktliste ist erforderlich.", Response.Status.BAD_REQUEST);
         }
         products.forEach(this::validateProduct);
+        products.forEach(this::normalizeProductScope);
 
         try {
             openSearchService.indexProducts(products);
@@ -158,5 +162,17 @@ public class ProductResource {
         if (product.getLayoutCode() == null || product.getLayoutCode().isBlank()) {
             throw new WebApplicationException("Layout-Code ist erforderlich.", Response.Status.BAD_REQUEST);
         }
+    }
+
+    private void normalizeProductScope(Product product) {
+        product.setStoreId(normalizeOptional(product.getStoreId()));
+        product.setStoreCode(normalizeOptional(product.getStoreCode()));
+    }
+
+    private String normalizeOptional(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 }

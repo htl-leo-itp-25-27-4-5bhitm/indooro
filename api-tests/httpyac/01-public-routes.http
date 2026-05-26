@@ -34,6 +34,14 @@ Accept: application/json
 ?? header content-type includes json
 
 ###
+# Public product search accepts an optional store scope
+GET {{baseUrl}}/api/products/search?q=milch&size=5&storeId={{ACTIVE_STORE_ID}}
+Accept: application/json
+
+?? status startsWith 20
+?? header content-type includes json
+
+###
 # Public product by id uses normal lookup semantics
 GET {{baseUrl}}/api/products/{{TEST_PRODUCT_ID}}
 Accept: application/json

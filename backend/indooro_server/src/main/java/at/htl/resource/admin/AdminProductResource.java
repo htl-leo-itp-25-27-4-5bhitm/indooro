@@ -57,6 +57,8 @@ public class AdminProductResource extends AdminApiSupport {
 
         product.setName(product.getName().trim());
         product.setLayoutCode(product.getLayoutCode().trim());
+        product.setStoreId(normalizeOptional(product.getStoreId()));
+        product.setStoreCode(normalizeOptional(product.getStoreCode()));
 
         try {
             openSearchService.indexProduct(product);
@@ -124,5 +126,12 @@ public class AdminProductResource extends AdminApiSupport {
             return 1;
         }
         return Math.min(size, 1000);
+    }
+
+    private String normalizeOptional(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 }

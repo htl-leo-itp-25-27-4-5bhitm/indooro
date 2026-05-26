@@ -1,8 +1,10 @@
 package at.htl.resource;
 
+import at.htl.admin.service.AdminAccessService;
 import at.htl.model.Category;
 import at.htl.service.CategoryService;
 import io.smallrye.common.annotation.Blocking;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DefaultValue;
@@ -27,6 +29,9 @@ public class CategoryResource {
 
     @Inject
     CategoryService categoryService;
+
+    @Inject
+    AdminAccessService adminAccessService;
 
     @GET
     public Response getAllCategories(@QueryParam("size") @DefaultValue("100") Integer size) {
@@ -55,7 +60,9 @@ public class CategoryResource {
 
     @POST
     @Path("/bulk")
+    @RolesAllowed("admin")
     public Response bulkInsert(List<Category> categories) {
+        adminAccessService.requireAdmin();
         try {
             categoryService.bulkInsert(categories);
             return Response.ok(Map.of(

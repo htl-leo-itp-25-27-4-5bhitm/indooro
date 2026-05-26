@@ -1,9 +1,9 @@
 /*
 # Indooro Maintenance / Operator API Smoke Tests
 
-These endpoints are intentionally treated as smoke tests. Product/category
-writes may remain open for command-line operator workflows in the current
-project decision.
+These endpoints are intentionally treated as smoke tests. Operator writes run
+with the admin bearer token so protected maintenance routes do not fall back to
+the browser login flow.
 */
 
 @baseUrl={{BASE_URL}}
@@ -34,13 +34,15 @@ Authorization: Bearer {{$global.adminToken}}
 POST {{baseUrl}}/api/products/bulk
 Content-Type: application/json
 Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
 
 [
   {
     "id": {{TEST_PRODUCT_ID}},
     "name": "{{TEST_PRODUCT_NAME}}",
     "price": {{TEST_PRODUCT_PRICE}},
-    "layoutCode": "{{TEST_PRODUCT_LAYOUT_CODE}}"
+    "layoutCode": "{{TEST_PRODUCT_LAYOUT_CODE}}",
+    "storeId": "{{ACTIVE_STORE_ID}}"
   }
 ]
 
@@ -52,22 +54,56 @@ Accept: application/json
 POST {{baseUrl}}/api/products
 Content-Type: application/json
 Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
 
 {
   "id": {{TEST_PRODUCT_ID}},
   "name": "{{TEST_PRODUCT_NAME}}",
   "price": {{TEST_PRODUCT_PRICE}},
-  "layoutCode": "{{TEST_PRODUCT_LAYOUT_CODE}}"
+  "layoutCode": "{{TEST_PRODUCT_LAYOUT_CODE}}",
+  "storeId": "{{ACTIVE_STORE_ID}}"
 }
 
 ?? status startsWith 20
 ?? header content-type includes json
 
 ###
+# Anonymous category bulk import is rejected
+POST {{baseUrl}}/api/categories/bulk
+Content-Type: application/json
+Accept: application/json
+
+[
+  {
+    "categoryCode": {{TEST_CATEGORY_CODE}},
+    "categoryName": "{{TEST_CATEGORY_NAME}}"
+  }
+]
+
+?? status matches ^(302|401|403)$
+
+###
+# Store managers cannot run category bulk imports
+POST {{baseUrl}}/api/categories/bulk
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {{$global.storeToken}}
+
+[
+  {
+    "categoryCode": {{TEST_CATEGORY_CODE}},
+    "categoryName": "{{TEST_CATEGORY_NAME}}"
+  }
+]
+
+?? status == 403
+
+###
 # Category bulk import smoke
 POST {{baseUrl}}/api/categories/bulk
 Content-Type: application/json
 Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
 
 [
   {
@@ -84,6 +120,7 @@ Accept: application/json
 POST {{baseUrl}}/api/export/pdf
 Content-Type: application/json
 Accept: application/pdf
+Authorization: Bearer {{$global.adminToken}}
 
 [
   {

@@ -42,6 +42,8 @@ public final class MobileDtos {
     public record MobileLayoutResponse(
             UUID storeId,
             UUID layoutId,
+            String source,
+            boolean fallback,
             JsonNode layout
     ) {
     }

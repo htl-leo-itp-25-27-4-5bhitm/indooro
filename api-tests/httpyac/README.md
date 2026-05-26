@@ -99,10 +99,10 @@ npm run api:test -- --output none --output-failed response
 Erwarteter erfolgreicher Endstand:
 
 ```text
-76 requests processed (76 succeeded)
+79 requests processed (79 succeeded)
 ```
 
-## Was sind die 76 Tests?
+## Was sind die 79 Tests?
 
 Der Gesamtlauf `npm run api:test` fuehrt diese Dateien aus:
 
@@ -114,7 +114,7 @@ Der Gesamtlauf `npm run api:test` fuehrt diese Dateien aus:
 04-role-route-matrix.http
 ```
 
-Zusammen sind das 76 HTTP-Requests mit Assertions.
+Zusammen sind das 79 HTTP-Requests mit Assertions.
 
 ### 00-auth.http: 3 Auth-Checks
 
@@ -131,7 +131,7 @@ Geprueft wird jeweils:
 - Der Client `indooro-admin-web` darf Direct Access Grants verwenden.
 - Ein Access Token wird geliefert.
 
-### 01-public-routes.http: 11 Public-Checks
+### 01-public-routes.http: 12 Public-Checks
 
 Diese Checks laufen ohne Login. Sie stellen sicher, dass die oeffentlichen APIs
 weiterhin anonym erreichbar sind.
@@ -139,14 +139,15 @@ weiterhin anonym erreichbar sind.
 1. `GET /api/products?size=5`
 2. `GET /api/products/search`
 3. `GET /api/products/search?q=milch&size=5`
-4. `GET /api/products/{TEST_PRODUCT_ID}`
-5. `GET /api/categories?size=20`
-6. `GET /api/categories/{TEST_CATEGORY_CODE}`
-7. `GET /api/mobile/stores`
-8. `GET /api/mobile/stores/beacon-identities`
-9. `GET /api/mobile/stores/by-beacon`
-10. `GET /api/mobile/stores/by-beacon?uuid={ACTIVE_BEACON_UUID}`
-11. `GET /api/mobile/stores/{ACTIVE_STORE_ID}/layout/current`
+4. `GET /api/products/search?q=milch&size=5&storeId={ACTIVE_STORE_ID}`
+5. `GET /api/products/{TEST_PRODUCT_ID}`
+6. `GET /api/categories?size=20`
+7. `GET /api/categories/{TEST_CATEGORY_CODE}`
+8. `GET /api/mobile/stores`
+9. `GET /api/mobile/stores/beacon-identities`
+10. `GET /api/mobile/stores/by-beacon`
+11. `GET /api/mobile/stores/by-beacon?uuid={ACTIVE_BEACON_UUID}`
+12. `GET /api/mobile/stores/{ACTIVE_STORE_ID}/layout/current`
 
 Geprueft wird unter anderem:
 
@@ -185,7 +186,7 @@ Geprueft wird unter anderem:
 - Region- und Store-Manager duerfen globale Logs nicht sehen.
 - Store-Manager darf nur seine eigene Filiale und deren Layout sehen.
 
-### 03-maintenance-smoke.http: 6 Maintenance-Checks
+### 03-maintenance-smoke.http: 8 Maintenance-Checks
 
 Diese Checks pruefen Operator- und Wartungsfunktionen als Smoke-Test. Sie sind
 bewusst schlank, weil manche Endpunkte echte Daten oder Indexe veraendern.
@@ -194,14 +195,18 @@ bewusst schlank, weil manche Endpunkte echte Daten oder Indexe veraendern.
 2. `POST /api/admin/index/create`
 3. `POST /api/products/bulk`
 4. `POST /api/products`
-5. `POST /api/categories/bulk`
-6. `POST /api/export/pdf`
+5. `POST /api/categories/bulk` anonym
+6. `POST /api/categories/bulk` als Store-Manager
+7. `POST /api/categories/bulk` als Admin
+8. `POST /api/export/pdf`
 
 Geprueft wird:
 
 - Backend-Health ist erreichbar.
 - OpenSearch-Index-Erstellung ist grundsaetzlich aufrufbar.
 - Produkt- und Kategorie-Import funktionieren als Smoke.
+- Produkt-Import-Beispiele koennen optional eine Store-Zuordnung (`storeId`) schreiben, damit store-scoped Search verifiziert werden kann.
+- Kategorie-Bulk-Import ist nicht anonym oder fuer Store-Manager offen.
 - PDF-Export antwortet erfolgreich.
 
 Hinweis: Das ist noch keine vollstaendige fachliche Import-/Export-Teststrecke.
@@ -310,6 +315,18 @@ Fuer den normalen Stand brauchst du diese Variante nicht.
 - `indooro-store` ist auf seine Filiale eingeschraenkt.
 - Store-Manager bekommt bei fremden Filialen `403`.
 - Maintenance-Endpunkte haben Smoke-Coverage.
+
+## Manueller Layout-Fallback-Check
+
+Wenn ein aktiver Demo-Store keine aktive Layout-Version hat, muss diese Route
+weiterhin `200` liefern und den Fallback explizit markieren:
+
+```bash
+curl -i "$BASE_URL/api/mobile/stores/$ACTIVE_STORE_ID/layout/current"
+```
+
+Erwarteter JSON-Contract in diesem Fall: `layoutId` ist `null`, `source` ist
+`DEFAULT`, `fallback` ist `true`, und `layout` enthaelt das Default-Layout.
 
 ## Wichtige Fixture-IDs
 

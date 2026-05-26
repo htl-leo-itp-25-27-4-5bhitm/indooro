@@ -1,5 +1,7 @@
 # Indooro API Dokumentation
 
+> Historischer Hinweis (2026-05-26): Dieses Dokument beschreibt den fruehen OpenSearch/API-Stand und ist nicht mehr alleinige Quelle fuer agentische Umsetzung. Aktueller Contract ist OpenSpec plus Source Code. Abweichungen: Schreibende Produkt-/Kategorie-Importe sind admin-geschuetzt, Produktsuche unterstuetzt optionale Store-Filter (`storeId`, `storeCode`), und mobile Store-Layouts liefern explizite Fallback-Metadaten (`source`, `fallback`).
+
 ## Übersicht
 
 Die Indooro API ist eine RESTful-Schnittstelle zur Verwaltung und Suche von Supermarkt-Produkten mit OpenSearch-Integration. Der Server läuft auf Port **8080**.

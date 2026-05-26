@@ -16,6 +16,12 @@ public class Product {
     @JsonProperty("layoutCode")
     private String layoutCode;
 
+    @JsonProperty("storeId")
+    private String storeId;
+
+    @JsonProperty("storeCode")
+    private String storeCode;
+
     public Product() {
     }
 
@@ -24,6 +30,15 @@ public class Product {
         this.name = name;
         this.price = price;
         this.layoutCode = layoutCode;
+    }
+
+    public Product(Integer id, String name, Double price, String layoutCode, String storeId, String storeCode) {
+        this.id = id;
+        this.name = name;
+        this.price = price;
+        this.layoutCode = layoutCode;
+        this.storeId = storeId;
+        this.storeCode = storeCode;
     }
 
     // Getters and Setters
@@ -57,5 +72,21 @@ public class Product {
 
     public void setLayoutCode(String layoutCode) {
         this.layoutCode = layoutCode;
+    }
+
+    public String getStoreId() {
+        return storeId;
+    }
+
+    public void setStoreId(String storeId) {
+        this.storeId = storeId;
+    }
+
+    public String getStoreCode() {
+        return storeCode;
+    }
+
+    public void setStoreCode(String storeCode) {
+        this.storeCode = storeCode;
     }
 }
