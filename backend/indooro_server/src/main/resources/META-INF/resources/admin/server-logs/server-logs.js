@@ -1,4 +1,5 @@
 const API = '/api/admin/error-logs';
+const ME_API = '/api/admin/me';
 
 const els = {
   pageStatus: document.getElementById('pageStatus'),
@@ -23,10 +24,21 @@ async function fetchJson(url) {
       window.location.href = '/admin/';
       throw new Error('Login erforderlich.');
     }
-    throw new Error(rawBody || `Request failed with status ${response.status}`);
+    const message = rawBody.trim().startsWith('<')
+      ? `Request failed with status ${response.status}`
+      : rawBody || `Request failed with status ${response.status}`;
+    throw new Error(message);
   }
 
   return rawBody ? JSON.parse(rawBody) : null;
+}
+
+async function ensureAdmin() {
+  const user = await fetchJson(ME_API);
+  if (user?.role !== 'admin') {
+    window.location.replace('/admin/');
+    throw new Error('Kein Zugriff auf diese Admin-Funktion.');
+  }
 }
 
 function formatDate(value) {
@@ -81,6 +93,6 @@ els.refreshLogsBtn.addEventListener('click', async () => {
   }
 });
 
-loadLogs().catch((error) => {
+ensureAdmin().then(loadLogs).catch((error) => {
   setStatus(`Fehlerlog konnte nicht geladen werden: ${error.message}`, 'error');
 });

@@ -251,7 +251,7 @@ function createBeaconElement(x, y, excludeElementId = null) {
 
 function renderStoreContext() {
   if (backLink) {
-    backLink.href = hasStoreContext() ? `/admin/#store-detail` : '/admin/';
+    backLink.href = hasStoreContext() ? `/admin/stores/detail/?storeId=${encodeURIComponent(storeId)}` : '/admin/';
   }
 
   if (!hasStoreContext() || !storeContextBox || !assignedBeaconsPanel || !assignedBeaconsList) {

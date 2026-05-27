@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Indooro - Layout Editor</title>
+  <title>Indooro Layout-Editor</title>
   <script defer src="https://cdn.tailwindcss.com"></script>
   <script defer src="../editor.js"></script>
   <link rel="stylesheet" href="../editor.css">
 </head>
-<body class="h-screen antialiased text-gray-800 bg-gray-50">
+<body class="editor-workspace h-screen antialiased text-gray-800 bg-gray-50">
 
 <div class="flex h-screen overflow-hidden">
   <aside class="w-80 bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0">
@@ -22,7 +22,7 @@
       <div class="flex gap-2">
         <button id="toolSelect" class="flex-1 px-3 py-2 rounded flex items-center justify-center gap-2 bg-blue-500 text-white">
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h14M12 5v14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Auswaehlen
+          Auswählen
         </button>
         <button id="toolDraw" class="flex-1 px-3 py-2 rounded flex items-center justify-center gap-2 bg-gray-100">
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -47,14 +47,14 @@
     </div>
 
     <div class="p-4">
-      <h3 class="font-semibold mb-2">Rastergroesse</h3>
+      <h3 class="font-semibold mb-2">Rastergröße</h3>
       <div class="grid grid-cols-2 gap-2">
         <div>
           <label class="block text-xs font-medium mb-1">Breite (m)</label>
           <input id="gridWidth" type="number" value="40" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
         </div>
         <div>
-          <label class="block text-xs font-medium mb-1">Hoehe (m)</label>
+          <label class="block text-xs font-medium mb-1">Höhe (m)</label>
           <input id="gridHeight" type="number" value="60" class="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
         </div>
       </div>
@@ -78,7 +78,7 @@
         </div>
 
         <div class="flex items-center gap-1 ml-4 border-l pl-4">
-          <button id="undoBtn" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded flex items-center gap-1" title="Rueckgaengig (Strg+Z)">
+          <button id="undoBtn" class="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded flex items-center gap-1" title="Rückgängig (Strg+Z)">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M3 7v6h6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -123,7 +123,7 @@
         </button>
 
         <button id="launchBtn" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 flex items-center gap-2 font-semibold shadow-lg">
-          🚀 Simulation starten
+          Simulation starten
         </button>
       </div>
     </div>
@@ -134,7 +134,7 @@
 
     <div class="bg-white border-t border-gray-200 px-4 py-2 flex items-center justify-between text-sm text-gray-600 flex-shrink-0">
       <div>Elemente: <span id="countElements">0</span></div>
-      <div>Ladenflaeche: <span id="areaSize">40</span>m × <span id="areaSizeH">60</span>m</div>
+      <div>Ladenfläche: <span id="areaSize">40</span>m × <span id="areaSizeH">60</span>m</div>
       <div id="modeLabel">Auswahlmodus</div>
     </div>
   </div>
@@ -143,7 +143,7 @@
     <div class="p-4">
       <h3 class="font-semibold mb-3">Eigenschaften</h3>
       <div id="propertiesWrapper" class="text-sm text-gray-500">
-        Waehle ein Element aus, um seine Eigenschaften zu bearbeiten.
+        Wähle ein Element aus, um seine Eigenschaften zu bearbeiten.
       </div>
     </div>
   </aside>

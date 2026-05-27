@@ -48,3 +48,119 @@ aside {
   white-space: nowrap;
   line-height: 1;
 }
+
+.editor-workspace {
+  color: #1d2620;
+  background: #ebe6da !important;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.editor-workspace > .flex {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(235, 230, 218, 0.88)),
+    #ebe6da;
+}
+
+.editor-workspace aside {
+  background: #171f1a !important;
+  color: #f6f1e6;
+  border-color: rgba(255, 255, 255, 0.10) !important;
+}
+
+.editor-workspace aside h3,
+.editor-workspace aside label {
+  color: #f6f1e6;
+}
+
+.editor-workspace aside .text-gray-500,
+.editor-workspace aside .text-gray-700 {
+  color: rgba(246, 241, 230, 0.70) !important;
+}
+
+.editor-workspace aside .border-b {
+  border-color: rgba(255, 255, 255, 0.10) !important;
+}
+
+.editor-workspace input,
+.editor-workspace select,
+.editor-workspace textarea {
+  border-radius: 7px !important;
+  border-color: rgba(37, 46, 40, 0.18) !important;
+}
+
+.editor-workspace aside input,
+.editor-workspace aside select,
+.editor-workspace aside textarea {
+  color: #1d2620;
+  background: #fffefa;
+}
+
+.editor-workspace .flex-1.flex.flex-col > .bg-white {
+  background: #fffefa !important;
+  border-color: #d7cebd !important;
+}
+
+.editor-workspace .flex-1.overflow-auto {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(47, 109, 80, 0.10), transparent 32%),
+    #eee9df !important;
+}
+
+.canvas-area {
+  border: 1px solid #cfc5b4;
+  border-radius: 8px;
+  box-shadow: 0 22px 60px rgba(29, 38, 32, 0.14);
+}
+
+.editor-workspace button,
+.editor-workspace a,
+.editor-workspace label.cursor-pointer {
+  border-radius: 7px !important;
+  box-shadow: none !important;
+}
+
+.editor-workspace aside button,
+.editor-workspace aside a,
+.editor-workspace aside label.cursor-pointer {
+  color: #1d2620 !important;
+}
+
+.editor-workspace aside .bg-blue-500,
+.editor-workspace aside .bg-blue-600,
+.editor-workspace aside .bg-green-500,
+.editor-workspace aside .bg-green-600 {
+  color: #fffefa !important;
+}
+
+.editor-workspace .bg-blue-500,
+.editor-workspace .bg-blue-600,
+.editor-workspace .bg-purple-600,
+.editor-workspace .bg-purple-700,
+.editor-workspace .bg-green-500,
+.editor-workspace .bg-green-600 {
+  background-color: #2f6d50 !important;
+}
+
+.editor-workspace .bg-red-500,
+.editor-workspace .bg-red-600 {
+  background-color: #9b3d40 !important;
+}
+
+.editor-workspace .bg-gray-100 {
+  background-color: #f4f1ea !important;
+}
+
+.editor-workspace .hover\:bg-gray-200:hover {
+  background-color: #e7dfd1 !important;
+}
+
+.editor-workspace #storeContextBox {
+  color: #173d2b !important;
+  background: #e7f0e9 !important;
+  border-color: rgba(47, 109, 80, 0.18) !important;
+}
+
+.element-box.selected {
+  box-shadow: 0 0 0 3px rgba(47, 109, 80, 0.28), 0 3px 10px rgba(29, 38, 32, 0.14);
+  border-color: #2f6d50;
+}

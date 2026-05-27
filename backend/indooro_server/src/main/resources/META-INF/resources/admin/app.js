@@ -44,6 +44,48 @@ const state = {
   },
 };
 
+const ROUTES = {
+  dashboard: '/admin/',
+  regions: '/admin/regions/',
+  stores: '/admin/stores/',
+  'store-detail': '/admin/stores/detail/',
+  beacons: '/admin/beacons/',
+  products: '/admin/products/',
+  recipes: '/admin/recipes/',
+};
+
+function currentRoute() {
+  const path = window.location.pathname.replace(/\/+$/, '/') || '/admin/';
+  if (path === '/admin/' || path === '/admin') return 'dashboard';
+  if (path.startsWith('/admin/regions/')) return 'regions';
+  if (path.startsWith('/admin/stores/detail/')) return 'store-detail';
+  if (path.startsWith('/admin/stores/')) return 'stores';
+  if (path.startsWith('/admin/beacons/')) return 'beacons';
+  if (path.startsWith('/admin/products/')) return 'products';
+  if (path.startsWith('/admin/recipes/')) return 'recipes';
+  return 'dashboard';
+}
+
+function storeIdFromUrl() {
+  return new URLSearchParams(window.location.search).get('storeId');
+}
+
+function applyPageRoute() {
+  const route = currentRoute();
+  document.body.dataset.page = route;
+  document.querySelectorAll('[data-route-section]').forEach((section) => {
+    section.classList.toggle('route-hidden', section.dataset.routeSection !== route);
+  });
+  document.querySelectorAll('[data-route]').forEach((link) => {
+    link.classList.toggle('active', link.dataset.route === route);
+    if (link.dataset.route === route) {
+      link.setAttribute('aria-current', 'page');
+    } else {
+      link.removeAttribute('aria-current');
+    }
+  });
+}
+
 const els = {
   pageStatus: document.getElementById('pageStatus'),
   statRegions: document.getElementById('statRegions'),
@@ -145,7 +187,7 @@ async function fetchJson(url, options = {}) {
         const payload = JSON.parse(rawBody);
         message = payload.error || payload.message || payload.details || rawBody || message;
       } catch (_error) {
-        message = rawBody;
+        message = rawBody.trim().startsWith('<') ? message : rawBody;
       }
     }
 
@@ -177,6 +219,7 @@ function renderCurrentUser() {
   }
 
   const { username, email, role, scope } = state.currentUser;
+  document.body.dataset.adminRole = role || 'unknown';
   els.currentUserName.textContent = username || email || 'Admin';
   els.currentUserRole.textContent = roleLabel(role);
 
@@ -208,7 +251,6 @@ function canCreateStore() {
 function applyRoleUi() {
   const systemLogsPanel = document.getElementById('system-logs');
   systemLogsPanel?.classList.toggle('hidden', !isAdmin());
-  document.querySelector('a[href="#system-logs"]')?.classList.toggle('hidden', !isAdmin());
   document.querySelector('a[href="/admin/server-logs/"]')?.classList.toggle('hidden', !isAdmin());
   document.querySelectorAll('.admin-only').forEach((element) => {
     element.classList.toggle('hidden', !isAdmin());
@@ -217,6 +259,10 @@ function applyRoleUi() {
   els.regionForm.classList.toggle('hidden', !isAdmin());
   els.resetStoreFormBtn.classList.toggle('hidden', !canCreateStore());
   els.storeForm.classList.toggle('hidden', !canCreateStore());
+
+  if (!isAdmin() && ['products', 'recipes'].includes(currentRoute())) {
+    window.location.replace('/admin/');
+  }
 }
 
 function roleLabel(role) {
@@ -306,11 +352,11 @@ function getStoreById(storeId) {
 }
 
 function scrollToStoreDetail() {
-  document.getElementById('store-detail')?.scrollIntoView({
-    behavior: 'smooth',
-    block: 'start',
-  });
-  history.replaceState(null, '', '#store-detail');
+  if (state.selectedStoreId) {
+    window.location.href = `/admin/stores/detail/?storeId=${encodeURIComponent(state.selectedStoreId)}`;
+  } else {
+    window.location.href = '/admin/stores/detail/';
+  }
 }
 
 async function loadBootstrapData() {
@@ -440,11 +486,11 @@ function renderSystemLogs() {
           <div class="item-meta">Rolle ${escapeHtml(entry.actorRole || 'SYSTEM')} · ${escapeHtml(entry.actorLabel || 'system')}</div>
         </div>
       `).join('')
-    : '<div class="empty-state">Noch keine System-Logs vorhanden. Sobald Filialen, Regionen, Beacons oder Layouts geaendert werden, erscheinen sie hier.</div>';
+    : '<div class="empty-state">Noch keine System-Logs vorhanden. Sobald Filialen, Regionen, Beacons oder Layouts geändert werden, erscheinen sie hier.</div>';
 }
 
 function renderRegionOptions() {
-  const options = ['<option value="">Bitte waehlen</option>']
+  const options = ['<option value="">Bitte wählen</option>']
     .concat(state.regions.map((region) => `<option value="${region.id}">${escapeHtml(region.name)} (${escapeHtml(region.code)})</option>`))
     .join('');
 
@@ -481,7 +527,7 @@ function renderRegions() {
 
 function renderStores() {
   if (!state.stores.length) {
-    els.storesList.innerHTML = '<div class="empty-state">Keine Filialen fuer den aktuellen Filter gefunden.</div>';
+    els.storesList.innerHTML = '<div class="empty-state">Keine Filialen für den aktuellen Filter gefunden.</div>';
     return;
   }
 
@@ -500,7 +546,7 @@ function renderStores() {
         ${store.hasActiveLayout ? '<span class="badge">Layout vorhanden</span>' : '<span class="badge warn">Noch kein Layout</span>'}
       </div>
       <div class="item-footer">
-        <button type="button" class="action-button" data-action="select-store" data-id="${store.id}">Detail</button>
+        <a class="inline-link" href="/admin/stores/detail/?storeId=${encodeURIComponent(store.id)}">Detail</a>
         <button type="button" class="action-button" data-action="edit-store" data-id="${store.id}">Bearbeiten</button>
         <a class="inline-link" href="/admin/editor/?storeId=${store.id}">Editor</a>
         ${isStoreManager() ? '' : `<button type="button" class="action-button warn" data-action="archive-store" data-id="${store.id}">Archivieren</button>`}
@@ -562,26 +608,26 @@ function renderStoreDetail() {
           <div class="item-meta">Version ${layout.versionNo} · ${formatDate(layout.createdAt)}</div>
           <div class="item-footer">
             ${layout.status === 'ACTIVE' ? '' : `<button type="button" class="action-button" data-action="activate-layout" data-layout-id="${layout.layoutId}">Aktivieren</button>`}
-            <a class="inline-link" href="/admin/editor/?storeId=${store.id}">Im Editor oeffnen</a>
+            <a class="inline-link" href="/admin/editor/?storeId=${store.id}">Im Editor öffnen</a>
           </div>
         </article>
       `).join('')
-    : '<div class="empty-state">Fuer diese Filiale gibt es noch keine gespeicherten Layout-Versionen.</div>';
+    : '<div class="empty-state">Für diese Filiale gibt es noch keine gespeicherten Layout-Versionen.</div>';
 
   els.storeAuditTrail.innerHTML = state.selectedStoreAudit.length
     ? state.selectedStoreAudit.map((entry) => `
         <div class="timeline-entry">
           <strong>${escapeHtml(entry.action)}</strong>
           <time>${formatDate(entry.createdAt)}</time>
-          <p>${escapeHtml(entry.summary || 'Aenderung protokolliert')}</p>
+          <p>${escapeHtml(entry.summary || 'Änderung protokolliert')}</p>
         </div>
       `).join('')
-    : '<div class="empty-state">Noch keine protokollierten Aenderungen fuer diese Filiale.</div>';
+    : '<div class="empty-state">Noch keine protokollierten Änderungen für diese Filiale.</div>';
 }
 
 function renderBeacons() {
   if (!state.beacons.length) {
-    els.beaconsList.innerHTML = '<div class="empty-state">Keine Beacons fuer den aktuellen Filter gefunden.</div>';
+    els.beaconsList.innerHTML = '<div class="empty-state">Keine Beacons für den aktuellen Filter gefunden.</div>';
     return;
   }
 
@@ -618,7 +664,7 @@ function renderProducts() {
   }
 
   if (!state.products.length) {
-    els.productsList.innerHTML = '<div class="empty-state">Noch keine Produkte geladen. Lege ein Produkt an oder pruefe, ob der OpenSearch-Index bereits Daten enthaelt.</div>';
+    els.productsList.innerHTML = '<div class="empty-state">Noch keine Produkte geladen. Lege ein Produkt an oder prüfe, ob der OpenSearch-Index bereits Daten enthält.</div>';
     return;
   }
 
@@ -635,7 +681,7 @@ function renderProducts() {
       </div>
       <div class="item-footer">
         <button type="button" class="action-button" data-action="edit-product" data-id="${escapeHtml(product.id)}">Bearbeiten</button>
-        <button type="button" class="action-button danger" data-action="delete-product" data-id="${escapeHtml(product.id)}">Loeschen</button>
+        <button type="button" class="action-button danger" data-action="delete-product" data-id="${escapeHtml(product.id)}">Löschen</button>
       </div>
     </article>
   `).join('');
@@ -673,7 +719,7 @@ function renderRecipes() {
       </div>
       <div class="item-footer">
         <button type="button" class="action-button" data-action="select-recipe" data-id="${recipe.id}">Bearbeiten</button>
-        <button type="button" class="action-button" data-action="publish-recipe" data-id="${recipe.id}">Veroeffentlichen</button>
+        <button type="button" class="action-button" data-action="publish-recipe" data-id="${recipe.id}">Veröffentlichen</button>
         <button type="button" class="action-button warn" data-action="deactivate-recipe" data-id="${recipe.id}">Deaktivieren</button>
         <button type="button" class="action-button danger" data-action="archive-recipe" data-id="${recipe.id}">Archivieren</button>
       </div>
@@ -759,7 +805,7 @@ function renderAssignSelect(beaconId) {
     <label class="subtle">
       <span>Zuweisen zu</span>
       <select data-action="assign-beacon" data-id="${beaconId}">
-        <option value="">Filiale waehlen</option>
+        <option value="">Filiale wählen</option>
         ${activeStores.map((store) => `<option value="${store.id}">${escapeHtml(store.name)}</option>`).join('')}
       </select>
     </label>
@@ -901,6 +947,11 @@ async function refreshAll({ keepStatusMessage = false } = {}) {
   renderProducts();
   renderRecipes();
 
+  const routeStoreId = storeIdFromUrl();
+  if (currentRoute() === 'store-detail' && routeStoreId) {
+    state.selectedStoreId = routeStoreId;
+  }
+
   if (state.selectedStoreId) {
     await loadStoreDetail(state.selectedStoreId);
   }
@@ -990,7 +1041,7 @@ async function handleBeaconBulkSubmit(event) {
   const items = lines.map((line) => {
     const [beaconCode, minorRaw] = line.split(/[;,]/).map((part) => part.trim());
     if (!beaconCode || !minorRaw) {
-      throw new Error(`Ungueltige Beacon-Zeile: ${line}`);
+      throw new Error(`Ungültige Beacon-Zeile: ${line}`);
     }
     return {
       beaconCode,
@@ -1074,7 +1125,7 @@ async function handleRecipeSubmit(event) {
     throw new Error('Slug und Titel sind erforderlich.');
   }
   if (!Number.isInteger(recipe.servings) || recipe.servings < 1) {
-    throw new Error('Portionen muessen eine positive ganze Zahl sein.');
+    throw new Error('Portionen müssen eine positive ganze Zahl sein.');
   }
 
   const payload = state.editingRecipeId ? recipe : { recipe, ingredients: [], steps: [] };
@@ -1092,7 +1143,7 @@ async function handleRecipeSubmit(event) {
 async function handleRecipeIngredientSubmit(event) {
   event.preventDefault();
   if (!state.editingRecipeId) {
-    throw new Error('Waehle zuerst ein Rezept aus.');
+    throw new Error('Wähle zuerst ein Rezept aus.');
   }
 
   const quantityValue = els.recipeIngredientForm.elements.quantity.value.trim();
@@ -1115,13 +1166,13 @@ async function handleRecipeIngredientSubmit(event) {
   renderRecipeDetailTools();
   await loadRecipes();
   renderRecipes();
-  setStatus('Zutat wurde hinzugefuegt.', 'success');
+  setStatus('Zutat wurde hinzugefügt.', 'success');
 }
 
 async function handleRecipeStepSubmit(event) {
   event.preventDefault();
   if (!state.editingRecipeId) {
-    throw new Error('Waehle zuerst ein Rezept aus.');
+    throw new Error('Wähle zuerst ein Rezept aus.');
   }
 
   const durationValue = els.recipeStepForm.elements.durationMinutes.value.trim();
@@ -1139,7 +1190,7 @@ async function handleRecipeStepSubmit(event) {
   renderRecipeDetailTools();
   await loadRecipes();
   renderRecipes();
-  setStatus('Schritt wurde hinzugefuegt.', 'success');
+  setStatus('Schritt wurde hinzugefügt.', 'success');
 }
 
 async function publishRecipe(recipeId) {
@@ -1150,7 +1201,7 @@ async function publishRecipe(recipeId) {
     populateRecipeForm(state.selectedRecipeDetail);
   }
   renderRecipes();
-  setStatus('Rezept wurde veroeffentlicht.', 'success');
+  setStatus('Rezept wurde veröffentlicht.', 'success');
 }
 
 async function deactivateRecipe(recipeId) {
@@ -1184,11 +1235,11 @@ async function previewRecipeMapping(recipeId) {
           </div>
           <p class="subtle">${escapeHtml(entry.product?.name || entry.reason || 'Keine Zuordnung')}</p>
           <div class="item-footer">
-            <button type="button" class="action-button" data-action="load-recipe-mapping-suggestions" data-id="${recipeId}" data-ingredient-id="${entry.ingredientId}" data-query="${escapeHtml(entry.ingredientName)}">Produktvorschlaege</button>
+            <button type="button" class="action-button" data-action="load-recipe-mapping-suggestions" data-id="${recipeId}" data-ingredient-id="${entry.ingredientId}" data-query="${escapeHtml(entry.ingredientName)}">Produktvorschläge</button>
           </div>
         </article>
       `).join('')
-    : '<div class="empty-state">Keine Zutaten fuer Mapping vorhanden.</div>';
+    : '<div class="empty-state">Keine Zutaten für Mapping vorhanden.</div>';
   els.recipeMappingPreview.innerHTML = `<h4>Mapping-Status</h4>${rows}`;
 }
 
@@ -1217,17 +1268,17 @@ async function loadRecipeMappingSuggestions(recipeId, ingredientId, query) {
               data-layout-code="${escapeHtml(product.layoutCode || '')}"
               data-store-id="${escapeHtml(product.storeId || '')}"
               data-store-code="${escapeHtml(product.storeCode || '')}">
-              Mapping bestaetigen
+              Mapping bestätigen
             </button>
           </div>
         </article>
       `).join('')
-    : '<div class="empty-state">Keine passenden Produktvorschlaege gefunden.</div>';
+    : '<div class="empty-state">Keine passenden Produktvorschläge gefunden.</div>';
 
   els.recipeMappingPreview.innerHTML = `
-    <h4>Produktvorschlaege</h4>
+    <h4>Produktvorschläge</h4>
     ${rows}
-    <button type="button" class="secondary-button" data-action="preview-recipe-mapping" data-id="${recipeId}">Zurueck zum Mapping-Status</button>
+    <button type="button" class="secondary-button" data-action="preview-recipe-mapping" data-id="${recipeId}">Zurück zum Mapping-Status</button>
   `;
 }
 
@@ -1249,14 +1300,14 @@ async function confirmRecipeMapping(button) {
   await previewRecipeMapping(recipeId);
   await loadRecipes();
   renderRecipes();
-  setStatus('Produkt-Mapping wurde bestaetigt.', 'success');
+  setStatus('Produkt-Mapping wurde bestätigt.', 'success');
 }
 
 async function deleteProduct(productId) {
   const product = state.products.find((entry) => String(entry.id) === String(productId));
   const productLabel = product ? `${product.name} (ID ${product.id})` : `ID ${productId}`;
 
-  if (!window.confirm(`Willst du das Produkt ${productLabel} wirklich loeschen?`)) {
+  if (!window.confirm(`Willst du das Produkt ${productLabel} wirklich löschen?`)) {
     return;
   }
 
@@ -1267,7 +1318,7 @@ async function deleteProduct(productId) {
   }
   removeProductFromState(productId);
   renderProducts();
-  setStatus('Produkt wurde aus dem Katalog geloescht.', 'success');
+  setStatus('Produkt wurde aus dem Katalog gelöscht.', 'success');
 }
 
 async function archiveRegion(regionId) {
@@ -1511,7 +1562,7 @@ function bindEvents() {
         await archiveRegion(id);
       } else if (action === 'select-store') {
         const selectedStore = getStoreById(id);
-        setStatus(`Lade Filialdetail${selectedStore ? ` fuer ${selectedStore.name}` : ''}...`);
+        setStatus(`Lade Filialdetail${selectedStore ? ` für ${selectedStore.name}` : ''}...`);
         await loadStoreDetail(id);
         renderStores();
         renderStoreDetail();
@@ -1572,6 +1623,7 @@ function bindEvents() {
 }
 
 async function init() {
+  applyPageRoute();
   bindEvents();
   state.storeFilters.query = els.storeQuery.value;
   state.storeFilters.status = els.storeStatusFilter.value;
