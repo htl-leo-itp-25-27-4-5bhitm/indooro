@@ -1,14 +1,16 @@
 export function validateLayoutDocument(layout = {}, context = {}) {
   const elements = Array.isArray(layout.elements) ? layout.elements : [];
-  const width = Number(layout.width || layout.mapWidth || 1200);
-  const height = Number(layout.height || layout.mapHeight || 800);
+  const width = Number(layout.width || layout.mapWidth || layout.gridSize?.width || 1200);
+  const height = Number(layout.height || layout.mapHeight || layout.gridSize?.height || 800);
+  const gridWidth = Number(layout.gridSize?.width || layout.gridWidth || 0);
+  const gridHeight = Number(layout.gridSize?.height || layout.gridHeight || 0);
   const placedBeaconIds = new Map();
   const issues = [];
 
   if (!layout.shopName) {
     issues.push({ severity: "warning", message: "Shop-Name fehlt.", elementId: null });
   }
-  if (!Number(layout.gridSize || 0)) {
+  if (!gridWidth || !gridHeight) {
     issues.push({ severity: "warning", message: "Grid-Groesse fehlt.", elementId: null });
   }
   if (!elements.length) {
@@ -22,9 +24,12 @@ export function validateLayoutDocument(layout = {}, context = {}) {
     const id = element.id ?? element.label ?? "unbenannt";
     const x = Number(element.x ?? 0);
     const y = Number(element.y ?? 0);
-    const elementWidth = Number(element.width ?? element.w ?? 1);
-    const elementHeight = Number(element.height ?? element.h ?? 1);
-    if (x < 0 || y < 0 || x + elementWidth > width || y + elementHeight > height) {
+    const elementWidth = Number(element.width ?? element.w ?? (element.type === "beacon" ? 0 : 1));
+    const elementHeight = Number(element.height ?? element.h ?? (element.type === "beacon" ? 0 : 1));
+    const pointElement = element.type === "beacon";
+    const outsidePoint = pointElement && (x < 0 || y < 0 || x > width || y > height);
+    const outsideBox = !pointElement && (x < 0 || y < 0 || x + elementWidth > width || y + elementHeight > height);
+    if (outsidePoint || outsideBox) {
       issues.push({ severity: "error", message: `${labelForElement(element)} liegt ausserhalb der Flaeche.`, elementId: id });
     }
     if ((element.type === "shelf" || element.type === "poi") && !element.category && !element.layoutCode) {

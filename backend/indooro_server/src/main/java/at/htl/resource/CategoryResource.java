@@ -9,6 +9,7 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
@@ -56,6 +57,31 @@ public class CategoryResource {
         } catch (IOException e) {
             return Response.serverError().entity(Map.of("error", e.getMessage())).build();
         }
+    }
+
+    @POST
+    @RolesAllowed("admin")
+    public Response upsertCategory(Category category) {
+        adminAccessService.requireAdmin();
+        try {
+            categoryService.bulkInsert(List.of(category));
+            return Response.ok(category).build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity(Map.of("error", e.getMessage())).build();
+        } catch (IOException e) {
+            return Response.serverError().entity(Map.of("error", e.getMessage())).build();
+        }
+    }
+
+    @PUT
+    @Path("/{categoryCode}")
+    @RolesAllowed("admin")
+    public Response upsertCategoryByCode(@PathParam("categoryCode") Integer categoryCode, Category category) {
+        adminAccessService.requireAdmin();
+        if (category != null) {
+            category.setCategoryCode(categoryCode);
+        }
+        return upsertCategory(category);
     }
 
     @POST

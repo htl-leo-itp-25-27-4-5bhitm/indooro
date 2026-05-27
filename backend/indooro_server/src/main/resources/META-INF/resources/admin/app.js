@@ -394,18 +394,23 @@ function renderProductList(products) {
 }
 
 async function renderCategories() {
-  setPage("Kategorien", "Kategoriepflege bleibt bewusst Import-/Maintenance-orientiert.", `<button class="primary" data-open-category-import>Kategorie-Import</button>`);
+  setPage("Kategorien", "Kategorien verwalten und fuer Produktpflege bereitstellen.", `<button class="primary" data-open-category>Kategorie anlegen</button><button data-open-category-import>Kategorie-Import</button>`);
   const categories = normalizeList(await safeGet(API.categories, []));
   content(`
-    <section class="notice">Einzelne Kategorie-Mutationen sind im Backend aktuell nicht vorhanden. Diese Seite macht die Begrenzung sichtbar und bietet den vorhandenen geschuetzten Bulk-Import.</section>
-    <section class="panel" style="margin-top:16px">
+    <section class="panel">
       ${table({
         columns: ["Code", "Name", "Aktionen"],
-        rows: categories.map((category) => [mono(category.categoryCode || category.id || category.code), escapeHtml(category.name || category.displayName || "-"), "Bulk Import"]),
+        rows: categories.map((category) => [
+          mono(category.categoryCode || category.id || category.code),
+          escapeHtml(category.categoryName || category.name || category.displayName || "-"),
+          actions([["Bearbeiten", () => openCategoryDrawer(category)]])
+        ]),
         emptyMessage: "Keine Kategorien geladen."
       })}
     </section>
   `);
+  hydrateActions();
+  document.querySelector("[data-open-category]")?.addEventListener("click", () => openCategoryDrawer());
   document.querySelector("[data-open-category-import]")?.addEventListener("click", () => openImportDrawer("category"));
 }
 
@@ -626,6 +631,35 @@ function openProductDrawer(product = {}) {
       closeDrawer();
       toast("Produkt gespeichert.");
       renderProducts();
+    });
+  });
+}
+
+function openCategoryDrawer(category = {}) {
+  openDrawer(category.categoryCode ? "Kategorie bearbeiten" : "Kategorie anlegen", `
+    <form class="stack">
+      <div class="form-grid">
+        ${field("categoryCode", "Kategorie-Code", category.categoryCode ?? "", "number")}
+        ${field("categoryName", "Name", category.categoryName || category.name || "")}
+      </div>
+      <div data-error-summary></div>
+      <div class="toolbar"><button class="primary">Speichern</button></div>
+    </form>
+  `, (drawer) => {
+    drawer.querySelector("form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const values = formValues(event.currentTarget);
+      if (!values.categoryCode || !values.categoryName?.trim()) {
+        showErrors(event.currentTarget, { category: "Kategorie-Code und Name sind erforderlich." });
+        return;
+      }
+      await apiPost("/api/categories", {
+        categoryCode: Number(values.categoryCode),
+        categoryName: values.categoryName.trim()
+      });
+      closeDrawer();
+      toast("Kategorie gespeichert.");
+      renderCategories();
     });
   });
 }

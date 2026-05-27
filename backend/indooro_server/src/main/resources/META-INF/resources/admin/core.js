@@ -70,6 +70,7 @@ export function formatDate(value) {
 
 export function normalizeList(value) {
   if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.content)) return value.content;
   if (Array.isArray(value?.items)) return value.items;
   if (Array.isArray(value?.entries)) return value.entries;
   if (Array.isArray(value?.data)) return value.data;
@@ -115,11 +116,12 @@ export function readinessForProduct(product = {}) {
   const problems = [];
   if (!product.layoutCode || !String(product.layoutCode).trim()) problems.push("Layout-Code fehlt");
   if (product.layoutCode && !/^[A-Za-z0-9_.:-]{2,80}$/.test(product.layoutCode)) problems.push("Layout-Code ist unklar");
-  if (!product.storeId && !product.storeCode) problems.push("Store-Kontext fehlt");
+  const assignedToStore = Boolean(product.storeId || product.storeCode);
+  const blockingProblems = problems.filter((problem) => problem !== "Store-Kontext fehlt");
   return {
-    status: problems.length ? "warning" : "ready",
-    label: problems.length ? "Nicht routbar" : "Routbar",
-    problems
+    status: blockingProblems.length ? "warning" : "ready",
+    label: blockingProblems.length ? "Layout pruefen" : assignedToStore ? "Routbar" : "Global routbar",
+    problems: assignedToStore ? problems : [...problems, "Kein Store-spezifischer Scope"]
   };
 }
 

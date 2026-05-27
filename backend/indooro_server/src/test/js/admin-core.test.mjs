@@ -40,6 +40,7 @@ test("product readiness reports missing route metadata", () => {
   const readiness = readinessForProduct({ id: 1, name: "Apfel" });
   assert.equal(readiness.status, "warning");
   assert.ok(readiness.problems.includes("Layout-Code fehlt"));
+  assert.equal(readinessForProduct({ id: 2, name: "Milch", layoutCode: "A-01", storeCode: "LNZ" }).label, "Routbar");
 });
 
 test("imports support JSON arrays and NDJSON", () => {
