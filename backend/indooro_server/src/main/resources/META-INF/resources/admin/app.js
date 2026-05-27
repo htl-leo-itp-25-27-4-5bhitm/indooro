@@ -482,8 +482,8 @@ function renderEditorEntry() {
 function openRegionDrawer(region = {}) {
   openDrawer(region.id ? "Region bearbeiten" : "Region anlegen", `
     <form class="stack" data-form="region">
-      ${field("code", "Code", region.code || "")}
-      ${field("name", "Name", region.name || "")}
+      ${field("code", "Code", region.code || "", "text", "", "AT-OÖ")}
+      ${field("name", "Name", region.name || "", "text", "", "Oberösterreich")}
       <div class="toolbar"><button class="primary">Speichern</button></div>
     </form>
   `, (drawer) => {
@@ -505,15 +505,15 @@ function openStoreDrawer(store = {}, regions = []) {
     <form class="stack" data-form="store">
       <div class="form-grid">
         ${selectField("regionId", "Region", regions.map((r) => [r.id, `${r.code} · ${r.name}`]), values.region?.id || values.regionId || "")}
-        ${field("storeCode", "Store-Code", values.storeCode || "")}
-        ${field("name", "Name", values.name || "")}
-        ${field("street", "Strasse", values.street || "")}
-        ${field("zipCode", "PLZ", values.zipCode || "")}
-        ${field("city", "Stadt", values.city || "")}
-        ${field("country", "Land", values.country || "Austria")}
-        ${field("latitude", "Latitude", values.latitude ?? "", "number", "0.000001")}
-        ${field("longitude", "Longitude", values.longitude ?? "", "number", "0.000001")}
-        <div class="span-2">${textarea("notes", "Notizen", values.notes || "")}</div>
+        ${field("storeCode", "Store-Code", values.storeCode || "", "text", "", "SPAR-Leonding-001")}
+        ${field("name", "Name", values.name || "", "text", "", "EUROSPAR Leonding/Hart")}
+        ${field("street", "Strasse", values.street || "", "text", "", "Leondinger Straße 32")}
+        ${field("zipCode", "PLZ", values.zipCode || "", "text", "", "4060")}
+        ${field("city", "Stadt", values.city || "", "text", "", "Leonding")}
+        ${field("country", "Land", values.country || "Austria", "text", "", "Austria")}
+        ${field("latitude", "Latitude", values.latitude ?? "", "number", "0.000001", "48.2680495")}
+        ${field("longitude", "Longitude", values.longitude ?? "", "number", "0.000001", "14.2618747")}
+        <div class="span-2">${textarea("notes", "Notizen", values.notes || "", "z.B. Haupteingang links, Tiefkühlbereich hinten")}</div>
       </div>
       <div class="notice">Nach dem Speichern geht es sinnvoll mit Beacon-Zuweisung oder Layout-Erstellung weiter.</div>
       <div class="toolbar"><button class="primary">Speichern</button></div>
@@ -536,11 +536,11 @@ function openBeaconDrawer(beacon = {}, existing = []) {
   openDrawer(beacon.id ? "Beacon bearbeiten" : "Beacon anlegen", `
     <form class="stack">
       <div class="form-grid">
-        ${field("beaconCode", "Beacon-Code", beacon.beaconCode || "")}
-        ${field("uuid", "UUID", beacon.uuid || "")}
-        ${field("major", "Major", beacon.major ?? "", "number")}
-        ${field("minor", "Minor", beacon.minor ?? "", "number")}
-        <div class="span-2">${textarea("notes", "Notizen", beacon.notes || "")}</div>
+        ${field("beaconCode", "Beacon-Code", beacon.beaconCode || "", "text", "", "B-001")}
+        ${field("uuid", "UUID", beacon.uuid || "", "text", "", "fda50693-a4e2-4fb1-afcf-c6eb07647825")}
+        ${field("major", "Major", beacon.major ?? "", "number", "", "1")}
+        ${field("minor", "Minor", beacon.minor ?? "", "number", "", "1")}
+        <div class="span-2">${textarea("notes", "Notizen", beacon.notes || "", "z.B. Eingang Nord oder Kasse 1")}</div>
       </div>
       <div data-error-summary></div>
       <div class="toolbar"><button class="primary">Speichern</button></div>
@@ -562,9 +562,9 @@ function openBeaconDrawer(beacon = {}, existing = []) {
 function openBeaconBulkDrawer() {
   openDrawer("Beacon Bulk anlegen", `
     <form class="stack">
-      ${field("uuid", "Gemeinsame UUID")}
-      ${field("major", "Major", "", "number")}
-      ${textarea("items", "Beacon-Zeilen", "", "Ein Beacon pro Zeile: beaconCode,minor")}
+      ${field("uuid", "Gemeinsame UUID", "", "text", "", "fda50693-a4e2-4fb1-afcf-c6eb07647825")}
+      ${field("major", "Major", "", "number", "", "1")}
+      ${textarea("items", "Beacon-Zeilen", "", "B-001,1\nB-002,2\nB-003,3")}
       <div class="notice">Review: Zeilen werden vor Commit geparst. Ungueltige Zeilen stoppen den Import.</div>
       <div class="toolbar"><button class="primary">Review & Commit</button></div>
     </form>
@@ -611,12 +611,12 @@ function openProductDrawer(product = {}) {
   openDrawer(product.id ? "Produkt bearbeiten" : "Produkt anlegen", `
     <form class="stack">
       <div class="form-grid">
-        ${field("id", "Produkt-ID", product.id ?? "", "number")}
-        ${field("name", "Name", product.name || "")}
-        ${field("price", "Preis", product.price ?? "", "number", "0.01")}
-        ${field("layoutCode", "Layout-Code", product.layoutCode || "")}
-        ${field("storeId", "Store-ID optional", product.storeId || "")}
-        ${field("storeCode", "Store-Code optional", product.storeCode || "")}
+        ${field("id", "Produkt-ID", product.id ?? "", "number", "", "101")}
+        ${field("name", "Name", product.name || "", "text", "", "Apfel")}
+        ${field("price", "Preis", product.price ?? "", "number", "0.01", "1.99")}
+        ${field("layoutCode", "Layout-Code", product.layoutCode || "", "text", "", "A-01")}
+        ${field("storeId", "Store-ID optional", product.storeId || "", "text", "", "ad61389a-7486-48fa-afa2-9b5e4132f6a8")}
+        ${field("storeCode", "Store-Code optional", product.storeCode || "", "text", "", "SPAR-Leonding-001")}
       </div>
       <div data-error-summary></div>
       <div class="toolbar"><button class="primary">Speichern</button></div>
@@ -639,8 +639,8 @@ function openCategoryDrawer(category = {}) {
   openDrawer(category.categoryCode ? "Kategorie bearbeiten" : "Kategorie anlegen", `
     <form class="stack">
       <div class="form-grid">
-        ${field("categoryCode", "Kategorie-Code", category.categoryCode ?? "", "number")}
-        ${field("categoryName", "Name", category.categoryName || category.name || "")}
+        ${field("categoryCode", "Kategorie-Code", category.categoryCode ?? "", "number", "", "310")}
+        ${field("categoryName", "Name", category.categoryName || category.name || "", "text", "", "Obst & Gemüse")}
       </div>
       <div data-error-summary></div>
       <div class="toolbar"><button class="primary">Speichern</button></div>
@@ -668,7 +668,7 @@ function openImportDrawer(kind) {
   const title = kind === "category" ? "Kategorie-Import" : "Produkt-Import";
   openDrawer(title, `
     <form class="stack">
-      ${textarea("payload", "JSON Array oder NDJSON", "", "Ein JSON Array oder eine Zeile pro Objekt")}
+      ${textarea("payload", "JSON Array oder NDJSON", "", kind === "category" ? '[{"categoryCode":310,"categoryName":"Obst & Gemüse"}]' : '[{"id":101,"name":"Apfel","price":1.99,"layoutCode":"A-01","storeCode":"SPAR-Leonding-001"}]')}
       <div class="notice">Schritt 1 Parse, Schritt 2 Review, Schritt 3 Commit. Der Commit nutzt nur vorhandene Backend-Endpunkte.</div>
       <div class="toolbar"><button class="primary">Parsen und committen</button></div>
     </form>
@@ -694,16 +694,16 @@ function openRecipeDrawer(recipe = {}) {
     <div class="stepper"><div class="step active">1 Metadata</div><div class="step active">2 Zutaten</div><div class="step active">3 Schritte</div><div class="step">4 Publish</div></div>
     <form class="stack">
       <div class="form-grid">
-        ${field("slug", "Slug", recipe.slug || "")}
-        ${field("title", "Titel", recipe.title || "")}
-        ${field("servings", "Portionen", recipe.servings ?? 2, "number")}
-        ${field("prepTimeMinutes", "Vorbereitung min", recipe.prepTimeMinutes ?? "", "number")}
-        ${field("cookTimeMinutes", "Kochen min", recipe.cookTimeMinutes ?? "", "number")}
-        ${field("totalTimeMinutes", "Gesamt min", recipe.totalTimeMinutes ?? "", "number")}
-        <div class="span-2">${textarea("summary", "Summary", recipe.summary || "")}</div>
-        <div class="span-2">${textarea("description", "Beschreibung", recipe.description || "")}</div>
-        <div class="span-2">${textarea("ingredientsText", "Zutaten", (recipe.ingredients || []).map((item, index) => `${index + 1};${item.displayName};${item.quantityText || ""}`).join("\n"), "position;name;menge")}</div>
-        <div class="span-2">${textarea("stepsText", "Schritte", (recipe.steps || []).map((item, index) => `${index + 1};${item.instruction}`).join("\n"), "position;anweisung")}</div>
+        ${field("slug", "Slug", recipe.slug || "", "text", "", "apfel-hafer-crumble")}
+        ${field("title", "Titel", recipe.title || "", "text", "", "Apfel-Hafer-Crumble")}
+        ${field("servings", "Portionen", recipe.servings ?? 2, "number", "", "4")}
+        ${field("prepTimeMinutes", "Vorbereitung min", recipe.prepTimeMinutes ?? "", "number", "", "12")}
+        ${field("cookTimeMinutes", "Kochen min", recipe.cookTimeMinutes ?? "", "number", "", "25")}
+        ${field("totalTimeMinutes", "Gesamt min", recipe.totalTimeMinutes ?? "", "number", "", "37")}
+        <div class="span-2">${textarea("summary", "Summary", recipe.summary || "", "Warmer Crumble mit Apfel, Hafer und Butter.")}</div>
+        <div class="span-2">${textarea("description", "Beschreibung", recipe.description || "", "Ein einfaches Ofenrezept fuer 4 Portionen.")}</div>
+        <div class="span-2">${textarea("ingredientsText", "Zutaten", (recipe.ingredients || []).map((item, index) => `${index + 1};${item.displayName};${item.quantityText || ""}`).join("\n"), "1;Apfel;4 Stk\n2;Haferflocken;120 g\n3;Butter;80 g")}</div>
+        <div class="span-2">${textarea("stepsText", "Schritte", (recipe.steps || []).map((item, index) => `${index + 1};${item.instruction}`).join("\n"), "1;Aepfel schneiden und in die Form geben\n2;Haferflocken und Butter verkneten\n3;25 Minuten backen")}</div>
       </div>
       <div data-error-summary></div>
       <div class="toolbar"><button class="primary">Speichern</button></div>
