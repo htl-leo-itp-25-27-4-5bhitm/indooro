@@ -1,3 +1,5 @@
+import { validateLayoutDocument } from './editor-core.js';
+
 /* ----- Data (aus React übernommen) ----- */
 let PRODUCT_CATEGORIES = []; // Will be loaded from JSON
 
@@ -103,7 +105,10 @@ function hasCollisions(element) {
 
 /* ----- DOM references ----- */
 const toolSelectBtn = document.getElementById('toolSelect');
+const toolMoveBtn = document.getElementById('toolMove');
 const toolDrawBtn = document.getElementById('toolDraw');
+const toolEditBtn = document.getElementById('toolEdit');
+const toolDeleteBtn = document.getElementById('toolDelete');
 const elementTypesDiv = document.getElementById('elementTypes');
 const templatesDiv = document.getElementById('templates');
 const canvasContainer = document.getElementById('canvasContainer');
@@ -127,6 +132,12 @@ const storeContextBox = document.getElementById('storeContextBox');
 const assignedBeaconsPanel = document.getElementById('assignedBeaconsPanel');
 const assignedBeaconsList = document.getElementById('assignedBeaconsList');
 const backLink = document.getElementById('backLink');
+const layersList = document.getElementById('layersList');
+const validationPanel = document.getElementById('validationPanel');
+const validateBtn = document.getElementById('validateBtn');
+const saveDraftBtn = document.getElementById('saveDraftBtn');
+const publishBtn = document.getElementById('publishBtn');
+const cursorPosition = document.getElementById('cursorPosition');
 
 function hasStoreContext() {
   return Boolean(storeId);
@@ -331,7 +342,7 @@ function buildLayoutPayload() {
   };
 }
 
-async function saveLayoutToServer(layoutData) {
+async function saveLayoutToServer(layoutData, activate = true) {
   const response = await fetch(getSaveLayoutEndpoint(), {
     method: 'POST',
     credentials: 'same-origin',
@@ -342,8 +353,8 @@ async function saveLayoutToServer(layoutData) {
       hasStoreContext()
         ? {
             layoutName: shopNameInput.value || storeContext?.store?.name || 'Layout',
-            changeNote: 'Im Layout-Editor gespeichert',
-            activate: true,
+            changeNote: activate ? 'Im Layout-Editor publiziert' : 'Im Layout-Editor als Draft gespeichert',
+            activate,
             layout: layoutData
           }
         : layoutData
@@ -363,7 +374,8 @@ async function saveLayoutToServer(layoutData) {
 
   const savedLayout = await response.json();
   editorLayoutId = savedLayout.layoutId || editorLayoutId;
-  setSaveStatus(hasStoreContext() ? 'Filiallayout gespeichert' : 'Layout am Server gespeichert', 'success');
+  setSaveStatus(hasStoreContext() ? (activate ? 'Filiallayout publiziert' : 'Layout-Draft gespeichert') : 'Layout am Server gespeichert', 'success');
+  renderValidation();
 }
 
 async function loadSavedLayout() {
@@ -504,7 +516,10 @@ async function initUI() {
 
   // tool buttons
   toolSelectBtn.onclick = () => setTool('select');
+  toolMoveBtn.onclick = () => setTool('move');
   toolDrawBtn.onclick = () => setTool('draw');
+  toolEditBtn.onclick = () => setTool('edit');
+  toolDeleteBtn.onclick = () => setTool('delete');
 
   // grid toggle
   showGridCheckbox.onchange = () => { showGrid = showGridCheckbox.checked; renderCanvas(); };
@@ -517,6 +532,23 @@ async function initUI() {
   // export/import
   exportBtn.onclick = exportLayout;
   fileInput.onchange = importLayout;
+  validateBtn.onclick = () => renderValidation(true);
+  saveDraftBtn.onclick = async () => {
+    const layoutData = buildLayoutPayload();
+    await saveLayoutToServer(layoutData, false);
+  };
+  publishBtn.onclick = async () => {
+    const layoutData = buildLayoutPayload();
+    const validation = renderValidation(true);
+    if (!validation.readyToPublish) {
+      setSaveStatus('Publish blockiert: Validierung enthaelt Fehler', 'error');
+      return;
+    }
+    if (validation.warningCount && !window.confirm(`${validation.warningCount} Warnung(en) bleiben bestehen. Trotzdem publizieren?`)) {
+      return;
+    }
+    await saveLayoutToServer(layoutData, true);
+  };
   document.getElementById('newBtn').onclick = () => {
   if (confirm('Möchtest du wirklich ein neues Layout starten? Alle aktuellen Elemente gehen verloren.')) {
     elements = [];
@@ -598,7 +630,7 @@ async function launchSimulation() {
 
   try {
     localStorage.setItem('indooro_live_layout', JSON.stringify(layoutData));
-    await saveLayoutToServer(layoutData);
+    await saveLayoutToServer(layoutData, false);
     window.open('/customer/', '_blank');
   } catch (error) {
     alert('Fehler beim Starten der Simulation: ' + error.message);
@@ -609,19 +641,27 @@ async function launchSimulation() {
 /* ----- Tool management ----- */
 function setTool(t) {
   currentTool = t;
-  if (t === 'select') {
-    toolSelectBtn.classList.add('bg-blue-500','text-white');
-    toolSelectBtn.classList.remove('bg-gray-100');
-    toolDrawBtn.classList.remove('bg-blue-500','text-white');
-    toolDrawBtn.classList.add('bg-gray-100');
-    modeLabel.innerText = 'Auswahlmodus';
-  } else {
-    toolDrawBtn.classList.add('bg-blue-500','text-white');
-    toolDrawBtn.classList.remove('bg-gray-100');
-    toolSelectBtn.classList.remove('bg-blue-500','text-white');
-    toolSelectBtn.classList.add('bg-gray-100');
-    modeLabel.innerText = 'Zeichenmodus';
-  }
+  [toolSelectBtn, toolMoveBtn, toolDrawBtn, toolEditBtn, toolDeleteBtn].forEach(btn => {
+    btn.classList.remove('bg-blue-500', 'text-white', 'active');
+    btn.classList.add('bg-gray-100');
+  });
+  const activeButton = {
+    select: toolSelectBtn,
+    move: toolMoveBtn,
+    draw: toolDrawBtn,
+    edit: toolEditBtn,
+    delete: toolDeleteBtn
+  }[t] || toolSelectBtn;
+  activeButton.classList.add('bg-blue-500', 'text-white', 'active');
+  activeButton.classList.remove('bg-gray-100');
+  const labels = {
+    select: 'Auswahlmodus',
+    move: 'Verschieben',
+    draw: 'Zeichnen/Add',
+    edit: 'Inspector Edit',
+    delete: 'Loeschmodus'
+  };
+  modeLabel.innerText = labels[t] || 'Auswahlmodus';
 }
 
 /* ----- Canvas rendering ----- */
@@ -717,6 +757,8 @@ function renderCanvas() {
   countElementsSpan.innerText = elements.length;
   areaSizeW.innerText = gridSize.width;
   areaSizeH.innerText = gridSize.height;
+  renderLayers();
+  renderValidation();
   renderStoreContext();
 }
 
@@ -751,6 +793,10 @@ function renderBeaconElement(el) {
   // click to select
   div.addEventListener('mousedown', (ev) => {
     ev.stopPropagation();
+    if (currentTool === 'delete') {
+      deleteSelectedElement(el);
+      return;
+    }
     saveState();
     
     const rect = canvasContainer.getBoundingClientRect();
@@ -843,6 +889,10 @@ function renderRegularElement(el) {
   // click to select
   div.addEventListener('mousedown', (ev) => {
     ev.stopPropagation();
+    if (currentTool === 'delete') {
+      deleteSelectedElement(el);
+      return;
+    }
     saveState();
     
     const rect = canvasContainer.getBoundingClientRect();
@@ -1090,8 +1140,12 @@ window.addEventListener('mousemove', (e) => {
   const x = (e.clientX - rect.left) / (cellSize * zoom);
   const y = (e.clientY - rect.top) / (cellSize * zoom);
   currentMouseCell = { x: Math.round(x), y: Math.round(y) };
+  if (cursorPosition) {
+    cursorPosition.textContent = `x: ${currentMouseCell.x} y: ${currentMouseCell.y}`;
+  }
 
   if (isDragging && selectedElement && !selectedElement.locked) {
+    if (!['select', 'move', 'edit'].includes(currentTool)) return;
     const isBeacon = selectedElement.type === 'beacon';
     
     if (isBeacon) {
@@ -1171,6 +1225,19 @@ window.addEventListener('mouseup', (e) => {
   }
 });
 
+function deleteSelectedElement(el) {
+  if (!el) return;
+  const critical = ['beacon', 'entrance', 'checkout', 'shelf', 'counter', 'cooler', 'freezer'].includes(el.type);
+  if (critical && !window.confirm(`${el.label || el.beaconId || el.type} wirklich entfernen?`)) {
+    return;
+  }
+  saveState();
+  elements = elements.filter(item => item.id !== el.id);
+  selectedElement = null;
+  renderProperties();
+  renderCanvas();
+}
+
 /* clicking outside canvas should stop dragging/drawing */
 window.addEventListener('blur', () => { isDrawing = false; isDragging = false; renderCanvas(); });
 
@@ -1201,6 +1268,7 @@ window.addEventListener('keydown', (e) => {
 function renderProperties() {
   if (!selectedElement) {
     propertiesWrapper.innerHTML = '<p class="text-sm text-gray-500">Wähle ein Element aus, um seine Eigenschaften zu bearbeiten.</p>';
+    renderLayers();
     return;
   }
 
@@ -1212,6 +1280,72 @@ function renderProperties() {
   } else {
     renderRegularProperties(el);
   }
+  renderLayers();
+}
+
+function renderLayers() {
+  if (!layersList) return;
+  if (!elements.length) {
+    layersList.innerHTML = '<div class="muted">Noch keine Elemente.</div>';
+    return;
+  }
+  const grouped = elements.reduce((acc, element) => {
+    const key = element.type || 'element';
+    acc[key] = acc[key] || [];
+    acc[key].push(element);
+    return acc;
+  }, {});
+  layersList.innerHTML = Object.entries(grouped).map(([type, items]) => `
+    <div class="layer-group">
+      <h3>${escapeHtml(type)} (${items.length})</h3>
+      ${items.map((element) => `
+        <button class="layer-item ${selectedElement?.id === element.id ? 'active' : ''}" data-layer-id="${element.id}">
+          <span>${escapeHtml(element.label || element.beaconId || element.type)}</span>
+          <span>${element.locked ? 'Locked' : 'Visible'}</span>
+        </button>
+      `).join('')}
+    </div>
+  `).join('');
+  layersList.querySelectorAll('[data-layer-id]').forEach(button => {
+    button.addEventListener('click', () => {
+      selectedElement = elements.find(element => String(element.id) === button.dataset.layerId);
+      renderCanvas();
+      renderProperties();
+    });
+  });
+}
+
+function renderValidation(explicit = false) {
+  const validation = validateLayoutDocument(
+    {
+      shopName: shopNameInput.value,
+      gridSize,
+      width: gridSize.width,
+      height: gridSize.height,
+      elements
+    },
+    { assignedBeacons }
+  );
+  if (!validationPanel) return validation;
+  if (!explicit && !validation.issues.length) {
+    validationPanel.innerHTML = '<div class="validation-item">Keine blockierenden Probleme erkannt.</div>';
+    return validation;
+  }
+  validationPanel.innerHTML = validation.issues.length
+    ? validation.issues.map(issue => `
+        <button class="validation-item ${issue.severity}" ${issue.elementId ? `data-validation-element="${issue.elementId}"` : ''}>
+          <strong>${issue.severity === 'error' ? 'Fehler' : 'Warnung'}</strong><br>${escapeHtml(issue.message)}
+        </button>
+      `).join('')
+    : '<div class="validation-item">Layout ist publikationsbereit.</div>';
+  validationPanel.querySelectorAll('[data-validation-element]').forEach(button => {
+    button.addEventListener('click', () => {
+      selectedElement = elements.find(element => String(element.id) === button.dataset.validationElement);
+      renderCanvas();
+      renderProperties();
+    });
+  });
+  return validation;
 }
 
 /* ----- Beacon Properties Panel ----- */
@@ -1598,7 +1732,7 @@ async function exportLayout() {
   URL.revokeObjectURL(url);
 
   try {
-    await saveLayoutToServer(data);
+    await saveLayoutToServer(data, false);
   } catch (error) {
     alert('Layout wurde heruntergeladen, aber nicht am Server gespeichert: ' + error.message);
     setSaveStatus(error.message, 'error');

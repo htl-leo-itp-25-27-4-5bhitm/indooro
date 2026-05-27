@@ -1,54 +1,13 @@
 <!doctype html>
 <html lang="de">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Indooro Server-Fehlerlog</title>
-  <link rel="stylesheet" href="../app.css" />
-  <link rel="stylesheet" href="server-logs.css" />
-  <script defer src="server-logs.js"></script>
-</head>
-<body>
-  <div class="server-log-shell">
-    <header class="page-header">
-      <div>
-        <span class="eyebrow">Diagnose</span>
-        <h2>Server-Fehlerlog</h2>
-        <p id="pageStatus">Lade die letzten API- und Serverfehler...</p>
-      </div>
-      <div class="page-actions">
-        <a class="secondary-button" href="/admin/logout">Logout</a>
-        <button id="refreshLogsBtn" class="primary-button">Neu laden</button>
-        <a class="secondary-button" href="/admin/">Zur Admin-Plattform</a>
-      </div>
-    </header>
-
-    <section class="panel">
-      <div class="panel-header">
-        <div>
-          <span class="eyebrow">Backend</span>
-          <h3>Letzte Fehler</h3>
-        </div>
-      </div>
-      <p class="hint">Diese Seite zeigt protokollierte 4xx- und 5xx-Fehler aus der Backend-API. Für rohe Container-Logs verwendest du weiter <code>kubectl logs</code> in der LeoCloud.</p>
-      <div id="errorLogs" class="error-log-list"></div>
-    </section>
-
-    <section class="panel">
-      <div class="panel-header">
-        <div>
-          <span class="eyebrow">CLI</span>
-          <h3>Rohe LeoCloud Logs</h3>
-        </div>
-      </div>
-      <div class="cli-card">
-        <p class="hint">Mit diesen Befehlen bekommst du die kompletten Backend-Logs direkt aus dem Cluster:</p>
-        <pre><code>kubectl logs deployment/indooro-backend -n student-it220209 --tail=200
-kubectl logs deployment/indooro-backend -n student-it220209 -f
-kubectl get pods -n student-it220209
-kubectl logs pod/&lt;POD_NAME&gt; -n student-it220209 --tail=200</code></pre>
-      </div>
-    </section>
-  </div>
-</body>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Indooro Admin</title>
+    <link rel="stylesheet" href="/admin/app.css">
+  </head>
+  <body>
+    <div id="admin-root" class="loading">Indooro Admin wird geladen...</div>
+    <script type="module" src="/admin/app.js"></script>
+  </body>
 </html>

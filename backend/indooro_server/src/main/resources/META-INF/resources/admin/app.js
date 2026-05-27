@@ -1,1647 +1,986 @@
-const API = {
-  me: '/api/admin/me',
-  adminLogs: '/api/admin/logs',
-  regions: '/api/regions',
-  stores: '/api/stores',
-  beacons: '/api/beacons',
-  products: '/api/admin/products',
-  recipes: '/api/admin/recipes',
-  recipeTags: '/api/admin/recipe-tags',
-};
+import {
+  API,
+  ROUTES,
+  beaconState,
+  buildProductPayload,
+  buildStorePayload,
+  canAccessRoute,
+  escapeHtml,
+  formatDate,
+  includesText,
+  normalizeList,
+  paginateRows,
+  parseImportText,
+  readinessForProduct,
+  recipeReadiness,
+  routeFromPath,
+  sortRows,
+  summarizeScope,
+  userRoles,
+  validateBeaconForm,
+  validateProductForm,
+  validateRecipeForm,
+  validateStoreForm
+} from "./core.js";
 
+const root = document.querySelector("#admin-root");
 const state = {
-  regions: [],
-  stores: [],
-  beacons: [],
-  products: [],
-  recipes: [],
-  selectedRecipeDetail: null,
-  currentUser: null,
-  selectedStoreId: null,
-  selectedStoreDetail: null,
-  selectedStoreBeacons: [],
-  selectedStoreLayouts: [],
-  selectedStoreAudit: [],
-  systemLogs: [],
-  systemLogsExpanded: false,
-  editingRegionId: null,
-  editingStoreId: null,
-  editingBeaconId: null,
-  editingProductId: null,
-  editingRecipeId: null,
-  storeFilters: {
-    query: '',
-    status: 'ACTIVE',
-    regionId: '',
-  },
-  beaconFilters: {
-    query: '',
-    assignment: 'all',
-  },
-  recipeFilters: {
-    query: '',
-    status: '',
-  },
+  user: null,
+  route: routeFromPath(location.pathname),
+  cache: new Map(),
+  filters: {},
+  page: 1
 };
 
-const ROUTES = {
-  dashboard: '/admin/',
-  regions: '/admin/regions/',
-  stores: '/admin/stores/',
-  'store-detail': '/admin/stores/detail/',
-  beacons: '/admin/beacons/',
-  products: '/admin/products/',
-  recipes: '/admin/recipes/',
-};
-
-function currentRoute() {
-  const path = window.location.pathname.replace(/\/+$/, '/') || '/admin/';
-  if (path === '/admin/' || path === '/admin') return 'dashboard';
-  if (path.startsWith('/admin/regions/')) return 'regions';
-  if (path.startsWith('/admin/stores/detail/')) return 'store-detail';
-  if (path.startsWith('/admin/stores/')) return 'stores';
-  if (path.startsWith('/admin/beacons/')) return 'beacons';
-  if (path.startsWith('/admin/products/')) return 'products';
-  if (path.startsWith('/admin/recipes/')) return 'recipes';
-  return 'dashboard';
-}
-
-function storeIdFromUrl() {
-  return new URLSearchParams(window.location.search).get('storeId');
-}
-
-function applyPageRoute() {
-  const route = currentRoute();
-  document.body.dataset.page = route;
-  document.querySelectorAll('[data-route-section]').forEach((section) => {
-    section.classList.toggle('route-hidden', section.dataset.routeSection !== route);
-  });
-  document.querySelectorAll('[data-route]').forEach((link) => {
-    link.classList.toggle('active', link.dataset.route === route);
-    if (link.dataset.route === route) {
-      link.setAttribute('aria-current', 'page');
-    } else {
-      link.removeAttribute('aria-current');
-    }
-  });
-}
-
-const els = {
-  pageStatus: document.getElementById('pageStatus'),
-  statRegions: document.getElementById('statRegions'),
-  statStores: document.getElementById('statStores'),
-  statFreeBeacons: document.getElementById('statFreeBeacons'),
-  statAssignedBeacons: document.getElementById('statAssignedBeacons'),
-  refreshAllBtn: document.getElementById('refreshAllBtn'),
-  toggleSystemLogsBtn: document.getElementById('toggleSystemLogsBtn'),
-  refreshLogsBtn: document.getElementById('refreshLogsBtn'),
-  refreshBeaconsBtn: document.getElementById('refreshBeaconsBtn'),
-  refreshStoreDetailBtn: document.getElementById('refreshStoreDetailBtn'),
-  openEditorLink: document.getElementById('openEditorLink'),
-  systemLogs: document.getElementById('systemLogs'),
-  regionsList: document.getElementById('regionsList'),
-  regionForm: document.getElementById('regionForm'),
-  regionFormTitle: document.getElementById('regionFormTitle'),
-  resetRegionFormBtn: document.getElementById('resetRegionFormBtn'),
-  cancelRegionEditBtn: document.getElementById('cancelRegionEditBtn'),
-  storesList: document.getElementById('storesList'),
-  storeForm: document.getElementById('storeForm'),
-  storeFormTitle: document.getElementById('storeFormTitle'),
-  resetStoreFormBtn: document.getElementById('resetStoreFormBtn'),
-  cancelStoreEditBtn: document.getElementById('cancelStoreEditBtn'),
-  storeQuery: document.getElementById('storeQuery'),
-  storeStatusFilter: document.getElementById('storeStatusFilter'),
-  storeRegionFilter: document.getElementById('storeRegionFilter'),
-  applyStoreFiltersBtn: document.getElementById('applyStoreFiltersBtn'),
-  storeRegionInput: document.getElementById('storeRegionInput'),
-  storeDetailEmpty: document.getElementById('storeDetailEmpty'),
-  storeDetailContent: document.getElementById('storeDetailContent'),
-  storeMeta: document.getElementById('storeMeta'),
-  storeBeaconList: document.getElementById('storeBeaconList'),
-  storeLayoutVersions: document.getElementById('storeLayoutVersions'),
-  storeAuditTrail: document.getElementById('storeAuditTrail'),
-  beaconForm: document.getElementById('beaconForm'),
-  beaconFormTitle: document.getElementById('beaconFormTitle'),
-  cancelBeaconEditBtn: document.getElementById('cancelBeaconEditBtn'),
-  beaconBulkForm: document.getElementById('beaconBulkForm'),
-  beaconsList: document.getElementById('beaconsList'),
-  beaconAssignmentFilter: document.getElementById('beaconAssignmentFilter'),
-  beaconQuery: document.getElementById('beaconQuery'),
-  applyBeaconFiltersBtn: document.getElementById('applyBeaconFiltersBtn'),
-  refreshProductsBtn: document.getElementById('refreshProductsBtn'),
-  productsList: document.getElementById('productsList'),
-  productForm: document.getElementById('productForm'),
-  resetProductFormBtn: document.getElementById('resetProductFormBtn'),
-  refreshRecipesBtn: document.getElementById('refreshRecipesBtn'),
-  recipesList: document.getElementById('recipesList'),
-  recipeForm: document.getElementById('recipeForm'),
-  recipeFormTitle: document.getElementById('recipeFormTitle'),
-  resetRecipeFormBtn: document.getElementById('resetRecipeFormBtn'),
-  recipeQuery: document.getElementById('recipeQuery'),
-  recipeStatusFilter: document.getElementById('recipeStatusFilter'),
-  applyRecipeFiltersBtn: document.getElementById('applyRecipeFiltersBtn'),
-  recipeDetailTools: document.getElementById('recipeDetailTools'),
-  recipeIngredientForm: document.getElementById('recipeIngredientForm'),
-  recipeStepForm: document.getElementById('recipeStepForm'),
-  recipeMappingPreview: document.getElementById('recipeMappingPreview'),
-  currentUserName: document.getElementById('currentUserName'),
-  currentUserRole: document.getElementById('currentUserRole'),
-  currentUserScope: document.getElementById('currentUserScope'),
-  logoutLink: document.getElementById('logoutLink'),
-};
-
-function setStatus(message, tone = 'neutral') {
-  els.pageStatus.textContent = message;
-  els.pageStatus.className = tone === 'error' ? 'error-banner banner' : 'banner';
-  if (tone === 'neutral') {
-    els.pageStatus.className = '';
-  }
-}
-
-async function fetchJson(url, options = {}) {
-  const response = await fetch(url, {
-    credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-    ...options,
-  });
-
-  if (response.redirected && response.url.includes('/keycloak/')) {
-    window.location.href = '/admin/';
-    throw new Error('Login erforderlich.');
-  }
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      window.location.href = '/admin/';
-      throw new Error('Login erforderlich.');
-    }
-
-    let message = `Request failed with status ${response.status}`;
-    const rawBody = await response.text();
-
-    if (rawBody) {
-      try {
-        const payload = JSON.parse(rawBody);
-        message = payload.error || payload.message || payload.details || rawBody || message;
-      } catch (_error) {
-        message = rawBody.trim().startsWith('<') ? message : rawBody;
-      }
-    }
-
-    const error = new Error(message);
-    error.status = response.status;
-    throw error;
-  }
-
-  if (response.status === 204) {
-    return null;
-  }
-
-  const contentType = response.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    window.location.href = '/admin/';
-    throw new Error('Login erforderlich.');
-  }
-
-  return response.json();
-}
-
-async function loadCurrentUser() {
-  state.currentUser = await fetchJson(API.me);
-}
-
-function renderCurrentUser() {
-  if (!state.currentUser) {
-    return;
-  }
-
-  const { username, email, role, scope } = state.currentUser;
-  document.body.dataset.adminRole = role || 'unknown';
-  els.currentUserName.textContent = username || email || 'Admin';
-  els.currentUserRole.textContent = roleLabel(role);
-
-  if (scope?.storeName) {
-    els.currentUserScope.textContent = `Filiale: ${scope.storeName}`;
-  } else if (scope?.regionName) {
-    els.currentUserScope.textContent = `Region: ${scope.regionName}`;
-  } else {
-    els.currentUserScope.textContent = 'Alle Regionen und Filialen';
-  }
-}
-
-function isAdmin() {
-  return state.currentUser?.role === 'admin';
-}
-
-function isRegionManager() {
-  return state.currentUser?.role === 'region-manager';
-}
-
-function isStoreManager() {
-  return state.currentUser?.role === 'store-manager';
-}
-
-function canCreateStore() {
-  return isAdmin() || isRegionManager();
-}
-
-function applyRoleUi() {
-  const systemLogsPanel = document.getElementById('system-logs');
-  systemLogsPanel?.classList.toggle('hidden', !isAdmin());
-  document.querySelector('a[href="/admin/server-logs/"]')?.classList.toggle('hidden', !isAdmin());
-  document.querySelectorAll('.admin-only').forEach((element) => {
-    element.classList.toggle('hidden', !isAdmin());
-  });
-  els.resetRegionFormBtn.classList.toggle('hidden', !isAdmin());
-  els.regionForm.classList.toggle('hidden', !isAdmin());
-  els.resetStoreFormBtn.classList.toggle('hidden', !canCreateStore());
-  els.storeForm.classList.toggle('hidden', !canCreateStore());
-
-  if (!isAdmin() && ['products', 'recipes'].includes(currentRoute())) {
-    window.location.replace('/admin/');
-  }
-}
-
-function roleLabel(role) {
-  if (role === 'admin') return 'Administrator';
-  if (role === 'region-manager') return 'Region Manager';
-  if (role === 'store-manager') return 'Store Manager';
-  return role || 'Unbekannte Rolle';
-}
-
-function showAccessDenied(message) {
-  setStatus(message || 'Kein Zugriff auf diese Admin-Funktion.', 'error');
-}
-
-function handleUiError(error) {
-  if (error.status === 403) {
-    showAccessDenied(error.message);
-    return;
-  }
-  setStatus(error.message, 'error');
-}
-
-function formatDate(value) {
-  if (!value) {
-    return 'Noch nicht';
-  }
-  return new Intl.DateTimeFormat('de-AT', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
-}
-
-function formatPrice(value) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) {
-    return '-';
-  }
-
-  return new Intl.NumberFormat('de-AT', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(Number(value));
-}
-
-function formatCoordinates(latitude, longitude) {
-  if (latitude === null || latitude === undefined || longitude === null || longitude === undefined) {
-    return 'Nicht hinterlegt';
-  }
-  return `${Number(latitude).toFixed(7)}, ${Number(longitude).toFixed(7)}`;
-}
-
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  }[char]));
-}
-
-function normalizeBeaconUuid(value) {
-  return String(value ?? '')
-    .trim()
-    .replace(/-/g, '')
-    .toLowerCase();
-}
-
-function statusBadge(status) {
-  if (status === 'ARCHIVED') {
-    return '<span class="badge warn">Archiviert</span>';
-  }
-  return '<span class="badge">Aktiv</span>';
-}
-
-function assignmentBadge(beacon) {
-  if (beacon.currentStore) {
-    return `<span class="badge neutral">${escapeHtml(beacon.currentStore.name)}</span>`;
-  }
-  return '<span class="badge warn">Frei</span>';
-}
-
-function getRegionById(regionId) {
-  return state.regions.find((region) => region.id === regionId) || null;
-}
-
-function getStoreById(storeId) {
-  return state.stores.find((store) => store.id === storeId) || null;
-}
-
-function scrollToStoreDetail() {
-  if (state.selectedStoreId) {
-    window.location.href = `/admin/stores/detail/?storeId=${encodeURIComponent(state.selectedStoreId)}`;
-  } else {
-    window.location.href = '/admin/stores/detail/';
-  }
-}
-
-async function loadBootstrapData() {
-  const storeQuery = new URLSearchParams({
-    status: state.storeFilters.status,
-    size: '100',
-    ...(state.storeFilters.query ? { query: state.storeFilters.query } : {}),
-    ...(state.storeFilters.regionId ? { regionId: state.storeFilters.regionId } : {}),
-  });
-
-  const assigned = state.beaconFilters.assignment === 'all'
-    ? ''
-    : state.beaconFilters.assignment === 'assigned'
-      ? 'true'
-      : 'false';
-
-  const beaconQuery = new URLSearchParams({
-    status: 'ACTIVE',
-    ...(assigned ? { assigned } : {}),
-    ...(state.beaconFilters.query ? { query: state.beaconFilters.query } : {}),
-  });
-
-  const [regions, storesPage, beacons] = await Promise.all([
-    fetchJson(`${API.regions}?status=ACTIVE`),
-    fetchJson(`${API.stores}?${storeQuery.toString()}`),
-    fetchJson(`${API.beacons}?${beaconQuery.toString()}`),
-  ]);
-
-  state.regions = regions;
-  state.stores = storesPage.content || [];
-  state.beacons = beacons;
-
-  if (state.selectedStoreId && !state.stores.some((store) => store.id === state.selectedStoreId)) {
-    state.selectedStoreId = null;
-    clearSelectedStoreDetail();
-  }
-}
-
-async function loadSystemLogs() {
-  if (!isAdmin()) {
-    state.systemLogs = [];
-    return;
-  }
-
-  const payload = await fetchJson(`${API.adminLogs}?limit=20`);
-  state.systemLogs = payload.entries || [];
-}
-
-async function loadProducts() {
-  if (!isAdmin()) {
-    state.products = [];
-    return;
-  }
-
-  state.products = await fetchJson(`${API.products}?size=500`);
-}
-
-async function loadRecipes() {
-  if (!isAdmin()) {
-    state.recipes = [];
-    state.selectedRecipeDetail = null;
-    return;
-  }
-
-  const query = new URLSearchParams({
-    page: '0',
-    size: '100',
-    ...(state.recipeFilters.query ? { q: state.recipeFilters.query } : {}),
-    ...(state.recipeFilters.status ? { status: state.recipeFilters.status } : {}),
-  });
-  const page = await fetchJson(`${API.recipes}?${query.toString()}`);
-  state.recipes = page.content || [];
-}
-
-async function loadRecipeDetail(recipeId) {
-  state.selectedRecipeDetail = await fetchJson(`${API.recipes}/${recipeId}`);
-  state.editingRecipeId = recipeId;
-}
-
-async function loadStoreDetail(storeId) {
-  const [detail, beacons, layouts, audit] = await Promise.all([
-    fetchJson(`${API.stores}/${storeId}`),
-    fetchJson(`${API.stores}/${storeId}/beacons`),
-    fetchJson(`${API.stores}/${storeId}/layout/versions`),
-    fetchJson(`${API.stores}/${storeId}/audit`),
-  ]);
-
-  state.selectedStoreId = storeId;
-  state.selectedStoreDetail = detail;
-  state.selectedStoreBeacons = beacons;
-  state.selectedStoreLayouts = layouts;
-  state.selectedStoreAudit = audit.entries || [];
-}
-
-function clearSelectedStoreDetail() {
-  state.selectedStoreDetail = null;
-  state.selectedStoreBeacons = [];
-  state.selectedStoreLayouts = [];
-  state.selectedStoreAudit = [];
-}
-
-function renderStats() {
-  const activeRegions = state.regions.length;
-  const activeStores = state.stores.filter((store) => store.status === 'ACTIVE').length;
-  const freeBeacons = state.beacons.filter((beacon) => !beacon.currentStore).length;
-  const assignedBeacons = state.beacons.filter((beacon) => beacon.currentStore).length;
-
-  els.statRegions.textContent = String(activeRegions);
-  els.statStores.textContent = String(activeStores);
-  els.statFreeBeacons.textContent = String(freeBeacons);
-  els.statAssignedBeacons.textContent = String(assignedBeacons);
-}
-
-function renderSystemLogs() {
-  els.systemLogs.classList.toggle('expanded', state.systemLogsExpanded);
-  els.toggleSystemLogsBtn.textContent = state.systemLogsExpanded ? 'Weniger anzeigen' : 'Mehr anzeigen';
-
-  els.systemLogs.innerHTML = state.systemLogs.length
-    ? state.systemLogs.map((entry) => `
-        <div class="timeline-entry">
-          <div class="timeline-heading">
-            <strong>${escapeHtml(entry.action)}</strong>
-            <span class="badge neutral">${escapeHtml(entry.entityType)}</span>
-          </div>
-          <time>${formatDate(entry.createdAt)}</time>
-          <p>${escapeHtml(entry.summary || 'Systemereignis protokolliert')}</p>
-          <div class="item-meta">Rolle ${escapeHtml(entry.actorRole || 'SYSTEM')} · ${escapeHtml(entry.actorLabel || 'system')}</div>
-        </div>
-      `).join('')
-    : '<div class="empty-state">Noch keine System-Logs vorhanden. Sobald Filialen, Regionen, Beacons oder Layouts geändert werden, erscheinen sie hier.</div>';
-}
-
-function renderRegionOptions() {
-  const options = ['<option value="">Bitte wählen</option>']
-    .concat(state.regions.map((region) => `<option value="${region.id}">${escapeHtml(region.name)} (${escapeHtml(region.code)})</option>`))
-    .join('');
-
-  els.storeRegionInput.innerHTML = options;
-  els.storeRegionFilter.innerHTML = '<option value="">Alle Regionen</option>' + state.regions
-    .map((region) => `<option value="${region.id}">${escapeHtml(region.name)}</option>`)
-    .join('');
-  els.storeRegionFilter.value = state.storeFilters.regionId || '';
-}
-
-function renderRegions() {
-  if (!state.regions.length) {
-    els.regionsList.innerHTML = '<div class="empty-state">Noch keine Regionen vorhanden. Lege zuerst eine Region an, damit danach Filialen sauber zugeordnet werden koennen.</div>';
-    return;
-  }
-
-  els.regionsList.innerHTML = state.regions.map((region) => `
-    <article class="list-item">
-      <div class="item-header">
-        <div>
-          <h4>${escapeHtml(region.name)}</h4>
-          <div class="item-meta">${escapeHtml(region.code)} · ${formatDate(region.updatedAt)}</div>
-        </div>
-        ${statusBadge(region.status)}
-      </div>
-      <p class="subtle">${escapeHtml(region.description || 'Keine Beschreibung hinterlegt.')}</p>
-      <div class="item-footer">
-        ${isAdmin() ? `<button type="button" class="action-button" data-action="edit-region" data-id="${region.id}">Bearbeiten</button>` : ''}
-        ${isAdmin() ? `<button type="button" class="action-button warn" data-action="archive-region" data-id="${region.id}">Archivieren</button>` : ''}
-      </div>
-    </article>
-  `).join('');
-}
-
-function renderStores() {
-  if (!state.stores.length) {
-    els.storesList.innerHTML = '<div class="empty-state">Keine Filialen für den aktuellen Filter gefunden.</div>';
-    return;
-  }
-
-  els.storesList.innerHTML = state.stores.map((store) => `
-    <article class="list-item ${state.selectedStoreId === store.id ? 'active' : ''}">
-      <div class="item-header">
-        <div>
-          <h4>${escapeHtml(store.name)}</h4>
-          <div class="item-meta">${escapeHtml(store.storeCode)} · ${escapeHtml(store.city)}</div>
-        </div>
-        ${statusBadge(store.status)}
-      </div>
-      <div class="badge-row">
-        <span class="badge neutral">${escapeHtml(store.region.name)}</span>
-        <span class="badge">${store.activeBeaconCount} aktive Beacons</span>
-        ${store.hasActiveLayout ? '<span class="badge">Layout vorhanden</span>' : '<span class="badge warn">Noch kein Layout</span>'}
-      </div>
-      <div class="item-footer">
-        <a class="inline-link" href="/admin/stores/detail/?storeId=${encodeURIComponent(store.id)}">Detail</a>
-        <button type="button" class="action-button" data-action="edit-store" data-id="${store.id}">Bearbeiten</button>
-        <a class="inline-link" href="/admin/editor/?storeId=${store.id}">Editor</a>
-        ${isStoreManager() ? '' : `<button type="button" class="action-button warn" data-action="archive-store" data-id="${store.id}">Archivieren</button>`}
-      </div>
-    </article>
-  `).join('');
-}
-
-function renderStoreDetail() {
-  if (!state.selectedStoreDetail) {
-    els.storeDetailEmpty.classList.remove('hidden');
-    els.storeDetailContent.classList.add('hidden');
-    els.refreshStoreDetailBtn.disabled = true;
-    els.openEditorLink.classList.add('disabled-link');
-    els.openEditorLink.href = '/admin/editor/';
-    return;
-  }
-
-  const store = state.selectedStoreDetail;
-  els.storeDetailEmpty.classList.add('hidden');
-  els.storeDetailContent.classList.remove('hidden');
-  els.refreshStoreDetailBtn.disabled = false;
-  els.openEditorLink.classList.remove('disabled-link');
-  els.openEditorLink.href = `/admin/editor/?storeId=${store.id}`;
-
-  els.storeMeta.innerHTML = `
-    <dt>Name</dt><dd>${escapeHtml(store.name)}</dd>
-    <dt>Store-Code</dt><dd>${escapeHtml(store.storeCode)}</dd>
-    <dt>Adresse</dt><dd>${escapeHtml(store.street)}, ${escapeHtml(store.zipCode)} ${escapeHtml(store.city)}, ${escapeHtml(store.country)}</dd>
-    <dt>Koordinaten</dt><dd>${escapeHtml(formatCoordinates(store.latitude, store.longitude))}</dd>
-    <dt>Region</dt><dd>${escapeHtml(store.region.name)} (${escapeHtml(store.region.code)})</dd>
-    <dt>Status</dt><dd>${escapeHtml(store.status)}</dd>
-    <dt>Aktives Layout</dt><dd>${store.activeLayout ? `Version ${store.activeLayout.versionNo} · ${formatDate(store.activeLayout.createdAt)}` : 'Noch keines gespeichert'}</dd>
-    <dt>Notiz</dt><dd>${escapeHtml(store.notes || 'Keine Notiz')}</dd>
-  `;
-
-  els.storeBeaconList.innerHTML = state.selectedStoreBeacons.length
-    ? state.selectedStoreBeacons.map((assignment) => `
-        <article class="list-item">
-          <div class="item-header">
-            <h5>${escapeHtml(assignment.beaconCode)}</h5>
-            <span class="badge neutral">Seit ${formatDate(assignment.assignedAt)}</span>
-          </div>
-          <p class="subtle">${escapeHtml(assignment.identityKey)}</p>
-          <div class="item-footer">
-            <button type="button" class="action-button warn" data-action="release-beacon" data-id="${assignment.beaconId}">Freigeben</button>
-          </div>
-        </article>
-      `).join('')
-    : '<div class="empty-state">Aktuell ist dieser Filiale noch kein Beacon zugewiesen.</div>';
-
-  els.storeLayoutVersions.innerHTML = state.selectedStoreLayouts.length
-    ? state.selectedStoreLayouts.map((layout) => `
-        <article class="list-item">
-          <div class="item-header">
-            <h5>${escapeHtml(layout.layoutName || `Version ${layout.versionNo}`)}</h5>
-            <span class="badge ${layout.status === 'ACTIVE' ? '' : 'warn'}">${escapeHtml(layout.status)}</span>
-          </div>
-          <div class="item-meta">Version ${layout.versionNo} · ${formatDate(layout.createdAt)}</div>
-          <div class="item-footer">
-            ${layout.status === 'ACTIVE' ? '' : `<button type="button" class="action-button" data-action="activate-layout" data-layout-id="${layout.layoutId}">Aktivieren</button>`}
-            <a class="inline-link" href="/admin/editor/?storeId=${store.id}">Im Editor öffnen</a>
-          </div>
-        </article>
-      `).join('')
-    : '<div class="empty-state">Für diese Filiale gibt es noch keine gespeicherten Layout-Versionen.</div>';
-
-  els.storeAuditTrail.innerHTML = state.selectedStoreAudit.length
-    ? state.selectedStoreAudit.map((entry) => `
-        <div class="timeline-entry">
-          <strong>${escapeHtml(entry.action)}</strong>
-          <time>${formatDate(entry.createdAt)}</time>
-          <p>${escapeHtml(entry.summary || 'Änderung protokolliert')}</p>
-        </div>
-      `).join('')
-    : '<div class="empty-state">Noch keine protokollierten Änderungen für diese Filiale.</div>';
-}
-
-function renderBeacons() {
-  if (!state.beacons.length) {
-    els.beaconsList.innerHTML = '<div class="empty-state">Keine Beacons für den aktuellen Filter gefunden.</div>';
-    return;
-  }
-
-  els.beaconsList.innerHTML = state.beacons.map((beacon) => `
-    <article class="list-item">
-      <div class="item-header">
-        <div>
-          <h5>${escapeHtml(beacon.beaconCode)}</h5>
-          <div class="item-meta">${escapeHtml(beacon.identityKey)}</div>
-        </div>
-        ${assignmentBadge(beacon)}
-      </div>
-      <div class="item-meta">UUID ${escapeHtml(beacon.uuid)}${beacon.major !== null && beacon.major !== undefined ? ` · Major ${beacon.major}` : ''}${beacon.minor !== null && beacon.minor !== undefined ? ` · Minor ${beacon.minor}` : ''}</div>
-      <p class="subtle">${escapeHtml(beacon.notes || 'Keine Notiz')}</p>
-      <div class="item-footer">
-        <button type="button" class="action-button" data-action="edit-beacon" data-id="${beacon.id}">Bearbeiten</button>
-        ${beacon.currentStore
-          ? `<button type="button" class="action-button warn" data-action="release-beacon" data-id="${beacon.id}">Freigeben</button>`
-          : renderAssignSelect(beacon.id)}
-        <button type="button" class="action-button danger" data-action="archive-beacon" data-id="${beacon.id}">Archivieren</button>
-      </div>
-    </article>
-  `).join('');
-}
-
-function renderProducts() {
-  if (!els.productsList) {
-    return;
-  }
-
-  if (!isAdmin()) {
-    els.productsList.innerHTML = '';
-    return;
-  }
-
-  if (!state.products.length) {
-    els.productsList.innerHTML = '<div class="empty-state">Noch keine Produkte geladen. Lege ein Produkt an oder prüfe, ob der OpenSearch-Index bereits Daten enthält.</div>';
-    return;
-  }
-
-  const products = [...state.products].sort((a, b) => Number(b.id) - Number(a.id));
-
-  els.productsList.innerHTML = products.map((product) => `
-    <article class="list-item">
-      <div class="item-header">
-        <div>
-          <h4>${escapeHtml(product.name)}</h4>
-          <div class="item-meta">ID ${escapeHtml(product.id)} · ${escapeHtml(product.layoutCode)}</div>
-        </div>
-        <span class="badge neutral">${escapeHtml(formatPrice(product.price))}</span>
-      </div>
-      <div class="item-footer">
-        <button type="button" class="action-button" data-action="edit-product" data-id="${escapeHtml(product.id)}">Bearbeiten</button>
-        <button type="button" class="action-button danger" data-action="delete-product" data-id="${escapeHtml(product.id)}">Löschen</button>
-      </div>
-    </article>
-  `).join('');
-}
-
-function renderRecipes() {
-  if (!els.recipesList) {
-    return;
-  }
-
-  if (!isAdmin()) {
-    els.recipesList.innerHTML = '';
-    return;
-  }
-
-  if (!state.recipes.length) {
-    els.recipesList.innerHTML = '<div class="empty-state">Noch keine Rezepte gefunden. Lege ein Rezept an oder passe den Filter an.</div>';
-    renderRecipeDetailTools();
-    return;
-  }
-
-  els.recipesList.innerHTML = state.recipes.map((recipe) => `
-    <article class="list-item ${state.editingRecipeId === recipe.id ? 'active' : ''}">
-      <div class="item-header">
-        <div>
-          <h4>${escapeHtml(recipe.title)}</h4>
-          <div class="item-meta">${escapeHtml(recipe.slug)} · ${recipe.totalIngredientCount || 0} Zutaten · ${recipe.totalTimeMinutes ?? '-'} min</div>
-        </div>
-        <span class="badge ${recipe.status === 'PUBLISHED' ? '' : 'warn'}">${escapeHtml(recipe.status)}</span>
-      </div>
-      <p class="subtle">${escapeHtml(recipe.summary || 'Keine Zusammenfassung hinterlegt.')}</p>
-      <div class="badge-row">
-        ${(recipe.tags || []).map((tag) => `<span class="badge neutral">${escapeHtml(tag.name)}</span>`).join('')}
-        <span class="badge">${recipe.mappedIngredientCount || 0}/${recipe.totalIngredientCount || 0} gemappt</span>
-      </div>
-      <div class="item-footer">
-        <button type="button" class="action-button" data-action="select-recipe" data-id="${recipe.id}">Bearbeiten</button>
-        <button type="button" class="action-button" data-action="publish-recipe" data-id="${recipe.id}">Veröffentlichen</button>
-        <button type="button" class="action-button warn" data-action="deactivate-recipe" data-id="${recipe.id}">Deaktivieren</button>
-        <button type="button" class="action-button danger" data-action="archive-recipe" data-id="${recipe.id}">Archivieren</button>
-      </div>
-    </article>
-  `).join('');
-
-  renderRecipeDetailTools();
-}
-
-function renderRecipeDetailTools() {
-  if (!els.recipeDetailTools) {
-    return;
-  }
-
-  const detail = state.selectedRecipeDetail;
-  els.recipeDetailTools.classList.toggle('hidden', !detail);
-  if (!detail) {
-    els.recipeMappingPreview.innerHTML = '';
-    return;
-  }
-
-  const ingredientList = detail.ingredients?.length
-    ? detail.ingredients.map((ingredient) => `
-        <article class="list-item">
-          <div class="item-header">
-            <h5>${ingredient.position}. ${escapeHtml(ingredient.displayName)}</h5>
-            <span class="badge neutral">${escapeHtml(ingredient.unitCode || 'ohne Einheit')}</span>
-          </div>
-          <div class="item-meta">${escapeHtml(ingredient.canonicalName || 'kein Canonical Name')}</div>
-        </article>
-      `).join('')
-    : '<div class="empty-state">Noch keine Zutaten.</div>';
-
-  const stepList = detail.steps?.length
-    ? detail.steps.map((step) => `
-        <article class="list-item">
-          <div class="item-header">
-            <h5>${step.position}. Schritt</h5>
-            <span class="badge neutral">${step.durationMinutes ?? '-'} min</span>
-          </div>
-          <p class="subtle">${escapeHtml(step.instruction)}</p>
-        </article>
-      `).join('')
-    : '<div class="empty-state">Noch keine Schritte.</div>';
-
-  els.recipeMappingPreview.innerHTML = `
-    <h4>Aktuelle Zutaten</h4>
-    ${ingredientList}
-    <h4>Aktuelle Schritte</h4>
-    ${stepList}
-    <button type="button" class="secondary-button" data-action="preview-recipe-mapping" data-id="${detail.id}">Mapping-Status laden</button>
-  `;
-}
-
-function parseDecimalInput(value) {
-  const normalized = String(value ?? '').trim().replace(',', '.');
-  return normalized ? Number(normalized) : Number.NaN;
-}
-
-function parseOptionalDecimalInput(value) {
-  const normalized = String(value ?? '').trim().replace(',', '.');
-  return normalized ? Number(normalized) : null;
-}
-
-function upsertProductInState(product) {
-  state.products = [
-    product,
-    ...state.products.filter((entry) => String(entry.id) !== String(product.id)),
-  ];
-}
-
-function removeProductFromState(productId) {
-  state.products = state.products.filter((entry) => String(entry.id) !== String(productId));
-}
-
-function renderAssignSelect(beaconId) {
-  const activeStores = state.stores.filter((store) => store.status === 'ACTIVE');
-  if (!activeStores.length) {
-    return '<span class="subtle">Keine aktive Filiale vorhanden</span>';
-  }
-
-  return `
-    <label class="subtle">
-      <span>Zuweisen zu</span>
-      <select data-action="assign-beacon" data-id="${beaconId}">
-        <option value="">Filiale wählen</option>
-        ${activeStores.map((store) => `<option value="${store.id}">${escapeHtml(store.name)}</option>`).join('')}
-      </select>
-    </label>
-  `;
-}
-
-function resetRegionForm() {
-  state.editingRegionId = null;
-  els.regionForm.reset();
-  els.regionFormTitle.textContent = 'Region anlegen';
-}
-
-function resetStoreForm() {
-  state.editingStoreId = null;
-  els.storeForm.reset();
-  els.storeFormTitle.textContent = 'Filiale anlegen';
-  if (state.regions.length) {
-    els.storeRegionInput.value = state.regions[0].id;
-  }
-}
-
-function resetBeaconForm() {
-  state.editingBeaconId = null;
-  els.beaconForm.reset();
-  els.beaconFormTitle.textContent = 'Beacon anlegen';
-}
-
-function resetProductForm() {
-  state.editingProductId = null;
-  els.productForm?.reset();
-}
-
-function resetRecipeForm() {
-  state.editingRecipeId = null;
-  state.selectedRecipeDetail = null;
-  els.recipeForm?.reset();
-  if (els.recipeForm) {
-    els.recipeForm.elements.servings.value = '2';
-    els.recipeForm.elements.status.value = 'DRAFT';
-  }
-  if (els.recipeFormTitle) {
-    els.recipeFormTitle.textContent = 'Rezept anlegen';
-  }
-  renderRecipeDetailTools();
-}
-
-function populateRegionForm(regionId) {
-  const region = state.regions.find((entry) => entry.id === regionId);
-  if (!region) {
-    return;
-  }
-  state.editingRegionId = region.id;
-  els.regionFormTitle.textContent = 'Region bearbeiten';
-  els.regionForm.elements.code.value = region.code;
-  els.regionForm.elements.name.value = region.name;
-  els.regionForm.elements.description.value = region.description || '';
-}
-
-async function populateStoreForm(storeId) {
-  const store = state.selectedStoreDetail && state.selectedStoreDetail.id === storeId
-    ? state.selectedStoreDetail
-    : await fetchJson(`${API.stores}/${storeId}`);
-
-  state.editingStoreId = store.id;
-  els.storeFormTitle.textContent = 'Filiale bearbeiten';
-  els.storeForm.elements.regionId.value = store.region.id;
-  els.storeForm.elements.storeCode.value = store.storeCode;
-  els.storeForm.elements.name.value = store.name;
-  els.storeForm.elements.street.value = store.street;
-  els.storeForm.elements.zipCode.value = store.zipCode;
-  els.storeForm.elements.city.value = store.city;
-  els.storeForm.elements.country.value = store.country;
-  els.storeForm.elements.latitude.value = store.latitude ?? '';
-  els.storeForm.elements.longitude.value = store.longitude ?? '';
-  els.storeForm.elements.notes.value = store.notes || '';
-}
-
-async function populateBeaconForm(beaconId) {
-  const beacon = state.beacons.find((entry) => entry.id === beaconId) || await fetchJson(`${API.beacons}/${beaconId}`);
-  state.editingBeaconId = beacon.id;
-  els.beaconFormTitle.textContent = 'Beacon bearbeiten';
-  els.beaconForm.elements.beaconCode.value = beacon.beaconCode;
-  els.beaconForm.elements.uuid.value = beacon.uuid;
-  els.beaconForm.elements.major.value = beacon.major ?? '';
-  els.beaconForm.elements.minor.value = beacon.minor ?? '';
-  els.beaconForm.elements.notes.value = beacon.notes || '';
-}
-
-function populateProductForm(productId) {
-  const product = state.products.find((entry) => String(entry.id) === String(productId));
-  if (!product || !els.productForm) {
-    return;
-  }
-
-  state.editingProductId = product.id;
-  els.productForm.elements.id.value = product.id;
-  els.productForm.elements.name.value = product.name || '';
-  els.productForm.elements.price.value = product.price ?? '';
-  els.productForm.elements.layoutCode.value = product.layoutCode || '';
-  document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function populateRecipeForm(recipe) {
-  if (!recipe || !els.recipeForm) {
-    return;
-  }
-  state.editingRecipeId = recipe.id;
-  els.recipeFormTitle.textContent = 'Rezept bearbeiten';
-  els.recipeForm.elements.slug.value = recipe.slug || '';
-  els.recipeForm.elements.title.value = recipe.title || '';
-  els.recipeForm.elements.summary.value = recipe.summary || '';
-  els.recipeForm.elements.description.value = recipe.description || '';
-  els.recipeForm.elements.servings.value = recipe.servings || 2;
-  els.recipeForm.elements.status.value = recipe.status || 'DRAFT';
-  els.recipeForm.elements.prepTimeMinutes.value = recipe.prepTimeMinutes ?? '';
-  els.recipeForm.elements.cookTimeMinutes.value = recipe.cookTimeMinutes ?? '';
-  els.recipeForm.elements.imageUrl.value = recipe.imageUrl || '';
-  document.getElementById('recipes')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-async function refreshAll({ keepStatusMessage = false } = {}) {
-  if (!keepStatusMessage) {
-    setStatus('Synchronisiere Admin-Plattform mit dem Backend...');
-  }
-
-  await loadCurrentUser();
-  renderCurrentUser();
-  applyRoleUi();
-  await loadBootstrapData();
-  await loadSystemLogs();
-  await loadProducts();
-  await loadRecipes();
-  renderRegionOptions();
-  renderStats();
-  renderSystemLogs();
-  renderRegions();
-  renderStores();
-  renderBeacons();
-  renderProducts();
-  renderRecipes();
-
-  const routeStoreId = storeIdFromUrl();
-  if (currentRoute() === 'store-detail' && routeStoreId) {
-    state.selectedStoreId = routeStoreId;
-  }
-
-  if (state.selectedStoreId) {
-    await loadStoreDetail(state.selectedStoreId);
-  }
-
-  renderStoreDetail();
-  if (!keepStatusMessage) {
-    setStatus('Admin-Plattform ist aktuell. Du kannst jetzt Filialen, Beacons und Layouts verwalten.', 'success');
-  }
-}
-
-async function handleRegionSubmit(event) {
-  event.preventDefault();
-  const payload = {
-    code: els.regionForm.elements.code.value.trim(),
-    name: els.regionForm.elements.name.value.trim(),
-    description: els.regionForm.elements.description.value.trim() || null,
-  };
-
-  const url = state.editingRegionId ? `${API.regions}/${state.editingRegionId}` : API.regions;
-  const method = state.editingRegionId ? 'PUT' : 'POST';
-  await fetchJson(url, { method, body: JSON.stringify(payload) });
-  resetRegionForm();
-  await refreshAll();
-}
-
-async function handleStoreSubmit(event) {
-  event.preventDefault();
-  const latitude = parseOptionalDecimalInput(els.storeForm.elements.latitude.value);
-  const longitude = parseOptionalDecimalInput(els.storeForm.elements.longitude.value);
-
-  if (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) {
-    throw new Error('Latitude muss zwischen -90 und 90 liegen.');
-  }
-  if (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180)) {
-    throw new Error('Longitude muss zwischen -180 und 180 liegen.');
-  }
-
-  const payload = {
-    regionId: els.storeForm.elements.regionId.value,
-    storeCode: els.storeForm.elements.storeCode.value.trim(),
-    name: els.storeForm.elements.name.value.trim(),
-    street: els.storeForm.elements.street.value.trim(),
-    zipCode: els.storeForm.elements.zipCode.value.trim(),
-    city: els.storeForm.elements.city.value.trim(),
-    country: els.storeForm.elements.country.value.trim(),
-    latitude,
-    longitude,
-    notes: els.storeForm.elements.notes.value.trim() || null,
-  };
-
-  const url = state.editingStoreId ? `${API.stores}/${state.editingStoreId}` : API.stores;
-  const method = state.editingStoreId ? 'PUT' : 'POST';
-  const result = await fetchJson(url, { method, body: JSON.stringify(payload) });
-  resetStoreForm();
-  await refreshAll();
-  await loadStoreDetail(result.id);
-  renderStoreDetail();
-  scrollToStoreDetail();
-}
-
-async function handleBeaconSubmit(event) {
-  event.preventDefault();
-  const majorValue = els.beaconForm.elements.major.value.trim();
-  const minorValue = els.beaconForm.elements.minor.value.trim();
-  const payload = {
-    beaconCode: els.beaconForm.elements.beaconCode.value.trim(),
-    uuid: normalizeBeaconUuid(els.beaconForm.elements.uuid.value),
-    major: majorValue ? Number(majorValue) : null,
-    minor: minorValue ? Number(minorValue) : null,
-    notes: els.beaconForm.elements.notes.value.trim() || null,
-  };
-
-  const url = state.editingBeaconId ? `${API.beacons}/${state.editingBeaconId}` : API.beacons;
-  const method = state.editingBeaconId ? 'PUT' : 'POST';
-  await fetchJson(url, { method, body: JSON.stringify(payload) });
-  resetBeaconForm();
-  await refreshAll();
-}
-
-async function handleBeaconBulkSubmit(event) {
-  event.preventDefault();
-  const lines = els.beaconBulkForm.elements.items.value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  const items = lines.map((line) => {
-    const [beaconCode, minorRaw] = line.split(/[;,]/).map((part) => part.trim());
-    if (!beaconCode || !minorRaw) {
-      throw new Error(`Ungültige Beacon-Zeile: ${line}`);
-    }
-    return {
-      beaconCode,
-      minor: Number(minorRaw),
-    };
-  });
-
-  const majorValue = els.beaconBulkForm.elements.major.value.trim();
-  const payload = {
-    uuid: normalizeBeaconUuid(els.beaconBulkForm.elements.uuid.value),
-    major: majorValue ? Number(majorValue) : null,
-    notes: els.beaconBulkForm.elements.notes.value.trim() || null,
-    items,
-  };
-
-  await fetchJson(`${API.beacons}/bulk`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-
-  els.beaconBulkForm.reset();
-  await refreshAll();
-}
-
-async function handleProductSubmit(event) {
-  event.preventDefault();
-
-  const id = Number(els.productForm.elements.id.value);
-  const price = parseDecimalInput(els.productForm.elements.price.value);
-  const payload = {
-    id,
-    name: els.productForm.elements.name.value.trim(),
-    price,
-    layoutCode: els.productForm.elements.layoutCode.value.trim(),
-  };
-
-  if (!Number.isInteger(id) || id < 1) {
-    throw new Error('Produkt-ID muss eine positive ganze Zahl sein.');
-  }
-  if (!payload.name) {
-    throw new Error('Produktname ist erforderlich.');
-  }
-  if (!Number.isFinite(price) || price < 0) {
-    throw new Error('Preis ist erforderlich und darf nicht negativ sein.');
-  }
-  if (!payload.layoutCode) {
-    throw new Error('Layout-Code ist erforderlich.');
-  }
-
-  const savedProduct = await fetchJson(API.products, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-
-  resetProductForm();
-  upsertProductInState(savedProduct);
-  renderProducts();
-  setStatus('Produkt wurde im Katalog gespeichert.', 'success');
-}
-
-async function handleRecipeSubmit(event) {
-  event.preventDefault();
-  const prepTime = els.recipeForm.elements.prepTimeMinutes.value.trim();
-  const cookTime = els.recipeForm.elements.cookTimeMinutes.value.trim();
-  const recipe = {
-    slug: els.recipeForm.elements.slug.value.trim(),
-    title: els.recipeForm.elements.title.value.trim(),
-    summary: els.recipeForm.elements.summary.value.trim() || null,
-    description: els.recipeForm.elements.description.value.trim() || null,
-    imageUrl: els.recipeForm.elements.imageUrl.value.trim() || null,
-    imageAlt: null,
-    servings: Number(els.recipeForm.elements.servings.value),
-    prepTimeMinutes: prepTime ? Number(prepTime) : null,
-    cookTimeMinutes: cookTime ? Number(cookTime) : null,
-    totalTimeMinutes: (prepTime ? Number(prepTime) : 0) + (cookTime ? Number(cookTime) : 0),
-    status: els.recipeForm.elements.status.value,
-    tagIds: [],
-  };
-
-  if (!recipe.slug || !recipe.title) {
-    throw new Error('Slug und Titel sind erforderlich.');
-  }
-  if (!Number.isInteger(recipe.servings) || recipe.servings < 1) {
-    throw new Error('Portionen müssen eine positive ganze Zahl sein.');
-  }
-
-  const payload = state.editingRecipeId ? recipe : { recipe, ingredients: [], steps: [] };
-  const url = state.editingRecipeId ? `${API.recipes}/${state.editingRecipeId}` : API.recipes;
-  const method = state.editingRecipeId ? 'PUT' : 'POST';
-  const savedRecipe = await fetchJson(url, { method, body: JSON.stringify(payload) });
-  state.selectedRecipeDetail = savedRecipe;
-  state.editingRecipeId = savedRecipe.id;
-  await loadRecipes();
-  renderRecipes();
-  populateRecipeForm(savedRecipe);
-  setStatus('Rezept wurde gespeichert.', 'success');
-}
-
-async function handleRecipeIngredientSubmit(event) {
-  event.preventDefault();
-  if (!state.editingRecipeId) {
-    throw new Error('Wähle zuerst ein Rezept aus.');
-  }
-
-  const quantityValue = els.recipeIngredientForm.elements.quantity.value.trim();
-  const payload = {
-    position: Number(els.recipeIngredientForm.elements.position.value),
-    displayName: els.recipeIngredientForm.elements.displayName.value.trim(),
-    canonicalName: els.recipeIngredientForm.elements.canonicalName.value.trim() || null,
-    quantity: quantityValue ? Number(quantityValue.replace(',', '.')) : null,
-    quantityText: els.recipeIngredientForm.elements.quantityText.value.trim() || null,
-    unitCode: els.recipeIngredientForm.elements.unitCode.value.trim() || null,
-    preparationNote: els.recipeIngredientForm.elements.preparationNote.value.trim() || null,
-    optional: false,
-  };
-  await fetchJson(`${API.recipes}/${state.editingRecipeId}/ingredients`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-  els.recipeIngredientForm.reset();
-  await loadRecipeDetail(state.editingRecipeId);
-  renderRecipeDetailTools();
-  await loadRecipes();
-  renderRecipes();
-  setStatus('Zutat wurde hinzugefügt.', 'success');
-}
-
-async function handleRecipeStepSubmit(event) {
-  event.preventDefault();
-  if (!state.editingRecipeId) {
-    throw new Error('Wähle zuerst ein Rezept aus.');
-  }
-
-  const durationValue = els.recipeStepForm.elements.durationMinutes.value.trim();
-  const payload = {
-    position: Number(els.recipeStepForm.elements.position.value),
-    instruction: els.recipeStepForm.elements.instruction.value.trim(),
-    durationMinutes: durationValue ? Number(durationValue) : null,
-  };
-  await fetchJson(`${API.recipes}/${state.editingRecipeId}/steps`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-  els.recipeStepForm.reset();
-  await loadRecipeDetail(state.editingRecipeId);
-  renderRecipeDetailTools();
-  await loadRecipes();
-  renderRecipes();
-  setStatus('Schritt wurde hinzugefügt.', 'success');
-}
-
-async function publishRecipe(recipeId) {
-  await fetchJson(`${API.recipes}/${recipeId}/publish`, { method: 'PATCH' });
-  await loadRecipes();
-  if (state.editingRecipeId === recipeId) {
-    await loadRecipeDetail(recipeId);
-    populateRecipeForm(state.selectedRecipeDetail);
-  }
-  renderRecipes();
-  setStatus('Rezept wurde veröffentlicht.', 'success');
-}
-
-async function deactivateRecipe(recipeId) {
-  await fetchJson(`${API.recipes}/${recipeId}/deactivate`, { method: 'PATCH' });
-  await loadRecipes();
-  renderRecipes();
-  setStatus('Rezept wurde deaktiviert.', 'success');
-}
-
-async function archiveRecipe(recipeId) {
-  if (!window.confirm('Willst du dieses Rezept wirklich archivieren?')) {
-    return;
-  }
-  await fetchJson(`${API.recipes}/${recipeId}/archive`, { method: 'PATCH' });
-  if (state.editingRecipeId === recipeId) {
-    resetRecipeForm();
-  }
-  await loadRecipes();
-  renderRecipes();
-  setStatus('Rezept wurde archiviert.', 'success');
-}
-
-async function previewRecipeMapping(recipeId) {
-  const mapping = await fetchJson(`${API.recipes}/${recipeId}/mapping-status`);
-  const rows = mapping.ingredients?.length
-    ? mapping.ingredients.map((entry) => `
-        <article class="list-item">
-          <div class="item-header">
-            <h5>${escapeHtml(entry.ingredientName)}</h5>
-            <span class="badge ${entry.status === 'MAPPED' ? '' : 'warn'}">${escapeHtml(entry.status)}</span>
-          </div>
-          <p class="subtle">${escapeHtml(entry.product?.name || entry.reason || 'Keine Zuordnung')}</p>
-          <div class="item-footer">
-            <button type="button" class="action-button" data-action="load-recipe-mapping-suggestions" data-id="${recipeId}" data-ingredient-id="${entry.ingredientId}" data-query="${escapeHtml(entry.ingredientName)}">Produktvorschläge</button>
-          </div>
-        </article>
-      `).join('')
-    : '<div class="empty-state">Keine Zutaten für Mapping vorhanden.</div>';
-  els.recipeMappingPreview.innerHTML = `<h4>Mapping-Status</h4>${rows}`;
-}
-
-async function loadRecipeMappingSuggestions(recipeId, ingredientId, query) {
-  const encodedQuery = encodeURIComponent(query || '');
-  const suggestions = await fetchJson(`${API.recipes}/${recipeId}/ingredients/${ingredientId}/mapping-suggestions?q=${encodedQuery}&size=10`);
-  const rows = suggestions?.length
-    ? suggestions.map((product) => `
-        <article class="list-item">
-          <div class="item-header">
-            <div>
-              <h5>${escapeHtml(product.name || `Produkt ${product.id}`)}</h5>
-              <div class="item-meta">ID ${escapeHtml(product.id)} · ${escapeHtml(product.layoutCode || 'kein Layout')}</div>
-            </div>
-            <span class="badge neutral">${escapeHtml(product.storeCode || 'global')}</span>
-          </div>
-          <div class="item-footer">
-            <button
-              type="button"
-              class="action-button"
-              data-action="confirm-recipe-mapping"
-              data-id="${recipeId}"
-              data-ingredient-id="${ingredientId}"
-              data-product-id="${escapeHtml(product.id)}"
-              data-product-name="${escapeHtml(product.name || '')}"
-              data-layout-code="${escapeHtml(product.layoutCode || '')}"
-              data-store-id="${escapeHtml(product.storeId || '')}"
-              data-store-code="${escapeHtml(product.storeCode || '')}">
-              Mapping bestätigen
-            </button>
-          </div>
-        </article>
-      `).join('')
-    : '<div class="empty-state">Keine passenden Produktvorschläge gefunden.</div>';
-
-  els.recipeMappingPreview.innerHTML = `
-    <h4>Produktvorschläge</h4>
-    ${rows}
-    <button type="button" class="secondary-button" data-action="preview-recipe-mapping" data-id="${recipeId}">Zurück zum Mapping-Status</button>
-  `;
-}
-
-async function confirmRecipeMapping(button) {
-  const { id: recipeId, ingredientId, productId, productName, layoutCode, storeId, storeCode } = button.dataset;
-  await fetchJson(`${API.recipes}/${recipeId}/ingredients/${ingredientId}/product-mapping`, {
-    method: 'PUT',
-    body: JSON.stringify({
-      productId: Number(productId),
-      productName,
-      layoutCode: layoutCode || null,
-      storeId: storeId || null,
-      storeCode: storeCode || null,
-      mappingType: 'MANUAL',
-      confidence: 1,
-      manuallyConfirmed: true,
-    }),
-  });
-  await previewRecipeMapping(recipeId);
-  await loadRecipes();
-  renderRecipes();
-  setStatus('Produkt-Mapping wurde bestätigt.', 'success');
-}
-
-async function deleteProduct(productId) {
-  const product = state.products.find((entry) => String(entry.id) === String(productId));
-  const productLabel = product ? `${product.name} (ID ${product.id})` : `ID ${productId}`;
-
-  if (!window.confirm(`Willst du das Produkt ${productLabel} wirklich löschen?`)) {
-    return;
-  }
-
-  await fetchJson(`${API.products}/${encodeURIComponent(productId)}`, { method: 'DELETE' });
-
-  if (String(state.editingProductId) === String(productId)) {
-    resetProductForm();
-  }
-  removeProductFromState(productId);
-  renderProducts();
-  setStatus('Produkt wurde aus dem Katalog gelöscht.', 'success');
-}
-
-async function archiveRegion(regionId) {
-  if (!window.confirm('Willst du diese Region wirklich archivieren?')) {
-    return;
-  }
-  await fetchJson(`${API.regions}/${regionId}/archive`, { method: 'PATCH' });
-  if (state.editingRegionId === regionId) {
-    resetRegionForm();
-  }
-  await refreshAll();
-}
-
-async function archiveStore(storeId) {
-  if (!window.confirm('Willst du diese Filiale wirklich archivieren? Zugewiesene Beacons werden dabei freigegeben.')) {
-    return;
-  }
-  await fetchJson(`${API.stores}/${storeId}/archive`, { method: 'PATCH' });
-  if (state.selectedStoreId === storeId) {
-    clearSelectedStoreDetail();
-    state.selectedStoreId = null;
-  }
-  if (state.editingStoreId === storeId) {
-    resetStoreForm();
-  }
-  await refreshAll();
-}
-
-async function archiveBeacon(beaconId) {
-  if (!window.confirm('Willst du diesen Beacon wirklich archivieren?')) {
-    return;
-  }
-  await fetchJson(`${API.beacons}/${beaconId}/archive`, { method: 'PATCH' });
-  if (state.editingBeaconId === beaconId) {
-    resetBeaconForm();
-  }
-  await refreshAll();
-}
-
-async function releaseBeacon(beaconId) {
-  await fetchJson(`${API.beacons}/${beaconId}/release`, { method: 'POST' });
-  await refreshAll({ keepStatusMessage: true });
-  if (state.selectedStoreId) {
-    await loadStoreDetail(state.selectedStoreId);
-    renderStoreDetail();
-  }
-  setStatus('Beacon wurde freigegeben.', 'success');
-}
-
-async function assignBeacon(beaconId, storeId) {
-  if (!storeId) {
-    return;
-  }
-  await fetchJson(`${API.beacons}/${beaconId}/assign`, {
-    method: 'POST',
-    body: JSON.stringify({ storeId }),
-  });
-  await refreshAll({ keepStatusMessage: true });
-  if (state.selectedStoreId === storeId) {
-    await loadStoreDetail(storeId);
-    renderStoreDetail();
-  }
-  setStatus('Beacon wurde der Filiale zugeordnet.', 'success');
-}
-
-async function activateLayout(layoutId) {
-  if (!state.selectedStoreId) {
-    return;
-  }
-  await fetchJson(`${API.stores}/${state.selectedStoreId}/layout/versions/${layoutId}/activate`, {
-    method: 'POST',
-  });
-  await loadStoreDetail(state.selectedStoreId);
-  renderStoreDetail();
-  setStatus('Layout-Version wurde aktiviert.', 'success');
-}
-
-function bindEvents() {
-  els.refreshAllBtn.addEventListener('click', () => refreshAll());
-  els.toggleSystemLogsBtn.addEventListener('click', () => {
-    state.systemLogsExpanded = !state.systemLogsExpanded;
-    renderSystemLogs();
-  });
-  els.refreshLogsBtn.addEventListener('click', async () => {
-    if (!isAdmin()) {
-      return;
-    }
-    await loadSystemLogs();
-    renderSystemLogs();
-    setStatus('System-Logs wurden aktualisiert.', 'success');
-  });
-  els.logoutLink?.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.currentTarget.textContent = 'Logout...';
-    event.currentTarget.setAttribute('aria-disabled', 'true');
-    window.sessionStorage.clear();
-    window.localStorage.removeItem('indooro-admin-state');
-    window.location.assign(`/admin/logout?ts=${Date.now()}`);
-  });
-  els.refreshBeaconsBtn.addEventListener('click', () => refreshAll());
-  els.refreshStoreDetailBtn.addEventListener('click', async () => {
-    if (!state.selectedStoreId) {
-      return;
-    }
-    await loadStoreDetail(state.selectedStoreId);
-    renderStoreDetail();
-    setStatus('Filialdetail aktualisiert.', 'success');
-  });
-
-  els.resetRegionFormBtn.addEventListener('click', resetRegionForm);
-  els.cancelRegionEditBtn.addEventListener('click', resetRegionForm);
-  els.regionForm.addEventListener('submit', async (event) => {
-    try {
-      await handleRegionSubmit(event);
-    } catch (error) {
-      handleUiError(error);
-    }
-  });
-
-  els.resetStoreFormBtn.addEventListener('click', resetStoreForm);
-  els.cancelStoreEditBtn.addEventListener('click', resetStoreForm);
-  els.storeForm.addEventListener('submit', async (event) => {
-    try {
-      await handleStoreSubmit(event);
-    } catch (error) {
-      handleUiError(error);
-    }
-  });
-
-  els.storeQuery.addEventListener('input', (event) => {
-    state.storeFilters.query = event.target.value;
-  });
-  els.storeStatusFilter.addEventListener('change', (event) => {
-    state.storeFilters.status = event.target.value;
-  });
-  els.storeRegionFilter.addEventListener('change', (event) => {
-    state.storeFilters.regionId = event.target.value;
-  });
-  els.applyStoreFiltersBtn.addEventListener('click', () => refreshAll());
-
-  els.beaconQuery.addEventListener('input', (event) => {
-    state.beaconFilters.query = event.target.value;
-  });
-  els.beaconAssignmentFilter.addEventListener('change', (event) => {
-    state.beaconFilters.assignment = event.target.value;
-  });
-  els.applyBeaconFiltersBtn.addEventListener('click', () => refreshAll());
-
-  els.cancelBeaconEditBtn.addEventListener('click', resetBeaconForm);
-  els.beaconForm.addEventListener('submit', async (event) => {
-    try {
-      await handleBeaconSubmit(event);
-    } catch (error) {
-      handleUiError(error);
-    }
-  });
-  els.beaconBulkForm.addEventListener('submit', async (event) => {
-    try {
-      await handleBeaconBulkSubmit(event);
-    } catch (error) {
-      handleUiError(error);
-    }
-  });
-
-  els.refreshProductsBtn?.addEventListener('click', async () => {
-    try {
-      await loadProducts();
-      renderProducts();
-      setStatus('Produktliste wurde aktualisiert.', 'success');
-    } catch (error) {
-      handleUiError(error);
-    }
-  });
-  els.resetProductFormBtn?.addEventListener('click', resetProductForm);
-  els.productForm?.addEventListener('submit', async (event) => {
-    try {
-      await handleProductSubmit(event);
-    } catch (error) {
-      handleUiError(error);
-    }
-  });
-
-  els.refreshRecipesBtn?.addEventListener('click', async () => {
-    try {
-      await loadRecipes();
-      renderRecipes();
-      setStatus('Rezeptliste wurde aktualisiert.', 'success');
-    } catch (error) {
-      handleUiError(error);
-    }
-  });
-  els.resetRecipeFormBtn?.addEventListener('click', resetRecipeForm);
-  els.recipeQuery?.addEventListener('input', (event) => {
-    state.recipeFilters.query = event.target.value;
-  });
-  els.recipeStatusFilter?.addEventListener('change', (event) => {
-    state.recipeFilters.status = event.target.value;
-  });
-  els.applyRecipeFiltersBtn?.addEventListener('click', async () => {
-    try {
-      await loadRecipes();
-      renderRecipes();
-    } catch (error) {
-      handleUiError(error);
-    }
-  });
-  els.recipeForm?.addEventListener('submit', async (event) => {
-    try {
-      await handleRecipeSubmit(event);
-    } catch (error) {
-      handleUiError(error);
-    }
-  });
-  els.recipeIngredientForm?.addEventListener('submit', async (event) => {
-    try {
-      await handleRecipeIngredientSubmit(event);
-    } catch (error) {
-      handleUiError(error);
-    }
-  });
-  els.recipeStepForm?.addEventListener('submit', async (event) => {
-    try {
-      await handleRecipeStepSubmit(event);
-    } catch (error) {
-      handleUiError(error);
-    }
-  });
-
-  document.body.addEventListener('click', async (event) => {
-    const button = event.target.closest('[data-action]');
-    if (!button) {
-      return;
-    }
-
-    const { action, id, layoutId } = button.dataset;
-
-    try {
-      if (action === 'edit-region') {
-        populateRegionForm(id);
-      } else if (action === 'archive-region') {
-        await archiveRegion(id);
-      } else if (action === 'select-store') {
-        const selectedStore = getStoreById(id);
-        setStatus(`Lade Filialdetail${selectedStore ? ` für ${selectedStore.name}` : ''}...`);
-        await loadStoreDetail(id);
-        renderStores();
-        renderStoreDetail();
-        scrollToStoreDetail();
-        setStatus('Filialdetail wurde geladen.', 'success');
-      } else if (action === 'edit-store') {
-        await populateStoreForm(id);
-      } else if (action === 'archive-store') {
-        await archiveStore(id);
-      } else if (action === 'edit-beacon') {
-        await populateBeaconForm(id);
-      } else if (action === 'release-beacon') {
-        await releaseBeacon(id);
-      } else if (action === 'archive-beacon') {
-        await archiveBeacon(id);
-      } else if (action === 'activate-layout') {
-        await activateLayout(layoutId);
-      } else if (action === 'edit-product') {
-        populateProductForm(id);
-      } else if (action === 'delete-product') {
-        await deleteProduct(id);
-      } else if (action === 'select-recipe') {
-        await loadRecipeDetail(id);
-        populateRecipeForm(state.selectedRecipeDetail);
-        renderRecipes();
-      } else if (action === 'publish-recipe') {
-        await publishRecipe(id);
-      } else if (action === 'deactivate-recipe') {
-        await deactivateRecipe(id);
-      } else if (action === 'archive-recipe') {
-        await archiveRecipe(id);
-      } else if (action === 'preview-recipe-mapping') {
-        await previewRecipeMapping(id);
-      } else if (action === 'load-recipe-mapping-suggestions') {
-        await loadRecipeMappingSuggestions(id, button.dataset.ingredientId, button.dataset.query);
-      } else if (action === 'confirm-recipe-mapping') {
-        await confirmRecipeMapping(button);
-      }
-    } catch (error) {
-      handleUiError(error);
-    }
-  });
-
-  document.body.addEventListener('change', async (event) => {
-    const select = event.target.closest('select[data-action="assign-beacon"]');
-    if (!select) {
-      return;
-    }
-
-    try {
-      await assignBeacon(select.dataset.id, select.value);
-    } catch (error) {
-      handleUiError(error);
-    } finally {
-      select.value = '';
-    }
-  });
-}
+init().catch((error) => fatal(error));
 
 async function init() {
-  applyPageRoute();
-  bindEvents();
-  state.storeFilters.query = els.storeQuery.value;
-  state.storeFilters.status = els.storeStatusFilter.value;
-  state.beaconFilters.assignment = els.beaconAssignmentFilter.value;
-  state.recipeFilters.query = els.recipeQuery?.value || '';
-  state.recipeFilters.status = els.recipeStatusFilter?.value || '';
-  await refreshAll();
-  resetRegionForm();
-  resetStoreForm();
-  resetBeaconForm();
-  resetProductForm();
-  resetRecipeForm();
+  state.user = await apiGet(API.me);
+  renderShell();
+  if (!canAccessRoute(state.user, state.route)) {
+    renderAccessDenied();
+    return;
+  }
+  await renderRoute();
 }
 
-init().catch((error) => {
-  if (error.status === 403) {
-    showAccessDenied(error.message);
-  } else {
-    setStatus(`Admin-Plattform konnte nicht geladen werden: ${error.message}`, 'error');
+function renderShell() {
+  const nav = ROUTES
+    .filter((route) => canAccessRoute(state.user, route))
+    .map((route) => `
+      <a href="${route.path}" aria-current="${route.id === state.route.id ? "page" : "false"}">
+        <span class="nav-icon">${icon(route.icon)}</span>
+        <span>${route.label}</span>
+      </a>
+    `)
+    .join("");
+
+  root.className = "admin-app";
+  root.innerHTML = `
+    <aside class="sidebar">
+      <a class="brand" href="/admin/">
+        <span class="brand-mark">I</span>
+        <span>
+          <span class="brand-title">Indooro Admin</span>
+          <span class="brand-subtitle">Operations Platform</span>
+        </span>
+      </a>
+      <nav class="nav" aria-label="Admin Navigation">${nav}</nav>
+      <section class="user-card">
+        <div class="user-name">${escapeHtml(state.user.displayName || state.user.username || state.user.email || "Staff")}</div>
+        <div class="user-scope">${escapeHtml(summarizeScope(state.user))}</div>
+        <button class="logout small" data-action="logout">Logout</button>
+      </section>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div class="breadcrumbs"><a href="/admin/">Admin</a><span>/</span><span>${escapeHtml(state.route.label)}</span></div>
+        <div class="page-header">
+          <div>
+            <h1 id="page-title">${escapeHtml(state.route.label)}</h1>
+            <p class="page-description" id="page-description"></p>
+          </div>
+          <div class="toolbar" id="page-actions"></div>
+        </div>
+      </header>
+      <section class="content" id="page-content"></section>
+    </main>
+    <div class="toast-region" id="toasts" aria-live="polite"></div>
+  `;
+  root.querySelector("[data-action='logout']").addEventListener("click", () => location.href = "/logout");
+}
+
+async function renderRoute() {
+  const renderers = {
+    dashboard: renderDashboard,
+    regions: renderRegions,
+    stores: renderStores,
+    beacons: renderBeacons,
+    products: renderProducts,
+    categories: renderCategories,
+    recipes: renderRecipes,
+    "server-logs": renderServerLogs,
+    editor: renderEditorEntry
+  };
+  await renderers[state.route.id]?.();
+}
+
+function setPage(title, description, actions = "") {
+  document.querySelector("#page-title").textContent = title;
+  document.querySelector("#page-description").textContent = description;
+  document.querySelector("#page-actions").innerHTML = actions;
+}
+
+function content(html) {
+  document.querySelector("#page-content").innerHTML = html;
+}
+
+async function renderDashboard() {
+  setPage("Dashboard", "Kurzer Operations-Ueberblick mit naechsten sinnvollen Aktionen.", `
+    <a class="button primary" href="/admin/stores/">Store verwalten</a>
+    <a class="button" href="/admin/editor/">Editor oeffnen</a>
+  `);
+  content(`<div class="loading">Dashboard wird geladen...</div>`);
+  const [regions, stores, beacons, logs] = await Promise.all([
+    safeGet(API.regions, []),
+    safeGet(API.stores, []),
+    safeGet(API.beacons, []),
+    canAccess("admin") ? safeGet(API.adminLogs, []) : []
+  ]);
+  const missingLayouts = normalizeList(stores).filter((store) => !store.hasActiveLayout).length;
+  const freeBeacons = normalizeList(beacons).filter((beacon) => !beacon.currentStore && beacon.status !== "ARCHIVED").length;
+  content(`
+    <section class="grid four">
+      ${stat("Regionen", normalizeList(regions).length, "verwaltete Gebiete")}
+      ${stat("Stores", normalizeList(stores).length, "sichtbarer Scope")}
+      ${stat("Freie Beacons", freeBeacons, "bereit zur Zuweisung")}
+      ${stat("Layouts offen", missingLayouts, "Stores ohne aktives Layout")}
+    </section>
+    <section class="grid two" style="margin-top:16px">
+      <div class="panel">
+        <div class="panel-header"><h2>Setup-Warnungen</h2></div>
+        ${missingLayouts || freeBeacons ? `
+          <div class="stack">
+            ${missingLayouts ? `<div class="notice warning">${missingLayouts} Store(s) haben noch kein aktives Layout.</div>` : ""}
+            ${freeBeacons ? `<div class="notice">${freeBeacons} Beacon(s) sind frei und koennen zugewiesen werden.</div>` : ""}
+          </div>
+        ` : empty("Alles wirkt einsatzbereit.", "Keine offenen Setup-Warnungen im aktuellen Scope.")}
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h2>Letzte Audit Events</h2><a class="button small" href="/admin/server-logs/">Diagnose</a></div>
+        ${renderEventList(normalizeList(logs).slice(0, 8))}
+      </div>
+    </section>
+    <section class="panel" style="margin-top:16px">
+      <div class="panel-header"><h2>Quick Actions</h2></div>
+      <div class="toolbar">
+        <a class="button" href="/admin/stores/">Store anlegen</a>
+        <a class="button" href="/admin/beacons/">Beacon zuweisen</a>
+        ${canAccess("admin") ? `<a class="button" href="/admin/products/">Produkte importieren</a><a class="button" href="/admin/recipes/">Rezept erstellen</a>` : ""}
+      </div>
+    </section>
+  `);
+}
+
+async function renderRegions() {
+  setPage("Regionen", "Regionen sauber scannen, bearbeiten und archivieren.", `<button class="primary" data-open-region>Region anlegen</button>`);
+  const regions = normalizeList(await safeGet(API.regions, []));
+  renderRegionTable(regions);
+  document.querySelector("[data-open-region]")?.addEventListener("click", () => openRegionDrawer());
+}
+
+function renderRegionTable(regions) {
+  content(`
+    <section class="panel">
+      <div class="filters">${searchFilter("Region suchen", "name, code")}</div>
+      ${table({
+        columns: ["Code", "Name", "Status", "Aktionen"],
+        rows: regions.map((region) => [
+          mono(region.code),
+          escapeHtml(region.name),
+          badge(region.status || "ACTIVE", region.status === "ARCHIVED" ? "muted" : "success"),
+          actions([
+            ["Bearbeiten", () => openRegionDrawer(region)],
+            ["Archivieren", () => confirmMutation(`Region ${region.name} archivieren?`, "Bestehende Stores bleiben historisch sichtbar.", () => apiPatch(`${API.regions}/${region.id}/archive`, {}), renderRegions), "danger"]
+          ])
+        ]),
+        emptyMessage: "Keine Regionen im aktuellen Scope."
+      })}
+    </section>
+  `);
+  hydrateActions();
+}
+
+async function renderStores() {
+  const params = new URLSearchParams(location.search);
+  const detailId = location.pathname.includes("/detail") ? params.get("storeId") : null;
+  if (detailId) {
+    await renderStoreDetail(detailId);
+    return;
+  }
+  setPage("Stores", "Store-Liste, Layout-Readiness und gefuehrter Create/Edit Flow.", `<button class="primary" data-open-store>Store anlegen</button>`);
+  const [stores, regions] = await Promise.all([safeGet(API.stores, []), safeGet(API.regions, [])]);
+  renderStoreList(normalizeList(stores), normalizeList(regions));
+  document.querySelector("[data-open-store]")?.addEventListener("click", () => openStoreDrawer(null, normalizeList(regions)));
+}
+
+function renderStoreList(stores, regions) {
+  const filtered = applyQuery(stores, ["name", "storeCode", "city", "region.name"]);
+  const sorted = sortRows(filtered, state.filters.sort || "name", state.filters.dir || "asc");
+  const page = paginateRows(sorted, state.page, 25);
+  content(`
+    <section class="panel">
+      <div class="filters">
+        ${searchFilter("Stores suchen", "Name, Code, Stadt")}
+        ${selectFilter("region", "Region", [["", "Alle"], ...regions.map((r) => [r.id, `${r.code} · ${r.name}`])])}
+        ${selectFilter("layout", "Layout", [["", "Alle"], ["ready", "Aktiv"], ["missing", "Fehlt"]])}
+        ${selectFilter("sort", "Sortierung", [["name", "Name"], ["storeCode", "Code"], ["city", "Stadt"]])}
+      </div>
+      ${table({
+        columns: ["Store", "Region", "Ort", "Beacons", "Layout", "Aktionen"],
+        rows: page.rows
+          .filter((store) => !state.filters.region || store.region?.id === state.filters.region)
+          .filter((store) => !state.filters.layout || (state.filters.layout === "ready" ? store.hasActiveLayout : !store.hasActiveLayout))
+          .map((store) => [
+            `<strong>${escapeHtml(store.name)}</strong><br><span class="muted mono">${escapeHtml(store.storeCode)}</span>`,
+            escapeHtml(store.region?.name || "-"),
+            escapeHtml(store.city || "-"),
+            String(store.activeBeaconCount ?? 0),
+            badge(store.hasActiveLayout ? "Aktiv" : "Fehlt", store.hasActiveLayout ? "success" : "warning"),
+            actions([
+              ["Details", `/admin/stores/detail/?storeId=${store.id}`],
+              ["Bearbeiten", () => openStoreDrawer(store, regions)],
+              ["Editor", `/admin/editor/?storeId=${store.id}`]
+            ])
+          ]),
+        emptyMessage: "Keine Stores passen zu Suche oder Scope."
+      })}
+      ${pager(page)}
+    </section>
+  `);
+  hydrateFilters(() => renderStoreList(stores, regions));
+  hydrateActions();
+}
+
+async function renderStoreDetail(storeId) {
+  setPage("Store Detail", "Metadaten, Beacon-Zuweisungen, Layout-Versionen und Audit Trail.", `
+    <a class="button" href="/admin/stores/">Zur Liste</a>
+    <a class="button primary" href="/admin/editor/?storeId=${encodeURIComponent(storeId)}">Layout bearbeiten</a>
+  `);
+  content(`<div class="loading">Store Detail wird geladen...</div>`);
+  const [store, beacons, layouts, audit] = await Promise.all([
+    safeGet(`${API.stores}/${storeId}`, null),
+    safeGet(`${API.stores}/${storeId}/beacons`, []),
+    safeGet(`${API.stores}/${storeId}/layout/versions`, []),
+    safeGet(`${API.stores}/${storeId}/audit`, { entries: [] })
+  ]);
+  if (!store) {
+    content(empty("Store nicht gefunden.", "Der Link ist ungueltig oder ausserhalb deines Scopes."));
+    return;
+  }
+  content(`
+    <section class="grid three">
+      ${stat("Status", store.status || "ACTIVE", store.region?.name || "ohne Region")}
+      ${stat("Aktives Layout", store.activeLayout ? `v${store.activeLayout.versionNo}` : "Fehlt", store.activeLayout ? formatDate(store.activeLayout.createdAt) : "Editor starten")}
+      ${stat("Beacons", normalizeList(beacons).length, "aktive Zuweisungen")}
+    </section>
+    <section class="panel" style="margin-top:16px">
+      <div class="tabs">
+        <button class="tab" aria-selected="true">Ueberblick</button>
+        <button class="tab">Beacons</button>
+        <button class="tab">Layouts</button>
+        <button class="tab">Audit</button>
+      </div>
+      <div class="grid two">
+        <div>${detailList([
+          ["Code", store.storeCode],
+          ["Name", store.name],
+          ["Adresse", `${store.street || ""}, ${store.zipCode || ""} ${store.city || ""}`],
+          ["Koordinaten", [store.latitude, store.longitude].filter((v) => v != null).join(", ") || "-"],
+          ["Notizen", store.notes || "-"]
+        ])}</div>
+        <div class="stack">
+          <h3>Naechste Aktionen</h3>
+          <a class="button" href="/admin/beacons/?storeId=${store.id}">Beacon zuweisen</a>
+          <a class="button" href="/admin/editor/?storeId=${store.id}">Layout-Version erstellen</a>
+          <button class="danger" data-archive-store="${store.id}">Store archivieren</button>
+        </div>
+      </div>
+    </section>
+    <section class="grid two" style="margin-top:16px">
+      <div class="panel"><div class="panel-header"><h2>Beacons</h2></div>${renderBeaconMiniList(normalizeList(beacons))}</div>
+      <div class="panel"><div class="panel-header"><h2>Layout-Versionen</h2></div>${renderLayoutList(normalizeList(layouts), store.id)}</div>
+    </section>
+    <section class="panel" style="margin-top:16px"><div class="panel-header"><h2>Audit History</h2></div>${renderEventList(normalizeList(audit.entries))}</section>
+  `);
+  document.querySelector("[data-archive-store]")?.addEventListener("click", () => {
+    confirmMutation(`Store ${store.name} archivieren?`, "Der Store verschwindet aus aktiven Workflows.", () => apiPatch(`${API.stores}/${store.id}/archive`, {}), () => renderStoreDetail(store.id));
+  });
+}
+
+async function renderBeacons() {
+  setPage("Beacons", "Inventar, freie/zugewiesene Geraete und gefuehrte Assignment-Flows.", `<button class="primary" data-open-beacon>Beacon anlegen</button><button data-open-beacon-bulk>Bulk anlegen</button>`);
+  const [beacons, stores] = await Promise.all([safeGet(API.beacons, []), safeGet(API.stores, [])]);
+  renderBeaconPage(normalizeList(beacons), normalizeList(stores));
+  document.querySelector("[data-open-beacon]")?.addEventListener("click", () => openBeaconDrawer(null, normalizeList(beacons)));
+  document.querySelector("[data-open-beacon-bulk]")?.addEventListener("click", () => openBeaconBulkDrawer());
+}
+
+function renderBeaconPage(beacons, stores) {
+  const filtered = applyQuery(beacons, ["beaconCode", "uuid", "identityKey", "currentStore.name"]).filter((beacon) => {
+    if (!state.filters.state) return true;
+    if (state.filters.state === "free") return !beacon.currentStore && beacon.status !== "ARCHIVED";
+    if (state.filters.state === "assigned") return !!beacon.currentStore;
+    if (state.filters.state === "archived") return beacon.status === "ARCHIVED";
+    return true;
+  });
+  content(`
+    <section class="panel">
+      <div class="filters">
+        ${searchFilter("Beacons suchen", "Code, UUID, Store")}
+        ${selectFilter("state", "Status", [["", "Alle"], ["free", "Frei"], ["assigned", "Zugewiesen"], ["archived", "Archiviert"]])}
+        ${selectFilter("sort", "Sortierung", [["beaconCode", "Code"], ["uuid", "UUID"], ["currentStore.storeCode", "Store"]])}
+      </div>
+      ${table({
+        columns: ["Beacon", "Identitaet", "Status", "Store", "Aktionen"],
+        rows: sortRows(filtered, state.filters.sort || "beaconCode").map((beacon) => {
+          const status = beaconState(beacon);
+          return [
+            `<strong>${escapeHtml(beacon.beaconCode)}</strong><br><span class="muted">${escapeHtml(beacon.notes || "")}</span>`,
+            `<span class="mono">${escapeHtml(beacon.identityKey || `${beacon.uuid}:${beacon.major}:${beacon.minor}`)}</span>`,
+            badge(status.label, status.tone),
+            escapeHtml(beacon.currentStore?.name || "-"),
+            actions([
+              ["Bearbeiten", () => openBeaconDrawer(beacon, beacons)],
+              ["Zuweisen", () => openAssignDrawer(beacon, stores)],
+              ["Freigeben", () => confirmMutation(`${beacon.beaconCode} freigeben?`, "Die aktive Store-Zuweisung wird beendet.", () => apiPost(`${API.beacons}/${beacon.id}/release`, {}), renderBeacons)],
+              ["Archivieren", () => confirmMutation(`${beacon.beaconCode} archivieren?`, "Archivierte Beacons sind nicht mehr zuweisbar.", () => apiPatch(`${API.beacons}/${beacon.id}/archive`, {}), renderBeacons), "danger"]
+            ])
+          ];
+        }),
+        emptyMessage: "Keine Beacons passen zu Suche, Filter oder Scope."
+      })}
+    </section>
+  `);
+  hydrateFilters(() => renderBeaconPage(beacons, stores));
+  hydrateActions();
+}
+
+async function renderProducts() {
+  setPage("Produkte", "Katalog scannen, Layout-Readiness pruefen und Imports reviewen.", `<button class="primary" data-open-product>Produkt anlegen</button><button data-open-product-import>Import</button>`);
+  const products = normalizeList(await safeGet(API.products, []));
+  renderProductList(products);
+  document.querySelector("[data-open-product]")?.addEventListener("click", () => openProductDrawer());
+  document.querySelector("[data-open-product-import]")?.addEventListener("click", () => openImportDrawer("product"));
+}
+
+function renderProductList(products) {
+  const filtered = applyQuery(products, ["id", "name", "layoutCode", "storeCode"]).filter((product) => {
+    const readiness = readinessForProduct(product);
+    return !state.filters.readiness || readiness.status === state.filters.readiness;
+  });
+  const page = paginateRows(sortRows(filtered, state.filters.sort || "name"), state.page, 30);
+  content(`
+    <section class="panel">
+      <div class="filters">
+        ${searchFilter("Produkte suchen", "ID, Name, Layout-Code")}
+        ${selectFilter("readiness", "Readiness", [["", "Alle"], ["ready", "Routbar"], ["warning", "Nicht routbar"]])}
+        ${selectFilter("sort", "Sortierung", [["name", "Name"], ["id", "ID"], ["layoutCode", "Layout-Code"]])}
+      </div>
+      ${table({
+        columns: ["ID", "Produkt", "Preis", "Layout", "Store", "Readiness", "Aktionen"],
+        rows: page.rows.map((product) => {
+          const readiness = readinessForProduct(product);
+          return [
+            mono(product.id),
+            escapeHtml(product.name),
+            product.price == null ? "-" : `${Number(product.price).toFixed(2)} EUR`,
+            mono(product.layoutCode || "-"),
+            escapeHtml(product.storeCode || product.storeId || "-"),
+            `${badge(readiness.label, readiness.status)}${readiness.problems.length ? `<br><span class="muted">${escapeHtml(readiness.problems.join(", "))}</span>` : ""}`,
+            actions([
+              ["Bearbeiten", () => openProductDrawer(product)],
+              ["Loeschen", () => confirmMutation(`Produkt ${product.name} loeschen?`, "Das Produkt wird aus dem Admin-Katalog entfernt.", () => apiDelete(`/api/admin/products/${product.id}`), renderProducts), "danger"]
+            ])
+          ];
+        }),
+        emptyMessage: "Keine Produkte gefunden."
+      })}
+      ${pager(page)}
+    </section>
+  `);
+  hydrateFilters(() => renderProductList(products));
+  hydrateActions();
+}
+
+async function renderCategories() {
+  setPage("Kategorien", "Kategoriepflege bleibt bewusst Import-/Maintenance-orientiert.", `<button class="primary" data-open-category-import>Kategorie-Import</button>`);
+  const categories = normalizeList(await safeGet(API.categories, []));
+  content(`
+    <section class="notice">Einzelne Kategorie-Mutationen sind im Backend aktuell nicht vorhanden. Diese Seite macht die Begrenzung sichtbar und bietet den vorhandenen geschuetzten Bulk-Import.</section>
+    <section class="panel" style="margin-top:16px">
+      ${table({
+        columns: ["Code", "Name", "Aktionen"],
+        rows: categories.map((category) => [mono(category.categoryCode || category.id || category.code), escapeHtml(category.name || category.displayName || "-"), "Bulk Import"]),
+        emptyMessage: "Keine Kategorien geladen."
+      })}
+    </section>
+  `);
+  document.querySelector("[data-open-category-import]")?.addEventListener("click", () => openImportDrawer("category"));
+}
+
+async function renderRecipes() {
+  setPage("Rezepte", "Rezepte, Zutaten, Schritte, Mapping-Readiness und Publish Lifecycle.", `<button class="primary" data-open-recipe>Rezept anlegen</button>`);
+  const recipes = normalizeList(await safeGet(API.recipes, []));
+  renderRecipeList(recipes);
+  document.querySelector("[data-open-recipe]")?.addEventListener("click", () => openRecipeDrawer());
+}
+
+function renderRecipeList(recipes) {
+  const filtered = applyQuery(recipes, ["title", "slug", "status"]).filter((recipe) => !state.filters.status || recipe.status === state.filters.status);
+  content(`
+    <section class="panel">
+      <div class="filters">
+        ${searchFilter("Rezepte suchen", "Titel, Slug")}
+        ${selectFilter("status", "Status", [["", "Alle"], ["DRAFT", "Draft"], ["PUBLISHED", "Published"], ["ARCHIVED", "Archived"]])}
+        ${selectFilter("sort", "Sortierung", [["title", "Titel"], ["status", "Status"], ["publishedAt", "Publiziert"]])}
+      </div>
+      ${table({
+        columns: ["Rezept", "Status", "Mapping", "Tags", "Aktionen"],
+        rows: sortRows(filtered, state.filters.sort || "title").map((recipe) => {
+          const readiness = recipeReadiness(recipe);
+          return [
+            `<strong>${escapeHtml(recipe.title)}</strong><br><span class="muted mono">${escapeHtml(recipe.slug)}</span>`,
+            badge(recipe.status || "DRAFT", recipe.status === "PUBLISHED" ? "success" : recipe.status === "ARCHIVED" ? "muted" : "warning"),
+            `${badge(readiness.label, readiness.status)}<br><span class="muted">${recipe.mappedIngredientCount ?? 0}/${recipe.totalIngredientCount ?? 0} Zutaten</span>`,
+            escapeHtml((recipe.tags || []).map((tag) => tag.name).join(", ") || "-"),
+            actions([
+              ["Bearbeiten", () => openRecipeDrawer(recipe)],
+              ["Mapping", () => openMappingDrawer(recipe)],
+              ["Publish", () => confirmMutation(`${recipe.title} publizieren?`, "Das Rezept wird fuer mobile Nutzer sichtbar.", () => apiPatch(`${API.recipes}/${recipe.id}/publish`, {}), renderRecipes)],
+              ["Deaktivieren", () => confirmMutation(`${recipe.title} deaktivieren?`, "Das Rezept bleibt erhalten, ist aber nicht aktiv.", () => apiPatch(`${API.recipes}/${recipe.id}/deactivate`, {}), renderRecipes)],
+              ["Archivieren", () => confirmMutation(`${recipe.title} archivieren?`, "Archivierte Rezepte werden aus Arbeitslisten entfernt.", () => apiPatch(`${API.recipes}/${recipe.id}/archive`, {}), renderRecipes), "danger"]
+            ])
+          ];
+        }),
+        emptyMessage: "Keine Rezepte gefunden."
+      })}
+    </section>
+  `);
+  hydrateFilters(() => renderRecipeList(recipes));
+  hydrateActions();
+}
+
+async function renderServerLogs() {
+  setPage("Diagnose", "Admin-only Logs mit Stacktrace-Inspektion und Refresh.", `<button class="primary" data-refresh>Aktualisieren</button>`);
+  const [audit, errors] = await Promise.all([safeGet(API.adminLogs, []), safeGet(API.errorLogs, [])]);
+  content(`
+    <section class="grid two">
+      <div class="panel"><div class="panel-header"><h2>Audit Events</h2></div>${renderEventList(normalizeList(audit))}</div>
+      <div class="panel"><div class="panel-header"><h2>Error Logs</h2></div>${renderDiagnostics(normalizeList(errors))}</div>
+    </section>
+  `);
+  document.querySelector("[data-refresh]")?.addEventListener("click", renderServerLogs);
+}
+
+function renderEditorEntry() {
+  setPage("Layout Editor", "Dediziertes Planungstool mit Canvas, Toolbar, Inspector und Validierung.", `<a class="button primary" href="/admin/editor/${location.search}">Editor oeffnen</a>`);
+  content(`
+    <section class="panel">
+      <h2>Editor wird separat geladen</h2>
+      <p class="muted">Die Editor-Seite besitzt eine eigene Tool-Oberflaeche. Store-Kontext und Legacy-Modus bleiben ueber Query-Parameter kompatibel.</p>
+      <a class="button primary" href="/admin/editor/${location.search}">Zum Layout Editor</a>
+    </section>
+  `);
+}
+
+function openRegionDrawer(region = {}) {
+  openDrawer(region.id ? "Region bearbeiten" : "Region anlegen", `
+    <form class="stack" data-form="region">
+      ${field("code", "Code", region.code || "")}
+      ${field("name", "Name", region.name || "")}
+      <div class="toolbar"><button class="primary">Speichern</button></div>
+    </form>
+  `, (drawer) => {
+    drawer.querySelector("form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const values = formValues(event.currentTarget);
+      await (region.id ? apiPut(`${API.regions}/${region.id}`, values) : apiPost(API.regions, values));
+      closeDrawer();
+      toast("Region gespeichert.");
+      renderRegions();
+    });
+  });
+}
+
+function openStoreDrawer(store = {}, regions = []) {
+  const values = store || {};
+  openDrawer(values.id ? "Store bearbeiten" : "Store anlegen", `
+    <div class="stepper"><div class="step active">1 Identitaet</div><div class="step active">2 Adresse</div><div class="step active">3 Koordinaten</div><div class="step">4 Review</div></div>
+    <form class="stack" data-form="store">
+      <div class="form-grid">
+        ${selectField("regionId", "Region", regions.map((r) => [r.id, `${r.code} · ${r.name}`]), values.region?.id || values.regionId || "")}
+        ${field("storeCode", "Store-Code", values.storeCode || "")}
+        ${field("name", "Name", values.name || "")}
+        ${field("street", "Strasse", values.street || "")}
+        ${field("zipCode", "PLZ", values.zipCode || "")}
+        ${field("city", "Stadt", values.city || "")}
+        ${field("country", "Land", values.country || "Austria")}
+        ${field("latitude", "Latitude", values.latitude ?? "", "number", "0.000001")}
+        ${field("longitude", "Longitude", values.longitude ?? "", "number", "0.000001")}
+        <div class="span-2">${textarea("notes", "Notizen", values.notes || "")}</div>
+      </div>
+      <div class="notice">Nach dem Speichern geht es sinnvoll mit Beacon-Zuweisung oder Layout-Erstellung weiter.</div>
+      <div class="toolbar"><button class="primary">Speichern</button></div>
+    </form>
+  `, (drawer) => {
+    drawer.querySelector("form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const values = formValues(event.currentTarget);
+      const errors = validateStoreForm(values);
+      if (showErrors(event.currentTarget, errors)) return;
+      const saved = await (store?.id ? apiPut(`${API.stores}/${store.id}`, buildStorePayload(values)) : apiPost(API.stores, buildStorePayload(values)));
+      closeDrawer();
+      toast("Store gespeichert. Naechster Schritt: Beacons oder Layout.");
+      location.href = `/admin/stores/detail/?storeId=${saved.id || store.id}`;
+    });
+  });
+}
+
+function openBeaconDrawer(beacon = {}, existing = []) {
+  openDrawer(beacon.id ? "Beacon bearbeiten" : "Beacon anlegen", `
+    <form class="stack">
+      <div class="form-grid">
+        ${field("beaconCode", "Beacon-Code", beacon.beaconCode || "")}
+        ${field("uuid", "UUID", beacon.uuid || "")}
+        ${field("major", "Major", beacon.major ?? "", "number")}
+        ${field("minor", "Minor", beacon.minor ?? "", "number")}
+        <div class="span-2">${textarea("notes", "Notizen", beacon.notes || "")}</div>
+      </div>
+      <div data-error-summary></div>
+      <div class="toolbar"><button class="primary">Speichern</button></div>
+    </form>
+  `, (drawer) => {
+    drawer.querySelector("form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const values = { ...formValues(event.currentTarget), id: beacon.id };
+      const errors = validateBeaconForm(values, existing);
+      if (showErrors(event.currentTarget, errors)) return;
+      await (beacon.id ? apiPut(`${API.beacons}/${beacon.id}`, values) : apiPost(API.beacons, values));
+      closeDrawer();
+      toast("Beacon gespeichert.");
+      renderBeacons();
+    });
+  });
+}
+
+function openBeaconBulkDrawer() {
+  openDrawer("Beacon Bulk anlegen", `
+    <form class="stack">
+      ${field("uuid", "Gemeinsame UUID")}
+      ${field("major", "Major", "", "number")}
+      ${textarea("items", "Beacon-Zeilen", "", "Ein Beacon pro Zeile: beaconCode,minor")}
+      <div class="notice">Review: Zeilen werden vor Commit geparst. Ungueltige Zeilen stoppen den Import.</div>
+      <div class="toolbar"><button class="primary">Review & Commit</button></div>
+    </form>
+  `, (drawer) => {
+    drawer.querySelector("form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const values = formValues(event.currentTarget);
+      const items = values.items.split(/\r?\n/).filter(Boolean).map((line) => {
+        const [beaconCode, minor] = line.split(",").map((part) => part.trim());
+        return { beaconCode, minor: Number(minor) };
+      });
+      if (!values.uuid || !items.length || items.some((item) => !item.beaconCode || Number.isNaN(item.minor))) {
+        toast("Bulk-Review fehlgeschlagen: UUID und gueltige Zeilen sind erforderlich.", "danger");
+        return;
+      }
+      await apiPost(`${API.beacons}/bulk`, { uuid: values.uuid, major: Number(values.major), items });
+      closeDrawer();
+      toast(`${items.length} Beacon(s) angelegt.`);
+      renderBeacons();
+    });
+  });
+}
+
+function openAssignDrawer(beacon, stores) {
+  openDrawer("Beacon zuweisen", `
+    <form class="stack">
+      <div class="notice">Beacon <strong>${escapeHtml(beacon.beaconCode)}</strong> wird nach Bestaetigung einem Store zugewiesen.</div>
+      ${selectField("storeId", "Ziel-Store", stores.map((store) => [store.id, `${store.storeCode} · ${store.name}`]))}
+      <div class="toolbar"><button class="primary">Zuweisung bestaetigen</button></div>
+    </form>
+  `, (drawer) => {
+    drawer.querySelector("form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const values = formValues(event.currentTarget);
+      await apiPost(`${API.beacons}/${beacon.id}/assign`, { storeId: values.storeId });
+      closeDrawer();
+      toast("Beacon zugewiesen.");
+      renderBeacons();
+    });
+  });
+}
+
+function openProductDrawer(product = {}) {
+  openDrawer(product.id ? "Produkt bearbeiten" : "Produkt anlegen", `
+    <form class="stack">
+      <div class="form-grid">
+        ${field("id", "Produkt-ID", product.id ?? "", "number")}
+        ${field("name", "Name", product.name || "")}
+        ${field("price", "Preis", product.price ?? "", "number", "0.01")}
+        ${field("layoutCode", "Layout-Code", product.layoutCode || "")}
+        ${field("storeId", "Store-ID optional", product.storeId || "")}
+        ${field("storeCode", "Store-Code optional", product.storeCode || "")}
+      </div>
+      <div data-error-summary></div>
+      <div class="toolbar"><button class="primary">Speichern</button></div>
+    </form>
+  `, (drawer) => {
+    drawer.querySelector("form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const values = formValues(event.currentTarget);
+      const errors = validateProductForm(values);
+      if (showErrors(event.currentTarget, errors)) return;
+      await apiPost(API.productWrite, buildProductPayload(values));
+      closeDrawer();
+      toast("Produkt gespeichert.");
+      renderProducts();
+    });
+  });
+}
+
+function openImportDrawer(kind) {
+  const title = kind === "category" ? "Kategorie-Import" : "Produkt-Import";
+  openDrawer(title, `
+    <form class="stack">
+      ${textarea("payload", "JSON Array oder NDJSON", "", "Ein JSON Array oder eine Zeile pro Objekt")}
+      <div class="notice">Schritt 1 Parse, Schritt 2 Review, Schritt 3 Commit. Der Commit nutzt nur vorhandene Backend-Endpunkte.</div>
+      <div class="toolbar"><button class="primary">Parsen und committen</button></div>
+    </form>
+  `, (drawer) => {
+    drawer.querySelector("form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        const items = parseImportText(formValues(event.currentTarget).payload);
+        if (!items.length) throw new Error("Keine Datensaetze gefunden.");
+        await apiPost(kind === "category" ? API.categoryBulk : API.productBulk, items);
+        closeDrawer();
+        toast(`${items.length} Datensatz/Datensaetze importiert.`);
+        kind === "category" ? renderCategories() : renderProducts();
+      } catch (error) {
+        toast(`Import abgebrochen: ${error.message}`, "danger");
+      }
+    });
+  });
+}
+
+function openRecipeDrawer(recipe = {}) {
+  openDrawer(recipe.id ? "Rezept bearbeiten" : "Rezept anlegen", `
+    <div class="stepper"><div class="step active">1 Metadata</div><div class="step active">2 Zutaten</div><div class="step active">3 Schritte</div><div class="step">4 Publish</div></div>
+    <form class="stack">
+      <div class="form-grid">
+        ${field("slug", "Slug", recipe.slug || "")}
+        ${field("title", "Titel", recipe.title || "")}
+        ${field("servings", "Portionen", recipe.servings ?? 2, "number")}
+        ${field("prepTimeMinutes", "Vorbereitung min", recipe.prepTimeMinutes ?? "", "number")}
+        ${field("cookTimeMinutes", "Kochen min", recipe.cookTimeMinutes ?? "", "number")}
+        ${field("totalTimeMinutes", "Gesamt min", recipe.totalTimeMinutes ?? "", "number")}
+        <div class="span-2">${textarea("summary", "Summary", recipe.summary || "")}</div>
+        <div class="span-2">${textarea("description", "Beschreibung", recipe.description || "")}</div>
+        <div class="span-2">${textarea("ingredientsText", "Zutaten", (recipe.ingredients || []).map((item, index) => `${index + 1};${item.displayName};${item.quantityText || ""}`).join("\n"), "position;name;menge")}</div>
+        <div class="span-2">${textarea("stepsText", "Schritte", (recipe.steps || []).map((item, index) => `${index + 1};${item.instruction}`).join("\n"), "position;anweisung")}</div>
+      </div>
+      <div data-error-summary></div>
+      <div class="toolbar"><button class="primary">Speichern</button></div>
+    </form>
+  `, (drawer) => {
+    drawer.querySelector("form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const values = formValues(event.currentTarget);
+      const errors = validateRecipeForm(values);
+      if (showErrors(event.currentTarget, errors)) return;
+      const recipePayload = {
+        slug: values.slug,
+        title: values.title,
+        summary: values.summary || null,
+        description: values.description || null,
+        servings: Number(values.servings),
+        prepTimeMinutes: numberOrNull(values.prepTimeMinutes),
+        cookTimeMinutes: numberOrNull(values.cookTimeMinutes),
+        totalTimeMinutes: numberOrNull(values.totalTimeMinutes),
+        status: recipe.status || "DRAFT",
+        tagIds: []
+      };
+      const ingredients = rowsFromText(values.ingredientsText).map(([position, displayName, quantityText]) => ({ position: Number(position), displayName, quantityText, optional: false }));
+      const steps = rowsFromText(values.stepsText).map(([position, instruction]) => ({ position: Number(position), instruction }));
+      if (recipe.id) {
+        await apiPut(`${API.recipes}/${recipe.id}`, recipePayload);
+      } else {
+        await apiPost(API.recipes, { recipe: recipePayload, ingredients, steps });
+      }
+      closeDrawer();
+      toast("Rezept gespeichert.");
+      renderRecipes();
+    });
+  });
+}
+
+async function openMappingDrawer(recipe) {
+  openDrawer("Zutaten-Mapping", `<div class="loading">Mapping wird geladen...</div>`);
+  const mapping = await safeGet(`${API.recipes}/${recipe.id}/mapping-status`, { ingredients: [] });
+  const drawer = document.querySelector(".drawer");
+  drawer.innerHTML = `
+    <div class="split"><h2>Zutaten-Mapping</h2><button class="ghost" data-close-drawer>Schliessen</button></div>
+    <div class="stack">
+      ${normalizeList(mapping.ingredients).map((item) => `
+        <div class="panel">
+          <div class="split"><strong>${escapeHtml(item.ingredientName)}</strong>${badge(item.status, item.status === "RESOLVED" ? "success" : "warning")}</div>
+          <p class="muted">${escapeHtml(item.reason || "Vorschlaege pruefen oder manuell bestaetigen.")}</p>
+          ${(item.candidates || []).map((candidate) => `<div class="split"><span>${escapeHtml(candidate.name)} <span class="mono">${escapeHtml(candidate.layoutCode || "-")}</span></span><button class="small" data-map="${item.ingredientId}" data-product="${candidate.id}">Zuordnen</button></div>`).join("") || empty("Keine Vorschlaege.", "Produktsuche im Backend lieferte keinen sicheren Treffer.")}
+        </div>
+      `).join("") || empty("Keine Mapping-Daten.", "Dieses Rezept hat noch keine Zutaten.")}
+    </div>
+  `;
+  drawer.querySelector("[data-close-drawer]")?.addEventListener("click", closeDrawer);
+  drawer.querySelectorAll("[data-map]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const candidate = normalizeList(mapping.ingredients).flatMap((item) => item.candidates || []).find((product) => String(product.id) === button.dataset.product);
+      await apiPut(`${API.recipes}/${recipe.id}/ingredients/${button.dataset.map}/product-mapping`, {
+        productId: candidate.id,
+        productName: candidate.name,
+        layoutCode: candidate.layoutCode,
+        storeId: candidate.storeId || null,
+        storeCode: candidate.storeCode || null,
+        mappingType: "MANUAL",
+        confidence: 1,
+        manuallyConfirmed: true
+      });
+      toast("Mapping bestaetigt.");
+      closeDrawer();
+      renderRecipes();
+    });
+  });
+}
+
+function table({ columns, rows, emptyMessage }) {
+  if (!rows.length) return empty(emptyMessage, "Passe Suche, Filter oder Scope an.");
+  return `<div class="table-wrap"><table><thead><tr>${columns.map((c) => `<th>${escapeHtml(c)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
+function actions(items) {
+  return `<div class="row-actions">${items.map(([label, action, tone]) => {
+    if (typeof action === "string") return `<a class="button small ${tone || ""}" href="${action}">${escapeHtml(label)}</a>`;
+    const id = `action-${Math.random().toString(36).slice(2)}`;
+    actionRegistry.set(id, action);
+    return `<button class="small ${tone || ""}" data-action-id="${id}">${escapeHtml(label)}</button>`;
+  }).join("")}</div>`;
+}
+
+const actionRegistry = new Map();
+function hydrateActions() {
+  document.querySelectorAll("[data-action-id]").forEach((button) => {
+    button.addEventListener("click", () => actionRegistry.get(button.dataset.actionId)?.());
+  });
+}
+
+function hydrateFilters(callback) {
+  document.querySelectorAll("[data-filter]").forEach((control) => {
+    control.addEventListener("input", () => {
+      state.filters[control.dataset.filter] = control.value;
+      state.page = 1;
+      callback();
+    });
+  });
+}
+
+function searchFilter(label, placeholder) {
+  return `<div class="field"><label>${label}</label><input data-filter="query" value="${escapeHtml(state.filters.query || "")}" placeholder="${escapeHtml(placeholder)}"></div>`;
+}
+
+function selectFilter(name, label, options) {
+  return `<div class="field"><label>${label}</label><select data-filter="${name}">${options.map(([value, text]) => `<option value="${escapeHtml(value)}" ${state.filters[name] === value ? "selected" : ""}>${escapeHtml(text)}</option>`).join("")}</select></div>`;
+}
+
+function applyQuery(rows, fields) {
+  return rows.filter((row) => includesText(row, state.filters.query, fields));
+}
+
+function pager(page) {
+  return `<div class="split" style="margin-top:12px"><span class="muted">${page.totalRows} Eintraege · Seite ${page.page}/${page.totalPages}</span><div class="toolbar"><button class="small" ${page.page <= 1 ? "disabled" : ""} data-page="${page.page - 1}">Zurueck</button><button class="small" ${page.page >= page.totalPages ? "disabled" : ""} data-page="${page.page + 1}">Weiter</button></div></div>`;
+}
+
+document.addEventListener("click", (event) => {
+  const pageButton = event.target.closest("[data-page]");
+  if (pageButton) {
+    state.page = Number(pageButton.dataset.page);
+    renderRoute();
   }
 });
+
+function openDrawer(title, html, hydrate = () => {}) {
+  closeDrawer();
+  const backdrop = document.createElement("div");
+  backdrop.className = "drawer-backdrop";
+  backdrop.innerHTML = `<aside class="drawer"><div class="split"><h2>${escapeHtml(title)}</h2><button class="ghost" data-close-drawer>Schliessen</button></div><div style="height:16px"></div>${html}</aside>`;
+  document.body.append(backdrop);
+  backdrop.querySelector("[data-close-drawer]").addEventListener("click", closeDrawer);
+  hydrate(backdrop.querySelector(".drawer"));
+}
+
+function closeDrawer() {
+  document.querySelector(".drawer-backdrop")?.remove();
+}
+
+function confirmMutation(title, body, mutate, after) {
+  const backdrop = document.createElement("div");
+  backdrop.className = "dialog-backdrop";
+  backdrop.innerHTML = `
+    <section class="dialog">
+      <h2>${escapeHtml(title)}</h2>
+      <p class="muted">${escapeHtml(body)}</p>
+      <div class="toolbar"><button data-cancel>Abbrechen</button><button class="danger" data-confirm>Bestaetigen</button></div>
+    </section>
+  `;
+  document.body.append(backdrop);
+  backdrop.querySelector("[data-cancel]").addEventListener("click", () => backdrop.remove());
+  backdrop.querySelector("[data-confirm]").addEventListener("click", async () => {
+    await mutate();
+    backdrop.remove();
+    toast("Aktion abgeschlossen.");
+    after?.();
+  });
+}
+
+function formValues(form) {
+  return Object.fromEntries(new FormData(form).entries());
+}
+
+function showErrors(form, errors) {
+  const entries = Object.entries(errors);
+  const summary = form.querySelector("[data-error-summary]");
+  if (summary) summary.innerHTML = entries.length ? `<div class="notice danger">${entries.map(([, message]) => escapeHtml(message)).join("<br>")}</div>` : "";
+  return entries.length > 0;
+}
+
+function field(name, label, value = "", type = "text", step = "", placeholder = "") {
+  return `<div class="field"><label for="${name}">${escapeHtml(label)}</label><input id="${name}" name="${name}" type="${type}" value="${escapeHtml(value)}" ${step ? `step="${escapeHtml(step)}"` : ""} placeholder="${escapeHtml(placeholder)}"></div>`;
+}
+
+function textarea(name, label, value = "", placeholder = "") {
+  return `<div class="field"><label for="${name}">${escapeHtml(label)}</label><textarea id="${name}" name="${name}" placeholder="${escapeHtml(placeholder)}">${escapeHtml(value)}</textarea></div>`;
+}
+
+function selectField(name, label, options, value = "") {
+  return `<div class="field"><label for="${name}">${escapeHtml(label)}</label><select id="${name}" name="${name}"><option value="">Bitte waehlen</option>${options.map(([optionValue, text]) => `<option value="${escapeHtml(optionValue)}" ${String(optionValue) === String(value) ? "selected" : ""}>${escapeHtml(text)}</option>`).join("")}</select></div>`;
+}
+
+function stat(label, value, hint) {
+  return `<div class="stat"><div class="stat-label">${escapeHtml(label)}</div><div class="stat-value">${escapeHtml(value)}</div><div class="stat-hint">${escapeHtml(hint)}</div></div>`;
+}
+
+function badge(label, tone = "muted") {
+  return `<span class="badge ${tone}">${escapeHtml(label)}</span>`;
+}
+
+function mono(value) {
+  return `<span class="mono">${escapeHtml(value ?? "-")}</span>`;
+}
+
+function empty(title, body) {
+  return `<div class="empty"><strong>${escapeHtml(title)}</strong><br>${escapeHtml(body)}</div>`;
+}
+
+function detailList(items) {
+  return `<dl class="stack">${items.map(([key, value]) => `<div><dt class="muted">${escapeHtml(key)}</dt><dd style="margin:0">${escapeHtml(value)}</dd></div>`).join("")}</dl>`;
+}
+
+function renderEventList(events) {
+  if (!events.length) return empty("Keine Events.", "Noch keine sichtbaren Aktivitaeten.");
+  return `<div class="stack">${events.map((event) => `<div class="notice"><div class="split"><strong>${escapeHtml(event.action || event.summary || "Event")}</strong><span class="muted">${formatDate(event.createdAt)}</span></div><div class="muted">${escapeHtml(event.summary || event.actorLabel || "")}</div></div>`).join("")}</div>`;
+}
+
+function renderDiagnostics(errors) {
+  if (!errors.length) return empty("Keine Fehlerlogs.", "Systemdiagnose ist aktuell ruhig.");
+  return `<div class="stack">${errors.slice(0, 30).map((log) => `<details class="notice"><summary><strong>${escapeHtml(log.message || log.error || "Fehler")}</strong> <span class="muted">${formatDate(log.createdAt)}</span></summary><pre class="mono">${escapeHtml(log.stackTrace || log.stack || JSON.stringify(log, null, 2))}</pre></details>`).join("")}</div>`;
+}
+
+function renderBeaconMiniList(beacons) {
+  if (!beacons.length) return empty("Keine Beacons zugewiesen.", "Starte die Zuweisung aus Beacons oder Store Detail.");
+  return `<div class="stack">${beacons.map((beacon) => `<div class="split"><span>${escapeHtml(beacon.beaconCode)}</span>${badge(beacon.identityKey || "aktiv", "info")}</div>`).join("")}</div>`;
+}
+
+function renderLayoutList(layouts, storeId) {
+  if (!layouts.length) return empty("Keine Layout-Versionen.", "Oeffne den Editor und speichere eine erste Version.");
+  return `<div class="stack">${layouts.map((layout) => `<div class="split"><span>Version ${escapeHtml(layout.versionNo || layout.layoutName || layout.layoutId)}</span><span>${badge(layout.active ? "Aktiv" : "Version", layout.active ? "success" : "muted")} <a class="button small" href="/admin/editor/?storeId=${storeId}&layoutId=${layout.layoutId || layout.id}">Oeffnen</a></span></div>`).join("")}</div>`;
+}
+
+function rowsFromText(text) {
+  return String(text || "").split(/\r?\n/).filter(Boolean).map((line) => line.split(";").map((part) => part.trim()));
+}
+
+function numberOrNull(value) {
+  return value === "" || value == null ? null : Number(value);
+}
+
+function canAccess(role) {
+  return userRoles(state.user).includes(role);
+}
+
+async function safeGet(url, fallback) {
+  try {
+    return await apiGet(url);
+  } catch (error) {
+    toast(error.message, "danger");
+    return fallback;
+  }
+}
+
+async function apiGet(url) {
+  return request(url);
+}
+
+async function apiPost(url, body) {
+  return request(url, { method: "POST", body: JSON.stringify(body) });
+}
+
+async function apiPut(url, body) {
+  return request(url, { method: "PUT", body: JSON.stringify(body) });
+}
+
+async function apiPatch(url, body) {
+  return request(url, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+async function apiDelete(url) {
+  return request(url, { method: "DELETE" });
+}
+
+async function request(url, options = {}) {
+  const response = await fetch(url, {
+    credentials: "same-origin",
+    headers: { Accept: "application/json", ...(options.body ? { "Content-Type": "application/json" } : {}) },
+    ...options
+  });
+  const text = await response.text();
+  const data = text ? parseMaybeJson(text) : null;
+  if (response.status === 401) {
+    location.href = "/admin/";
+    throw new Error("Anmeldung erforderlich.");
+  }
+  if (response.status === 403) {
+    throw new Error("Kein Zugriff auf diesen Workflow.");
+  }
+  if (!response.ok) {
+    throw new Error(data?.message || data?.error || text || `Request failed (${response.status})`);
+  }
+  return data;
+}
+
+function parseMaybeJson(text) {
+  try { return JSON.parse(text); } catch { return text; }
+}
+
+function renderAccessDenied() {
+  setPage("Kein Zugriff", "Diese Seite liegt ausserhalb deiner Rolle oder deines Scopes.");
+  content(`<section class="access-denied"><strong>403</strong><br>Navigation und Direktzugriff sind role-aware. Waehle links eine erlaubte Seite.</section>`);
+}
+
+function fatal(error) {
+  root.className = "access-denied";
+  root.innerHTML = `<strong>Admin Platform konnte nicht geladen werden.</strong><br>${escapeHtml(error.message || error)}`;
+}
+
+function toast(message, tone = "success") {
+  const region = document.querySelector("#toasts") || document.body.appendChild(Object.assign(document.createElement("div"), { id: "toasts", className: "toast-region" }));
+  const item = document.createElement("div");
+  item.className = `toast ${tone}`;
+  item.textContent = message;
+  region.append(item);
+  setTimeout(() => item.remove(), 4200);
+}
+
+function icon(name) {
+  const icons = { grid: "▦", map: "⌖", store: "▤", radio: "◉", box: "□", tags: "⌗", book: "▧", layout: "▣", terminal: "▥" };
+  return icons[name] || "•";
+}

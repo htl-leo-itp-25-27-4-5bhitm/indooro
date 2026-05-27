@@ -5,6 +5,12 @@
   "scripts": {
     "start:a": "node scripts/orchestrator.js start-a",
     "start:b": "node scripts/orchestrator.js start-b",
+    "admin:lint": "node --check backend/indooro_server/src/main/resources/META-INF/resources/admin/core.js && node --check backend/indooro_server/src/main/resources/META-INF/resources/admin/app.js && node --check backend/indooro_server/src/main/resources/META-INF/resources/admin/editor-core.js && node --check backend/indooro_server/src/main/resources/META-INF/resources/admin/editor.js",
+    "admin:typecheck": "npm run admin:lint",
+    "admin:test": "node --test backend/indooro_server/src/test/js/*.test.mjs",
+    "admin:smoke": "playwright test",
+    "admin:build": "npm run admin:lint && node scripts/verify-admin-assets.mjs",
+    "admin:verify": "npm run admin:build && npm run admin:test && npm run admin:smoke",
     "api:test": "npx -y httpyac send api-tests/httpyac/00-auth.http api-tests/httpyac/01-public-routes.http api-tests/httpyac/02-admin-rbac.http api-tests/httpyac/03-maintenance-smoke.http api-tests/httpyac/04-role-route-matrix.http --all --bail",
     "api:test:public": "npx -y httpyac send api-tests/httpyac/01-public-routes.http --all --bail",
     "api:test:rbac": "npx -y httpyac send api-tests/httpyac/00-auth.http api-tests/httpyac/02-admin-rbac.http --all --bail",
@@ -13,5 +19,8 @@
     "api:test:roles:tokens": "npx -y httpyac send api-tests/httpyac/00-auth-env-tokens.http api-tests/httpyac/04-role-route-matrix.http --all --bail",
     "api:test:maintenance": "npx -y httpyac send api-tests/httpyac/00-auth.http api-tests/httpyac/03-maintenance-smoke.http --all --bail",
     "api:test:maintenance:tokens": "npx -y httpyac send api-tests/httpyac/00-auth-env-tokens.http api-tests/httpyac/03-maintenance-smoke.http --all --bail"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
   }
 }
