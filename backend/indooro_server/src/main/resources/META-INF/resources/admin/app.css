@@ -178,6 +178,7 @@ a {
 .nav-links a[href="#store-detail"]::before { content: "DT"; }
 .nav-links a[href="#beacons"]::before { content: "BC"; }
 .nav-links a[href="#products"]::before { content: "PR"; }
+.nav-links a[href="#recipes"]::before { content: "RC"; }
 .ghost-button[href="/admin/logout"]::before { content: "LO"; }
 .ghost-button[href="/admin/editor/"]::before { content: "ED"; }
 .ghost-button[href="/admin/server-logs/"]::before { content: "ER"; }
@@ -377,6 +378,27 @@ a:focus-visible {
 .disabled-link {
   pointer-events: none;
   opacity: 0.48;
+}
+
+.recipe-detail-tools {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.recipe-detail-tools hr {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.compact-form {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
 }
 
 .stats-grid {

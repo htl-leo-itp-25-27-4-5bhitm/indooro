@@ -3,6 +3,7 @@ import SwiftUI
 private enum AppSection: Hashable {
     case start
     case planning
+    case recipes
     case shopping
     case map
 }
@@ -13,6 +14,7 @@ struct ContentView: View {
     @StateObject private var shoppingSessionManager = ShoppingSessionManager()
     @StateObject private var mapProductSearch = ProductSearchStore()
     @StateObject private var productsSearch = ProductSearchStore()
+    @StateObject private var recipeStore = RecipeStore()
 
     @State private var selectedSection: AppSection = .start
     @State private var targetProduct: Product?
@@ -26,6 +28,7 @@ struct ContentView: View {
                 selectedList: shoppingListManager.selectedList,
                 activeBanner: shoppingSessionManager.banner(),
                 onOpenPlanning: { selectedSection = .planning },
+                onOpenRecipes: { selectedSection = .recipes },
                 onOpenShopping: { selectedSection = .shopping },
                 onOpenMap: { selectedSection = .map }
             )
@@ -47,6 +50,19 @@ struct ContentView: View {
                 Label("Planung", systemImage: "plus.circle.fill")
             }
             .tag(AppSection.planning)
+
+            RecipesPage(
+                recipeStore: recipeStore,
+                listManager: shoppingListManager,
+                sessionManager: shoppingSessionManager,
+                beaconManager: beaconManager,
+                onOpenShopping: { selectedSection = .shopping },
+                onRecipeItemsAdded: syncShoppingSession
+            )
+            .tabItem {
+                Label("Rezepte", systemImage: "fork.knife")
+            }
+            .tag(AppSection.recipes)
 
             ShoppingListsPage(
                 listManager: shoppingListManager,

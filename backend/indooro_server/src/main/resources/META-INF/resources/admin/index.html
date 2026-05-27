@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Indooro Admin Plattform</title>
   <link rel="stylesheet" href="app.css" />
-  <script defer src="app.js?v=20260519-product-delete"></script>
+  <script defer src="app.js?v=20260526-recipes"></script>
 </head>
 <body>
   <div class="admin-shell">
@@ -24,6 +24,7 @@
         <a href="#store-detail">Filialdetail</a>
         <a href="#beacons">Beacons</a>
         <a href="#products" class="admin-only">Produkte</a>
+        <a href="#recipes" class="admin-only">Rezepte</a>
       </nav>
 
       <div class="sidebar-actions">
@@ -92,6 +93,11 @@
           <span class="workflow-kicker">Admin</span>
           <strong>Produkte pflegen</strong>
           <span>Produktdaten mit Layout-Code in den Suchkatalog schreiben.</span>
+        </a>
+        <a class="workflow-card admin-only" href="#recipes">
+          <span class="workflow-kicker">Admin</span>
+          <strong>Rezepte kuratieren</strong>
+          <span>Zutaten, Schritte und Produkt-Mappings fuer die App pflegen.</span>
         </a>
       </section>
 
@@ -403,6 +409,154 @@
               <button type="button" id="resetProductFormBtn" class="secondary-button">Zuruecksetzen</button>
             </div>
           </form>
+        </div>
+      </section>
+
+      <section class="panel admin-only" id="recipes">
+        <div class="panel-header">
+          <div>
+            <span class="eyebrow">Planung</span>
+            <h3>Rezept Verwaltung</h3>
+          </div>
+          <button id="refreshRecipesBtn" class="secondary-button">Rezepte aktualisieren</button>
+        </div>
+
+        <div class="toolbar-row">
+          <label class="search-field">
+            Suche
+            <input id="recipeQuery" type="search" placeholder="Titel, Beschreibung oder Zutat" />
+          </label>
+          <label>
+            Status
+            <select id="recipeStatusFilter">
+              <option value="">Alle</option>
+              <option value="PUBLISHED">Veroeffentlicht</option>
+              <option value="DRAFT">Draft</option>
+              <option value="ARCHIVED">Archiviert</option>
+            </select>
+          </label>
+          <button id="applyRecipeFiltersBtn" class="secondary-button">Filter anwenden</button>
+        </div>
+
+        <div class="two-column-grid wide-right">
+          <div>
+            <div id="recipesList" class="list-stack"></div>
+          </div>
+
+          <div class="form-card">
+            <form id="recipeForm">
+              <h4 id="recipeFormTitle">Rezept anlegen</h4>
+              <label>
+                Slug
+                <input name="slug" maxlength="140" required placeholder="tomaten-pasta" />
+              </label>
+              <label>
+                Titel
+                <input name="title" maxlength="180" required placeholder="Tomaten-Pasta" />
+              </label>
+              <label>
+                Zusammenfassung
+                <textarea name="summary" rows="2" maxlength="4000" placeholder="Kurzbeschreibung fuer die App"></textarea>
+              </label>
+              <label>
+                Beschreibung
+                <textarea name="description" rows="3" maxlength="12000" placeholder="Optional"></textarea>
+              </label>
+              <div class="split-grid">
+                <label>
+                  Portionen
+                  <input name="servings" type="number" min="1" step="1" required value="2" />
+                </label>
+                <label>
+                  Status
+                  <select name="status">
+                    <option value="DRAFT">Draft</option>
+                    <option value="PUBLISHED">Veroeffentlicht</option>
+                  </select>
+                </label>
+              </div>
+              <div class="split-grid">
+                <label>
+                  Vorbereitung
+                  <input name="prepTimeMinutes" type="number" min="0" step="1" placeholder="10" />
+                </label>
+                <label>
+                  Kochen
+                  <input name="cookTimeMinutes" type="number" min="0" step="1" placeholder="15" />
+                </label>
+              </div>
+              <label>
+                Bild URL
+                <input name="imageUrl" placeholder="https://..." />
+              </label>
+              <div class="form-actions">
+                <button type="submit" class="primary-button">Rezept speichern</button>
+                <button type="button" id="resetRecipeFormBtn" class="secondary-button">Zuruecksetzen</button>
+              </div>
+            </form>
+
+            <div id="recipeDetailTools" class="recipe-detail-tools hidden">
+              <hr />
+              <h4>Zutaten und Schritte</h4>
+              <form id="recipeIngredientForm" class="compact-form">
+                <div class="split-grid">
+                  <label>
+                    Position
+                    <input name="position" type="number" min="1" step="1" value="1" required />
+                  </label>
+                  <label>
+                    Einheit
+                    <input name="unitCode" maxlength="20" placeholder="g" />
+                  </label>
+                </div>
+                <label>
+                  Zutat
+                  <input name="displayName" maxlength="180" required placeholder="250 g Mehl" />
+                </label>
+                <label>
+                  Canonical Name
+                  <input name="canonicalName" maxlength="180" placeholder="mehl" />
+                </label>
+                <div class="split-grid">
+                  <label>
+                    Menge
+                    <input name="quantity" type="text" inputmode="decimal" placeholder="250" />
+                  </label>
+                  <label>
+                    Freitext-Menge
+                    <input name="quantityText" maxlength="80" placeholder="nach Geschmack" />
+                  </label>
+                </div>
+                <label>
+                  Notiz
+                  <input name="preparationNote" maxlength="2000" placeholder="Optional" />
+                </label>
+                <div class="form-actions">
+                  <button type="submit" class="secondary-button">Zutat hinzufuegen</button>
+                </div>
+              </form>
+              <form id="recipeStepForm" class="compact-form">
+                <div class="split-grid">
+                  <label>
+                    Position
+                    <input name="position" type="number" min="1" step="1" value="1" required />
+                  </label>
+                  <label>
+                    Dauer
+                    <input name="durationMinutes" type="number" min="0" step="1" placeholder="5" />
+                  </label>
+                </div>
+                <label>
+                  Schritt
+                  <textarea name="instruction" rows="2" required placeholder="Zubereitungsschritt"></textarea>
+                </label>
+                <div class="form-actions">
+                  <button type="submit" class="secondary-button">Schritt hinzufuegen</button>
+                </div>
+              </form>
+              <div id="recipeMappingPreview" class="list-stack compact"></div>
+            </div>
+          </div>
         </div>
       </section>
     </main>

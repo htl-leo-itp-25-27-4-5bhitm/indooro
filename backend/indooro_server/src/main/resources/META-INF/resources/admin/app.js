@@ -5,6 +5,8 @@ const API = {
   stores: '/api/stores',
   beacons: '/api/beacons',
   products: '/api/admin/products',
+  recipes: '/api/admin/recipes',
+  recipeTags: '/api/admin/recipe-tags',
 };
 
 const state = {
@@ -12,6 +14,8 @@ const state = {
   stores: [],
   beacons: [],
   products: [],
+  recipes: [],
+  selectedRecipeDetail: null,
   currentUser: null,
   selectedStoreId: null,
   selectedStoreDetail: null,
@@ -24,6 +28,7 @@ const state = {
   editingStoreId: null,
   editingBeaconId: null,
   editingProductId: null,
+  editingRecipeId: null,
   storeFilters: {
     query: '',
     status: 'ACTIVE',
@@ -32,6 +37,10 @@ const state = {
   beaconFilters: {
     query: '',
     assignment: 'all',
+  },
+  recipeFilters: {
+    query: '',
+    status: '',
   },
 };
 
@@ -81,6 +90,18 @@ const els = {
   productsList: document.getElementById('productsList'),
   productForm: document.getElementById('productForm'),
   resetProductFormBtn: document.getElementById('resetProductFormBtn'),
+  refreshRecipesBtn: document.getElementById('refreshRecipesBtn'),
+  recipesList: document.getElementById('recipesList'),
+  recipeForm: document.getElementById('recipeForm'),
+  recipeFormTitle: document.getElementById('recipeFormTitle'),
+  resetRecipeFormBtn: document.getElementById('resetRecipeFormBtn'),
+  recipeQuery: document.getElementById('recipeQuery'),
+  recipeStatusFilter: document.getElementById('recipeStatusFilter'),
+  applyRecipeFiltersBtn: document.getElementById('applyRecipeFiltersBtn'),
+  recipeDetailTools: document.getElementById('recipeDetailTools'),
+  recipeIngredientForm: document.getElementById('recipeIngredientForm'),
+  recipeStepForm: document.getElementById('recipeStepForm'),
+  recipeMappingPreview: document.getElementById('recipeMappingPreview'),
   currentUserName: document.getElementById('currentUserName'),
   currentUserRole: document.getElementById('currentUserRole'),
   currentUserScope: document.getElementById('currentUserScope'),
@@ -347,6 +368,28 @@ async function loadProducts() {
   state.products = await fetchJson(`${API.products}?size=500`);
 }
 
+async function loadRecipes() {
+  if (!isAdmin()) {
+    state.recipes = [];
+    state.selectedRecipeDetail = null;
+    return;
+  }
+
+  const query = new URLSearchParams({
+    page: '0',
+    size: '100',
+    ...(state.recipeFilters.query ? { q: state.recipeFilters.query } : {}),
+    ...(state.recipeFilters.status ? { status: state.recipeFilters.status } : {}),
+  });
+  const page = await fetchJson(`${API.recipes}?${query.toString()}`);
+  state.recipes = page.content || [];
+}
+
+async function loadRecipeDetail(recipeId) {
+  state.selectedRecipeDetail = await fetchJson(`${API.recipes}/${recipeId}`);
+  state.editingRecipeId = recipeId;
+}
+
 async function loadStoreDetail(storeId) {
   const [detail, beacons, layouts, audit] = await Promise.all([
     fetchJson(`${API.stores}/${storeId}`),
@@ -598,6 +641,93 @@ function renderProducts() {
   `).join('');
 }
 
+function renderRecipes() {
+  if (!els.recipesList) {
+    return;
+  }
+
+  if (!isAdmin()) {
+    els.recipesList.innerHTML = '';
+    return;
+  }
+
+  if (!state.recipes.length) {
+    els.recipesList.innerHTML = '<div class="empty-state">Noch keine Rezepte gefunden. Lege ein Rezept an oder passe den Filter an.</div>';
+    renderRecipeDetailTools();
+    return;
+  }
+
+  els.recipesList.innerHTML = state.recipes.map((recipe) => `
+    <article class="list-item ${state.editingRecipeId === recipe.id ? 'active' : ''}">
+      <div class="item-header">
+        <div>
+          <h4>${escapeHtml(recipe.title)}</h4>
+          <div class="item-meta">${escapeHtml(recipe.slug)} · ${recipe.totalIngredientCount || 0} Zutaten · ${recipe.totalTimeMinutes ?? '-'} min</div>
+        </div>
+        <span class="badge ${recipe.status === 'PUBLISHED' ? '' : 'warn'}">${escapeHtml(recipe.status)}</span>
+      </div>
+      <p class="subtle">${escapeHtml(recipe.summary || 'Keine Zusammenfassung hinterlegt.')}</p>
+      <div class="badge-row">
+        ${(recipe.tags || []).map((tag) => `<span class="badge neutral">${escapeHtml(tag.name)}</span>`).join('')}
+        <span class="badge">${recipe.mappedIngredientCount || 0}/${recipe.totalIngredientCount || 0} gemappt</span>
+      </div>
+      <div class="item-footer">
+        <button type="button" class="action-button" data-action="select-recipe" data-id="${recipe.id}">Bearbeiten</button>
+        <button type="button" class="action-button" data-action="publish-recipe" data-id="${recipe.id}">Veroeffentlichen</button>
+        <button type="button" class="action-button warn" data-action="deactivate-recipe" data-id="${recipe.id}">Deaktivieren</button>
+        <button type="button" class="action-button danger" data-action="archive-recipe" data-id="${recipe.id}">Archivieren</button>
+      </div>
+    </article>
+  `).join('');
+
+  renderRecipeDetailTools();
+}
+
+function renderRecipeDetailTools() {
+  if (!els.recipeDetailTools) {
+    return;
+  }
+
+  const detail = state.selectedRecipeDetail;
+  els.recipeDetailTools.classList.toggle('hidden', !detail);
+  if (!detail) {
+    els.recipeMappingPreview.innerHTML = '';
+    return;
+  }
+
+  const ingredientList = detail.ingredients?.length
+    ? detail.ingredients.map((ingredient) => `
+        <article class="list-item">
+          <div class="item-header">
+            <h5>${ingredient.position}. ${escapeHtml(ingredient.displayName)}</h5>
+            <span class="badge neutral">${escapeHtml(ingredient.unitCode || 'ohne Einheit')}</span>
+          </div>
+          <div class="item-meta">${escapeHtml(ingredient.canonicalName || 'kein Canonical Name')}</div>
+        </article>
+      `).join('')
+    : '<div class="empty-state">Noch keine Zutaten.</div>';
+
+  const stepList = detail.steps?.length
+    ? detail.steps.map((step) => `
+        <article class="list-item">
+          <div class="item-header">
+            <h5>${step.position}. Schritt</h5>
+            <span class="badge neutral">${step.durationMinutes ?? '-'} min</span>
+          </div>
+          <p class="subtle">${escapeHtml(step.instruction)}</p>
+        </article>
+      `).join('')
+    : '<div class="empty-state">Noch keine Schritte.</div>';
+
+  els.recipeMappingPreview.innerHTML = `
+    <h4>Aktuelle Zutaten</h4>
+    ${ingredientList}
+    <h4>Aktuelle Schritte</h4>
+    ${stepList}
+    <button type="button" class="secondary-button" data-action="preview-recipe-mapping" data-id="${detail.id}">Mapping-Status laden</button>
+  `;
+}
+
 function parseDecimalInput(value) {
   const normalized = String(value ?? '').trim().replace(',', '.');
   return normalized ? Number(normalized) : Number.NaN;
@@ -662,6 +792,20 @@ function resetProductForm() {
   els.productForm?.reset();
 }
 
+function resetRecipeForm() {
+  state.editingRecipeId = null;
+  state.selectedRecipeDetail = null;
+  els.recipeForm?.reset();
+  if (els.recipeForm) {
+    els.recipeForm.elements.servings.value = '2';
+    els.recipeForm.elements.status.value = 'DRAFT';
+  }
+  if (els.recipeFormTitle) {
+    els.recipeFormTitle.textContent = 'Rezept anlegen';
+  }
+  renderRecipeDetailTools();
+}
+
 function populateRegionForm(regionId) {
   const region = state.regions.find((entry) => entry.id === regionId);
   if (!region) {
@@ -718,6 +862,24 @@ function populateProductForm(productId) {
   document.getElementById('products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function populateRecipeForm(recipe) {
+  if (!recipe || !els.recipeForm) {
+    return;
+  }
+  state.editingRecipeId = recipe.id;
+  els.recipeFormTitle.textContent = 'Rezept bearbeiten';
+  els.recipeForm.elements.slug.value = recipe.slug || '';
+  els.recipeForm.elements.title.value = recipe.title || '';
+  els.recipeForm.elements.summary.value = recipe.summary || '';
+  els.recipeForm.elements.description.value = recipe.description || '';
+  els.recipeForm.elements.servings.value = recipe.servings || 2;
+  els.recipeForm.elements.status.value = recipe.status || 'DRAFT';
+  els.recipeForm.elements.prepTimeMinutes.value = recipe.prepTimeMinutes ?? '';
+  els.recipeForm.elements.cookTimeMinutes.value = recipe.cookTimeMinutes ?? '';
+  els.recipeForm.elements.imageUrl.value = recipe.imageUrl || '';
+  document.getElementById('recipes')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 async function refreshAll({ keepStatusMessage = false } = {}) {
   if (!keepStatusMessage) {
     setStatus('Synchronisiere Admin-Plattform mit dem Backend...');
@@ -729,6 +891,7 @@ async function refreshAll({ keepStatusMessage = false } = {}) {
   await loadBootstrapData();
   await loadSystemLogs();
   await loadProducts();
+  await loadRecipes();
   renderRegionOptions();
   renderStats();
   renderSystemLogs();
@@ -736,6 +899,7 @@ async function refreshAll({ keepStatusMessage = false } = {}) {
   renderStores();
   renderBeacons();
   renderProducts();
+  renderRecipes();
 
   if (state.selectedStoreId) {
     await loadStoreDetail(state.selectedStoreId);
@@ -885,6 +1049,207 @@ async function handleProductSubmit(event) {
   upsertProductInState(savedProduct);
   renderProducts();
   setStatus('Produkt wurde im Katalog gespeichert.', 'success');
+}
+
+async function handleRecipeSubmit(event) {
+  event.preventDefault();
+  const prepTime = els.recipeForm.elements.prepTimeMinutes.value.trim();
+  const cookTime = els.recipeForm.elements.cookTimeMinutes.value.trim();
+  const recipe = {
+    slug: els.recipeForm.elements.slug.value.trim(),
+    title: els.recipeForm.elements.title.value.trim(),
+    summary: els.recipeForm.elements.summary.value.trim() || null,
+    description: els.recipeForm.elements.description.value.trim() || null,
+    imageUrl: els.recipeForm.elements.imageUrl.value.trim() || null,
+    imageAlt: null,
+    servings: Number(els.recipeForm.elements.servings.value),
+    prepTimeMinutes: prepTime ? Number(prepTime) : null,
+    cookTimeMinutes: cookTime ? Number(cookTime) : null,
+    totalTimeMinutes: (prepTime ? Number(prepTime) : 0) + (cookTime ? Number(cookTime) : 0),
+    status: els.recipeForm.elements.status.value,
+    tagIds: [],
+  };
+
+  if (!recipe.slug || !recipe.title) {
+    throw new Error('Slug und Titel sind erforderlich.');
+  }
+  if (!Number.isInteger(recipe.servings) || recipe.servings < 1) {
+    throw new Error('Portionen muessen eine positive ganze Zahl sein.');
+  }
+
+  const payload = state.editingRecipeId ? recipe : { recipe, ingredients: [], steps: [] };
+  const url = state.editingRecipeId ? `${API.recipes}/${state.editingRecipeId}` : API.recipes;
+  const method = state.editingRecipeId ? 'PUT' : 'POST';
+  const savedRecipe = await fetchJson(url, { method, body: JSON.stringify(payload) });
+  state.selectedRecipeDetail = savedRecipe;
+  state.editingRecipeId = savedRecipe.id;
+  await loadRecipes();
+  renderRecipes();
+  populateRecipeForm(savedRecipe);
+  setStatus('Rezept wurde gespeichert.', 'success');
+}
+
+async function handleRecipeIngredientSubmit(event) {
+  event.preventDefault();
+  if (!state.editingRecipeId) {
+    throw new Error('Waehle zuerst ein Rezept aus.');
+  }
+
+  const quantityValue = els.recipeIngredientForm.elements.quantity.value.trim();
+  const payload = {
+    position: Number(els.recipeIngredientForm.elements.position.value),
+    displayName: els.recipeIngredientForm.elements.displayName.value.trim(),
+    canonicalName: els.recipeIngredientForm.elements.canonicalName.value.trim() || null,
+    quantity: quantityValue ? Number(quantityValue.replace(',', '.')) : null,
+    quantityText: els.recipeIngredientForm.elements.quantityText.value.trim() || null,
+    unitCode: els.recipeIngredientForm.elements.unitCode.value.trim() || null,
+    preparationNote: els.recipeIngredientForm.elements.preparationNote.value.trim() || null,
+    optional: false,
+  };
+  await fetchJson(`${API.recipes}/${state.editingRecipeId}/ingredients`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  els.recipeIngredientForm.reset();
+  await loadRecipeDetail(state.editingRecipeId);
+  renderRecipeDetailTools();
+  await loadRecipes();
+  renderRecipes();
+  setStatus('Zutat wurde hinzugefuegt.', 'success');
+}
+
+async function handleRecipeStepSubmit(event) {
+  event.preventDefault();
+  if (!state.editingRecipeId) {
+    throw new Error('Waehle zuerst ein Rezept aus.');
+  }
+
+  const durationValue = els.recipeStepForm.elements.durationMinutes.value.trim();
+  const payload = {
+    position: Number(els.recipeStepForm.elements.position.value),
+    instruction: els.recipeStepForm.elements.instruction.value.trim(),
+    durationMinutes: durationValue ? Number(durationValue) : null,
+  };
+  await fetchJson(`${API.recipes}/${state.editingRecipeId}/steps`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  els.recipeStepForm.reset();
+  await loadRecipeDetail(state.editingRecipeId);
+  renderRecipeDetailTools();
+  await loadRecipes();
+  renderRecipes();
+  setStatus('Schritt wurde hinzugefuegt.', 'success');
+}
+
+async function publishRecipe(recipeId) {
+  await fetchJson(`${API.recipes}/${recipeId}/publish`, { method: 'PATCH' });
+  await loadRecipes();
+  if (state.editingRecipeId === recipeId) {
+    await loadRecipeDetail(recipeId);
+    populateRecipeForm(state.selectedRecipeDetail);
+  }
+  renderRecipes();
+  setStatus('Rezept wurde veroeffentlicht.', 'success');
+}
+
+async function deactivateRecipe(recipeId) {
+  await fetchJson(`${API.recipes}/${recipeId}/deactivate`, { method: 'PATCH' });
+  await loadRecipes();
+  renderRecipes();
+  setStatus('Rezept wurde deaktiviert.', 'success');
+}
+
+async function archiveRecipe(recipeId) {
+  if (!window.confirm('Willst du dieses Rezept wirklich archivieren?')) {
+    return;
+  }
+  await fetchJson(`${API.recipes}/${recipeId}/archive`, { method: 'PATCH' });
+  if (state.editingRecipeId === recipeId) {
+    resetRecipeForm();
+  }
+  await loadRecipes();
+  renderRecipes();
+  setStatus('Rezept wurde archiviert.', 'success');
+}
+
+async function previewRecipeMapping(recipeId) {
+  const mapping = await fetchJson(`${API.recipes}/${recipeId}/mapping-status`);
+  const rows = mapping.ingredients?.length
+    ? mapping.ingredients.map((entry) => `
+        <article class="list-item">
+          <div class="item-header">
+            <h5>${escapeHtml(entry.ingredientName)}</h5>
+            <span class="badge ${entry.status === 'MAPPED' ? '' : 'warn'}">${escapeHtml(entry.status)}</span>
+          </div>
+          <p class="subtle">${escapeHtml(entry.product?.name || entry.reason || 'Keine Zuordnung')}</p>
+          <div class="item-footer">
+            <button type="button" class="action-button" data-action="load-recipe-mapping-suggestions" data-id="${recipeId}" data-ingredient-id="${entry.ingredientId}" data-query="${escapeHtml(entry.ingredientName)}">Produktvorschlaege</button>
+          </div>
+        </article>
+      `).join('')
+    : '<div class="empty-state">Keine Zutaten fuer Mapping vorhanden.</div>';
+  els.recipeMappingPreview.innerHTML = `<h4>Mapping-Status</h4>${rows}`;
+}
+
+async function loadRecipeMappingSuggestions(recipeId, ingredientId, query) {
+  const encodedQuery = encodeURIComponent(query || '');
+  const suggestions = await fetchJson(`${API.recipes}/${recipeId}/ingredients/${ingredientId}/mapping-suggestions?q=${encodedQuery}&size=10`);
+  const rows = suggestions?.length
+    ? suggestions.map((product) => `
+        <article class="list-item">
+          <div class="item-header">
+            <div>
+              <h5>${escapeHtml(product.name || `Produkt ${product.id}`)}</h5>
+              <div class="item-meta">ID ${escapeHtml(product.id)} · ${escapeHtml(product.layoutCode || 'kein Layout')}</div>
+            </div>
+            <span class="badge neutral">${escapeHtml(product.storeCode || 'global')}</span>
+          </div>
+          <div class="item-footer">
+            <button
+              type="button"
+              class="action-button"
+              data-action="confirm-recipe-mapping"
+              data-id="${recipeId}"
+              data-ingredient-id="${ingredientId}"
+              data-product-id="${escapeHtml(product.id)}"
+              data-product-name="${escapeHtml(product.name || '')}"
+              data-layout-code="${escapeHtml(product.layoutCode || '')}"
+              data-store-id="${escapeHtml(product.storeId || '')}"
+              data-store-code="${escapeHtml(product.storeCode || '')}">
+              Mapping bestaetigen
+            </button>
+          </div>
+        </article>
+      `).join('')
+    : '<div class="empty-state">Keine passenden Produktvorschlaege gefunden.</div>';
+
+  els.recipeMappingPreview.innerHTML = `
+    <h4>Produktvorschlaege</h4>
+    ${rows}
+    <button type="button" class="secondary-button" data-action="preview-recipe-mapping" data-id="${recipeId}">Zurueck zum Mapping-Status</button>
+  `;
+}
+
+async function confirmRecipeMapping(button) {
+  const { id: recipeId, ingredientId, productId, productName, layoutCode, storeId, storeCode } = button.dataset;
+  await fetchJson(`${API.recipes}/${recipeId}/ingredients/${ingredientId}/product-mapping`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      productId: Number(productId),
+      productName,
+      layoutCode: layoutCode || null,
+      storeId: storeId || null,
+      storeCode: storeCode || null,
+      mappingType: 'MANUAL',
+      confidence: 1,
+      manuallyConfirmed: true,
+    }),
+  });
+  await previewRecipeMapping(recipeId);
+  await loadRecipes();
+  renderRecipes();
+  setStatus('Produkt-Mapping wurde bestaetigt.', 'success');
 }
 
 async function deleteProduct(productId) {
@@ -1085,6 +1450,52 @@ function bindEvents() {
     }
   });
 
+  els.refreshRecipesBtn?.addEventListener('click', async () => {
+    try {
+      await loadRecipes();
+      renderRecipes();
+      setStatus('Rezeptliste wurde aktualisiert.', 'success');
+    } catch (error) {
+      handleUiError(error);
+    }
+  });
+  els.resetRecipeFormBtn?.addEventListener('click', resetRecipeForm);
+  els.recipeQuery?.addEventListener('input', (event) => {
+    state.recipeFilters.query = event.target.value;
+  });
+  els.recipeStatusFilter?.addEventListener('change', (event) => {
+    state.recipeFilters.status = event.target.value;
+  });
+  els.applyRecipeFiltersBtn?.addEventListener('click', async () => {
+    try {
+      await loadRecipes();
+      renderRecipes();
+    } catch (error) {
+      handleUiError(error);
+    }
+  });
+  els.recipeForm?.addEventListener('submit', async (event) => {
+    try {
+      await handleRecipeSubmit(event);
+    } catch (error) {
+      handleUiError(error);
+    }
+  });
+  els.recipeIngredientForm?.addEventListener('submit', async (event) => {
+    try {
+      await handleRecipeIngredientSubmit(event);
+    } catch (error) {
+      handleUiError(error);
+    }
+  });
+  els.recipeStepForm?.addEventListener('submit', async (event) => {
+    try {
+      await handleRecipeStepSubmit(event);
+    } catch (error) {
+      handleUiError(error);
+    }
+  });
+
   document.body.addEventListener('click', async (event) => {
     const button = event.target.closest('[data-action]');
     if (!button) {
@@ -1122,6 +1533,22 @@ function bindEvents() {
         populateProductForm(id);
       } else if (action === 'delete-product') {
         await deleteProduct(id);
+      } else if (action === 'select-recipe') {
+        await loadRecipeDetail(id);
+        populateRecipeForm(state.selectedRecipeDetail);
+        renderRecipes();
+      } else if (action === 'publish-recipe') {
+        await publishRecipe(id);
+      } else if (action === 'deactivate-recipe') {
+        await deactivateRecipe(id);
+      } else if (action === 'archive-recipe') {
+        await archiveRecipe(id);
+      } else if (action === 'preview-recipe-mapping') {
+        await previewRecipeMapping(id);
+      } else if (action === 'load-recipe-mapping-suggestions') {
+        await loadRecipeMappingSuggestions(id, button.dataset.ingredientId, button.dataset.query);
+      } else if (action === 'confirm-recipe-mapping') {
+        await confirmRecipeMapping(button);
       }
     } catch (error) {
       handleUiError(error);
@@ -1149,11 +1576,14 @@ async function init() {
   state.storeFilters.query = els.storeQuery.value;
   state.storeFilters.status = els.storeStatusFilter.value;
   state.beaconFilters.assignment = els.beaconAssignmentFilter.value;
+  state.recipeFilters.query = els.recipeQuery?.value || '';
+  state.recipeFilters.status = els.recipeStatusFilter?.value || '';
   await refreshAll();
   resetRegionForm();
   resetStoreForm();
   resetBeaconForm();
   resetProductForm();
+  resetRecipeForm();
 }
 
 init().catch((error) => {

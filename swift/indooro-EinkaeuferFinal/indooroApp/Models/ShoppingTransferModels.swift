@@ -23,12 +23,17 @@ struct ShoppingTransferItem: Codable, Hashable {
     let note: String?
     let status: ShoppingListItemStatus
 
-    init(item: ShoppingListItem, quantity: Int? = nil) {
+    init?(item: ShoppingListItem, quantity: Int? = nil) {
+        guard let productID = item.productID,
+              let price = item.price,
+              let layoutCode = item.layoutCode else {
+            return nil
+        }
         let availableQuantity = max(1, item.quantity)
-        self.productID = item.productID
+        self.productID = productID
         self.name = item.name
-        self.price = item.price
-        self.layoutCode = item.layoutCode
+        self.price = price
+        self.layoutCode = layoutCode
         self.quantity = min(availableQuantity, max(1, quantity ?? availableQuantity))
         self.note = item.trimmedNote
         self.status = item.status

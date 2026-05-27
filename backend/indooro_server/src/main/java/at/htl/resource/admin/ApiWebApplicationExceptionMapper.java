@@ -38,7 +38,11 @@ public class ApiWebApplicationExceptionMapper implements ExceptionMapper<WebAppl
         String path = uriInfo == null ? "unknown" : uriInfo.getPath();
         String message = normalizeMessage(exception, status);
 
-        errorLogService.logError(status, method, path, message, exception);
+        try {
+            errorLogService.logError(status, method, path, message, exception);
+        } catch (RuntimeException logFailure) {
+            // Error logging must never hide the API status that triggered the mapper.
+        }
 
         ErrorLogDtos.ApiErrorResponse payload = new ErrorLogDtos.ApiErrorResponse(
                 status,

@@ -45,22 +45,36 @@ enum ShoppingRouteMode: String, Codable, CaseIterable {
 
 struct ShoppingListItem: Codable, Identifiable, Hashable {
     let id: UUID
-    let productID: Int
+    let productID: Int?
     var name: String
-    var price: Double
-    var layoutCode: String
+    var price: Double?
+    var layoutCode: String?
     var quantity: Int
     var note: String?
     var sortOrder: Int?
     var status: ShoppingListItemStatus
     let addedAt: Date
     var updatedAt: Date
+    var sourceRecipeId: UUID?
+    var sourceRecipeName: String?
+    var ingredientName: String?
+    var ingredientQuantity: String?
+    var ingredientUnit: String?
+    var mappingConfidence: Double?
+    var manuallyConfirmed: Bool?
 
     init(
         product: Product,
         quantity: Int = 1,
         note: String? = nil,
-        sortOrder: Int? = nil
+        sortOrder: Int? = nil,
+        sourceRecipeId: UUID? = nil,
+        sourceRecipeName: String? = nil,
+        ingredientName: String? = nil,
+        ingredientQuantity: String? = nil,
+        ingredientUnit: String? = nil,
+        mappingConfidence: Double? = nil,
+        manuallyConfirmed: Bool? = nil
     ) {
         self.id = UUID()
         self.productID = product.id
@@ -73,6 +87,86 @@ struct ShoppingListItem: Codable, Identifiable, Hashable {
         self.status = .open
         self.addedAt = Date()
         self.updatedAt = Date()
+        self.sourceRecipeId = sourceRecipeId
+        self.sourceRecipeName = sourceRecipeName
+        self.ingredientName = ingredientName
+        self.ingredientQuantity = ingredientQuantity
+        self.ingredientUnit = ingredientUnit
+        self.mappingConfidence = mappingConfidence
+        self.manuallyConfirmed = manuallyConfirmed
+    }
+
+    init(
+        freeIngredientName: String,
+        quantity: Int = 1,
+        note: String? = nil,
+        sortOrder: Int? = nil,
+        sourceRecipeId: UUID?,
+        sourceRecipeName: String?,
+        ingredientQuantity: String?,
+        ingredientUnit: String?
+    ) {
+        self.id = UUID()
+        self.productID = nil
+        self.name = freeIngredientName
+        self.price = nil
+        self.layoutCode = nil
+        self.quantity = max(1, quantity)
+        self.note = note
+        self.sortOrder = sortOrder
+        self.status = .open
+        self.addedAt = Date()
+        self.updatedAt = Date()
+        self.sourceRecipeId = sourceRecipeId
+        self.sourceRecipeName = sourceRecipeName
+        self.ingredientName = freeIngredientName
+        self.ingredientQuantity = ingredientQuantity
+        self.ingredientUnit = ingredientUnit
+        self.mappingConfidence = nil
+        self.manuallyConfirmed = false
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case productID
+        case name
+        case price
+        case layoutCode
+        case quantity
+        case note
+        case sortOrder
+        case status
+        case addedAt
+        case updatedAt
+        case sourceRecipeId
+        case sourceRecipeName
+        case ingredientName
+        case ingredientQuantity
+        case ingredientUnit
+        case mappingConfidence
+        case manuallyConfirmed
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        productID = try container.decodeIfPresent(Int.self, forKey: .productID)
+        name = try container.decode(String.self, forKey: .name)
+        price = try container.decodeIfPresent(Double.self, forKey: .price)
+        layoutCode = try container.decodeIfPresent(String.self, forKey: .layoutCode)
+        quantity = try container.decode(Int.self, forKey: .quantity)
+        note = try container.decodeIfPresent(String.self, forKey: .note)
+        sortOrder = try container.decodeIfPresent(Int.self, forKey: .sortOrder)
+        status = try container.decode(ShoppingListItemStatus.self, forKey: .status)
+        addedAt = try container.decode(Date.self, forKey: .addedAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        sourceRecipeId = try container.decodeIfPresent(UUID.self, forKey: .sourceRecipeId)
+        sourceRecipeName = try container.decodeIfPresent(String.self, forKey: .sourceRecipeName)
+        ingredientName = try container.decodeIfPresent(String.self, forKey: .ingredientName)
+        ingredientQuantity = try container.decodeIfPresent(String.self, forKey: .ingredientQuantity)
+        ingredientUnit = try container.decodeIfPresent(String.self, forKey: .ingredientUnit)
+        mappingConfidence = try container.decodeIfPresent(Double.self, forKey: .mappingConfidence)
+        manuallyConfirmed = try container.decodeIfPresent(Bool.self, forKey: .manuallyConfirmed)
     }
 
     var effectiveSortOrder: Int {
@@ -86,6 +180,26 @@ struct ShoppingListItem: Codable, Identifiable, Hashable {
 
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    var recipeSourceText: String? {
+        guard let sourceRecipeName, !sourceRecipeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+
+        let ingredient = ingredientName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let amount = [ingredientQuantity, ingredientUnit]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+        if let ingredient, !ingredient.isEmpty, !amount.isEmpty {
+            return "\(sourceRecipeName): \(amount) \(ingredient)"
+        }
+        if let ingredient, !ingredient.isEmpty {
+            return "\(sourceRecipeName): \(ingredient)"
+        }
+        return sourceRecipeName
     }
 
     static func sortByListOrder(_ lhs: ShoppingListItem, _ rhs: ShoppingListItem) -> Bool {

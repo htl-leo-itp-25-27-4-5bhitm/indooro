@@ -48,6 +48,44 @@ private func mergedShoppingNote(existing: String?, incoming: String?) -> String?
     }
 }
 
+private func mergedSourceText(existing: String?, incoming: String?) -> String? {
+    let existingText = normalizedShoppingNote(existing)
+    let incomingText = normalizedShoppingNote(incoming)
+
+    switch (existingText, incomingText) {
+    case (nil, nil):
+        return nil
+    case let (existing?, nil):
+        return existing
+    case let (nil, incoming?):
+        return incoming
+    case let (existing?, incoming?):
+        if existing.localizedCaseInsensitiveContains(incoming) {
+            return existing
+        }
+        if incoming.localizedCaseInsensitiveContains(existing) {
+            return incoming
+        }
+        return "\(existing), \(incoming)"
+    }
+}
+
+private func normalizedIngredientName(_ value: String) -> String {
+    value
+        .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+}
+
+private func recipeIngredientNote(ingredient: RecipeIngredient, recipeName: String) -> String {
+    let amount = [ingredient.quantityTextForList, ingredient.unitCode]
+        .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+        .joined(separator: " ")
+    let amountPrefix = amount.isEmpty ? "" : "\(amount) "
+    return "Aus \(recipeName): \(amountPrefix)\(ingredient.displayName)"
+}
+
 private func movedItems<T>(_ items: [T], fromOffsets: IndexSet, toOffset: Int) -> [T] {
     var reordered = items
     let movingItems = fromOffsets.map { reordered[$0] }
@@ -84,7 +122,8 @@ enum ShoppingStopResolver {
         var unresolvedItems: [ShoppingListItem] = []
 
         for item in openItems {
-            guard let shelf = resolveShelf(for: item.layoutCode, elements: layoutElements) else {
+            guard let layoutCode = item.layoutCode,
+                  let shelf = resolveShelf(for: layoutCode, elements: layoutElements) else {
                 unresolvedItems.append(item)
                 continue
             }
@@ -116,9 +155,12 @@ enum ShoppingStopResolver {
             mode: routeMode
         )
 
-        let totalStopCount = Set(
+        let totalStopCount = Set<Int64>(
             list.items.compactMap { item in
-                resolveShelf(for: item.layoutCode, elements: layoutElements)?.id
+                guard let layoutCode = item.layoutCode else {
+                    return nil
+                }
+                return resolveShelf(for: layoutCode, elements: layoutElements)?.id
             }
         ).count
 
@@ -374,6 +416,117 @@ final class ShoppingListManager: ObservableObject {
         return createdItem
     }
 
+    @discardableResult
+    func addRecipeIngredients(
+        recipe: RecipeDetail,
+        mapping: RecipeProductMappingResponse,
+        includeFreeIngredients: Bool,
+        to listID: UUID? = nil
+    ) -> [ShoppingListItem] {
+        let targetListID = resolvedTargetListID(preferred: listID)
+        guard let targetListID else {
+            return []
+        }
+
+        let statusByIngredientID = Dictionary(
+            uniqueKeysWithValues: mapping.ingredients.map { ($0.ingredientId, $0) }
+        )
+        var changedItems: [ShoppingListItem] = []
+
+        mutateList(id: targetListID) { list in
+            var nextOrder = nextSortOrder(in: list.items)
+
+            for ingredient in recipe.ingredients.sorted(by: { $0.position < $1.position }) {
+                let mappingStatus = statusByIngredientID[ingredient.id]
+                let sourceNote = recipeIngredientNote(
+                    ingredient: ingredient,
+                    recipeName: recipe.title
+                )
+
+                if let mappedProduct = mappingStatus?.product,
+                   let product = mappedProduct.product {
+                    if let existingIndex = list.items.firstIndex(where: {
+                        $0.productID == product.id
+                            && $0.layoutCode == product.layoutCode
+                            && $0.status == .open
+                    }) {
+                        list.items[existingIndex].quantity += 1
+                        list.items[existingIndex].note = mergedShoppingNote(
+                            existing: list.items[existingIndex].note,
+                            incoming: sourceNote
+                        )
+                        list.items[existingIndex].sourceRecipeId = list.items[existingIndex].sourceRecipeId ?? recipe.id
+                        list.items[existingIndex].sourceRecipeName = mergedSourceText(
+                            existing: list.items[existingIndex].sourceRecipeName,
+                            incoming: recipe.title
+                        )
+                        list.items[existingIndex].ingredientName = list.items[existingIndex].ingredientName ?? ingredient.displayName
+                        list.items[existingIndex].ingredientQuantity = list.items[existingIndex].ingredientQuantity ?? ingredient.quantityTextForList
+                        list.items[existingIndex].ingredientUnit = list.items[existingIndex].ingredientUnit ?? ingredient.unitCode
+                        list.items[existingIndex].mappingConfidence = mappingStatus?.confidence
+                        list.items[existingIndex].manuallyConfirmed = mappingStatus?.manuallyConfirmed
+                        list.items[existingIndex].updatedAt = Date()
+                        changedItems.append(list.items[existingIndex])
+                    } else {
+                        let item = ShoppingListItem(
+                            product: product,
+                            sortOrder: nextOrder,
+                            sourceRecipeId: recipe.id,
+                            sourceRecipeName: recipe.title,
+                            ingredientName: ingredient.displayName,
+                            ingredientQuantity: ingredient.quantityTextForList,
+                            ingredientUnit: ingredient.unitCode,
+                            mappingConfidence: mappingStatus?.confidence,
+                            manuallyConfirmed: mappingStatus?.manuallyConfirmed
+                        )
+                        list.items.append(item)
+                        changedItems.append(item)
+                        nextOrder += 1
+                    }
+                    continue
+                }
+
+                guard includeFreeIngredients else {
+                    continue
+                }
+
+                let normalizedName = normalizedIngredientName(ingredient.displayName)
+                if let existingIndex = list.items.firstIndex(where: {
+                    $0.productID == nil
+                        && $0.status == .open
+                        && normalizedIngredientName($0.ingredientName ?? $0.name) == normalizedName
+                        && $0.sourceRecipeId == recipe.id
+                }) {
+                    list.items[existingIndex].quantity += 1
+                    list.items[existingIndex].note = mergedShoppingNote(
+                        existing: list.items[existingIndex].note,
+                        incoming: sourceNote
+                    )
+                    list.items[existingIndex].updatedAt = Date()
+                    changedItems.append(list.items[existingIndex])
+                } else {
+                    let item = ShoppingListItem(
+                        freeIngredientName: ingredient.displayName,
+                        sortOrder: nextOrder,
+                        sourceRecipeId: recipe.id,
+                        sourceRecipeName: recipe.title,
+                        ingredientQuantity: ingredient.quantityTextForList,
+                        ingredientUnit: ingredient.unitCode
+                    )
+                    list.items.append(item)
+                    changedItems.append(item)
+                    nextOrder += 1
+                }
+            }
+
+            if !changedItems.isEmpty {
+                list.updatedAt = Date()
+            }
+        }
+
+        return changedItems
+    }
+
     func updateItemStatus(
         _ itemID: UUID,
         in listID: UUID,
@@ -564,7 +717,7 @@ final class ShoppingListManager: ObservableObject {
             items = list.items.sorted(by: ShoppingListItem.sortByListOrder)
         }
 
-        let transferItems = items.map { ShoppingTransferItem(item: $0) }
+        let transferItems = items.compactMap { ShoppingTransferItem(item: $0) }
 
         return try ShoppingTransferService.makePackage(
             from: list,
@@ -589,7 +742,7 @@ final class ShoppingListManager: ObservableObject {
         guard let selections else {
             let transferItems = list.items
                 .sorted(by: ShoppingListItem.sortByListOrder)
-                .map { ShoppingTransferItem(item: $0) }
+                .compactMap { ShoppingTransferItem(item: $0) }
 
             return try ShoppingTransferService.makePackage(
                 from: list,

@@ -1,0 +1,194 @@
+package at.htl.resource.admin;
+
+import at.htl.admin.dto.CommonDtos;
+import at.htl.admin.dto.RecipeDtos;
+import at.htl.admin.service.RecipeService;
+import io.quarkus.test.InjectMock;
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.security.TestSecurity;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+
+@QuarkusTest
+class AdminRecipeResourceTest {
+
+    private static final UUID RECIPE_ID = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
+    private static final UUID INGREDIENT_ID = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+
+    @InjectMock
+    RecipeService recipeService;
+
+    @Test
+    void rejectsAnonymousRecipeAdminAccess() {
+        given()
+                .when().get("/api/admin/recipes")
+                .then()
+                .statusCode(401);
+    }
+
+    @Test
+    @TestSecurity(user = "admin", roles = "admin")
+    void listsRecipesForAdmin() {
+        when(recipeService.listAdminRecipes(eq(null), eq(null), eq(null), eq(0), eq(20)))
+                .thenReturn(new CommonDtos.PageResponse<>(List.of(summary("DRAFT")), 0, 20, 1));
+
+        given()
+                .when().get("/api/admin/recipes")
+                .then()
+                .statusCode(200)
+                .body("content[0].status", equalTo("DRAFT"));
+    }
+
+    @Test
+    @TestSecurity(user = "admin", roles = "admin")
+    void createsAndPublishesRecipe() {
+        when(recipeService.createRecipe(any())).thenReturn(detail("DRAFT"));
+        when(recipeService.publishRecipe(RECIPE_ID)).thenReturn(detail("PUBLISHED"));
+
+        given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "recipe": {
+                            "slug": "tomaten-pasta",
+                            "title": "Tomaten Pasta",
+                            "servings": 2,
+                            "status": "DRAFT"
+                          },
+                          "ingredients": [],
+                          "steps": []
+                        }
+                        """)
+                .when().post("/api/admin/recipes")
+                .then()
+                .statusCode(200)
+                .body("title", equalTo("Tomaten Pasta"));
+
+        given()
+                .when().patch("/api/admin/recipes/{recipeId}/publish", RECIPE_ID)
+                .then()
+                .statusCode(200)
+                .body("status", equalTo("PUBLISHED"));
+    }
+
+    @Test
+    @TestSecurity(user = "admin", roles = "admin")
+    void deactivatesAndArchivesRecipe() {
+        when(recipeService.deactivateRecipe(RECIPE_ID)).thenReturn(detail("DRAFT"));
+        when(recipeService.archiveRecipe(RECIPE_ID)).thenReturn(detail("ARCHIVED"));
+
+        given()
+                .when().patch("/api/admin/recipes/{recipeId}/deactivate", RECIPE_ID)
+                .then()
+                .statusCode(200)
+                .body("status", equalTo("DRAFT"));
+
+        given()
+                .when().patch("/api/admin/recipes/{recipeId}/archive", RECIPE_ID)
+                .then()
+                .statusCode(200)
+                .body("status", equalTo("ARCHIVED"));
+    }
+
+    @Test
+    @TestSecurity(user = "admin", roles = "admin")
+    void returnsConflictForDuplicateMapping() {
+        when(recipeService.confirmMapping(eq(RECIPE_ID), eq(INGREDIENT_ID), any()))
+                .thenThrow(new WebApplicationException("Mapping existiert bereits.", Response.Status.CONFLICT));
+
+        given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "productId": 42,
+                          "productName": "Tomaten",
+                          "layoutCode": "310/1",
+                          "mappingType": "MANUAL",
+                          "confidence": 1,
+                          "manuallyConfirmed": true
+                        }
+                        """)
+                .when().put("/api/admin/recipes/{recipeId}/ingredients/{ingredientId}/product-mapping", RECIPE_ID, INGREDIENT_ID)
+                .then()
+                .statusCode(409);
+    }
+
+    @Test
+    @TestSecurity(user = "admin", roles = "admin")
+    void returnsMappingSuggestions() {
+        when(recipeService.mappingSuggestions(eq(RECIPE_ID), eq(INGREDIENT_ID), eq(null), eq("tomaten"), eq(10)))
+                .thenReturn(List.of(new RecipeDtos.MappedRecipeProduct(42, "Tomaten", 1.99, "310/1", null, null)));
+
+        given()
+                .queryParam("q", "tomaten")
+                .when().get("/api/admin/recipes/{recipeId}/ingredients/{ingredientId}/mapping-suggestions", RECIPE_ID, INGREDIENT_ID)
+                .then()
+                .statusCode(200)
+                .body("[0].id", equalTo(42));
+    }
+
+    private RecipeDtos.RecipeSummaryResponse summary(String status) {
+        return new RecipeDtos.RecipeSummaryResponse(
+                RECIPE_ID,
+                "tomaten-pasta",
+                "Tomaten Pasta",
+                "Schnelle Pasta",
+                null,
+                2,
+                10,
+                15,
+                25,
+                status,
+                null,
+                0,
+                0,
+                List.of()
+        );
+    }
+
+    private RecipeDtos.RecipeDetailResponse detail(String status) {
+        return new RecipeDtos.RecipeDetailResponse(
+                RECIPE_ID,
+                "tomaten-pasta",
+                "Tomaten Pasta",
+                "Schnelle Pasta",
+                null,
+                null,
+                null,
+                2,
+                10,
+                15,
+                25,
+                status,
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                List.of(new RecipeDtos.RecipeIngredientResponse(
+                        INGREDIENT_ID,
+                        1,
+                        "Tomaten",
+                        "tomato",
+                        BigDecimal.valueOf(250),
+                        "250",
+                        "g",
+                        "Gramm",
+                        null,
+                        false
+                )),
+                List.of(new RecipeDtos.RecipeStepResponse(UUID.randomUUID(), 1, "Kochen.", 10))
+        );
+    }
+}

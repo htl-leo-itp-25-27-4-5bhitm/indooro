@@ -1035,9 +1035,16 @@ private struct PlannedProductRow: View {
                     }
                 }
 
-                Text("Regal \(item.layoutCode)")
+                Text(item.layoutCode.map { "Regal \($0)" } ?? "Freier Eintrag")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                if let recipeSourceText = item.recipeSourceText {
+                    Text(recipeSourceText)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
             }
 
             Spacer(minLength: 0)
@@ -1612,16 +1619,25 @@ private struct ShoppingChecklistRow: View {
                         }
                     }
 
-                    Text("Regal \(item.layoutCode)")
+                    Text(item.layoutCode.map { "Regal \($0)" } ?? "Keine Regalposition")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    if let recipeSourceText = item.recipeSourceText {
+                        Text(recipeSourceText)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
                 }
 
                 Spacer()
 
-                Text("\(String(format: "%.2f", item.price)) EUR")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                if let price = item.price {
+                    Text("\(String(format: "%.2f", price)) EUR")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
             }
             .contentShape(Rectangle())
         }

@@ -220,7 +220,7 @@ struct ShoppingItemSelectionSheet: View {
                                             }
                                         }
 
-                                        Text("Regal: \(item.layoutCode)")
+                                        Text(item.layoutCode.map { "Regal: \($0)" } ?? "Freier Eintrag")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
 

@@ -4,6 +4,7 @@ struct HomeDashboardView: View {
     let selectedList: ShoppingList?
     let activeBanner: ShoppingSessionBanner?
     let onOpenPlanning: () -> Void
+    let onOpenRecipes: () -> Void
     let onOpenShopping: () -> Void
     let onOpenMap: () -> Void
 
@@ -32,6 +33,7 @@ struct HomeDashboardView: View {
                     }
 
                     currentListCard
+                    recipesEntryCard
                     mapEntryCard
                 }
                 .padding(.horizontal, 22)
@@ -46,7 +48,7 @@ struct HomeDashboardView: View {
             HomeTutorialSheet(
                 onOpenPlanning: {
                     showsTutorial = false
-                    onOpenPlanning()
+                onOpenPlanning()
                 },
                 onOpenMap: {
                     showsTutorial = false
@@ -200,6 +202,50 @@ struct HomeDashboardView: View {
             .buttonStyle(.plain)
             .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .background(accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(borderColor, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.04), radius: 16, y: 8)
+    }
+
+    private var recipesEntryCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
+                Image(systemName: "fork.knife")
+                    .font(.title3)
+                    .foregroundStyle(warmAccent)
+                    .frame(width: 44, height: 44)
+                    .background(warmAccent.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Rezepte")
+                        .font(.headline.weight(.semibold))
+
+                    Text("Zutaten übernehmen und direkt durch den Markt routen.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            Button {
+                onOpenRecipes()
+            } label: {
+                Label("Rezepte öffnen", systemImage: "cart.badge.plus")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(warmAccent)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+            }
+            .buttonStyle(.plain)
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(warmAccent.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
