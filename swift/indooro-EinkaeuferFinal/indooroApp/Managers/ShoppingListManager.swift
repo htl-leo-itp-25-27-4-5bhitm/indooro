@@ -78,12 +78,12 @@ private func normalizedIngredientName(_ value: String) -> String {
 }
 
 private func recipeIngredientNote(ingredient: RecipeIngredient, recipeName: String) -> String {
-    let amount = [ingredient.quantityTextForList, ingredient.unitCode]
+    let amount = [ingredient.quantityTextForList, ingredient.displayUnitForList]
         .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
         .filter { !$0.isEmpty }
         .joined(separator: " ")
     let amountPrefix = amount.isEmpty ? "" : "\(amount) "
-    return "Aus \(recipeName): \(amountPrefix)\(ingredient.displayName)"
+    return "Aus \(recipeName): \(amountPrefix)\(ingredient.cleanDisplayName)"
 }
 
 private func movedItems<T>(_ items: [T], fromOffsets: IndexSet, toOffset: Int) -> [T] {
@@ -460,9 +460,9 @@ final class ShoppingListManager: ObservableObject {
                             existing: list.items[existingIndex].sourceRecipeName,
                             incoming: recipe.title
                         )
-                        list.items[existingIndex].ingredientName = list.items[existingIndex].ingredientName ?? ingredient.displayName
+                        list.items[existingIndex].ingredientName = list.items[existingIndex].ingredientName ?? ingredient.cleanDisplayName
                         list.items[existingIndex].ingredientQuantity = list.items[existingIndex].ingredientQuantity ?? ingredient.quantityTextForList
-                        list.items[existingIndex].ingredientUnit = list.items[existingIndex].ingredientUnit ?? ingredient.unitCode
+                        list.items[existingIndex].ingredientUnit = list.items[existingIndex].ingredientUnit ?? ingredient.displayUnitForList
                         list.items[existingIndex].mappingConfidence = mappingStatus?.confidence
                         list.items[existingIndex].manuallyConfirmed = mappingStatus?.manuallyConfirmed
                         list.items[existingIndex].updatedAt = Date()
@@ -473,9 +473,9 @@ final class ShoppingListManager: ObservableObject {
                             sortOrder: nextOrder,
                             sourceRecipeId: recipe.id,
                             sourceRecipeName: recipe.title,
-                            ingredientName: ingredient.displayName,
+                            ingredientName: ingredient.cleanDisplayName,
                             ingredientQuantity: ingredient.quantityTextForList,
-                            ingredientUnit: ingredient.unitCode,
+                            ingredientUnit: ingredient.displayUnitForList,
                             mappingConfidence: mappingStatus?.confidence,
                             manuallyConfirmed: mappingStatus?.manuallyConfirmed
                         )
@@ -490,7 +490,7 @@ final class ShoppingListManager: ObservableObject {
                     continue
                 }
 
-                let normalizedName = normalizedIngredientName(ingredient.displayName)
+                let normalizedName = normalizedIngredientName(ingredient.cleanDisplayName)
                 if let existingIndex = list.items.firstIndex(where: {
                     $0.productID == nil
                         && $0.status == .open
@@ -506,12 +506,12 @@ final class ShoppingListManager: ObservableObject {
                     changedItems.append(list.items[existingIndex])
                 } else {
                     let item = ShoppingListItem(
-                        freeIngredientName: ingredient.displayName,
+                        freeIngredientName: ingredient.cleanDisplayName,
                         sortOrder: nextOrder,
                         sourceRecipeId: recipe.id,
                         sourceRecipeName: recipe.title,
                         ingredientQuantity: ingredient.quantityTextForList,
-                        ingredientUnit: ingredient.unitCode
+                        ingredientUnit: ingredient.displayUnitForList
                     )
                     list.items.append(item)
                     changedItems.append(item)

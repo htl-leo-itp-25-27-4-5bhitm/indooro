@@ -59,17 +59,41 @@ struct RecipeIngredient: Codable, Identifiable, Hashable {
     let preparationNote: String?
     let optional: Bool
 
+    var displayUnitForList: String? {
+        guard let unitCode else {
+            return nil
+        }
+
+        let trimmed = unitCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+
+        switch trimmed.lowercased() {
+        case "piece":
+            return nil
+        case "tbsp":
+            return "EL"
+        case "tsp":
+            return "TL"
+        case "pinch":
+            return "Prise"
+        default:
+            return trimmed
+        }
+    }
+
     var amountText: String? {
         if let quantityText, !quantityText.isEmpty {
-            if let unitCode, !unitCode.isEmpty {
-                return "\(quantityText) \(unitCode)"
+            if let displayUnitForList {
+                return "\(quantityText) \(displayUnitForList)"
             }
             return quantityText
         }
         if let quantity {
             let formatted = quantity.rounded() == quantity ? String(Int(quantity)) : String(quantity)
-            if let unitCode, !unitCode.isEmpty {
-                return "\(formatted) \(unitCode)"
+            if let displayUnitForList {
+                return "\(formatted) \(displayUnitForList)"
             }
             return formatted
         }
@@ -84,6 +108,39 @@ struct RecipeIngredient: Codable, Identifiable, Hashable {
             return quantity.rounded() == quantity ? String(Int(quantity)) : String(quantity)
         }
         return nil
+    }
+
+    var cleanDisplayName: String {
+        let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawUnit = unitCode?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let amountCandidates = [
+            amountText,
+            [quantityTextForList, rawUnit]
+                .compactMap { $0 }
+                .filter { !$0.isEmpty }
+                .joined(separator: " "),
+            [quantityTextForList, displayUnitForList]
+                .compactMap { $0 }
+                .filter { !$0.isEmpty }
+                .joined(separator: " "),
+            quantityTextForList
+        ]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .sorted { $0.count > $1.count }
+
+        for amount in amountCandidates {
+            let prefix = "\(amount) "
+            if trimmedName.range(of: prefix, options: [.anchored, .caseInsensitive]) != nil {
+                let start = trimmedName.index(trimmedName.startIndex, offsetBy: prefix.count)
+                let cleaned = trimmedName[start...].trimmingCharacters(in: .whitespacesAndNewlines)
+                if !cleaned.isEmpty {
+                    return cleaned
+                }
+            }
+        }
+
+        return trimmedName
     }
 }
 

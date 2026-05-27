@@ -1,6 +1,45 @@
 import Foundation
 import CoreGraphics
 
+private func cleanRecipeIngredientName(
+    _ ingredientName: String?,
+    quantity: String?,
+    unit: String?
+) -> String? {
+    guard let ingredientName else {
+        return nil
+    }
+
+    let trimmedName = ingredientName.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedName.isEmpty else {
+        return nil
+    }
+
+    let amountCandidates = [
+        [quantity, unit]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " "),
+        quantity?.trimmingCharacters(in: .whitespacesAndNewlines)
+    ]
+        .compactMap { $0 }
+        .filter { !$0.isEmpty }
+        .sorted { $0.count > $1.count }
+
+    for amount in amountCandidates {
+        let prefix = "\(amount) "
+        if trimmedName.range(of: prefix, options: [.anchored, .caseInsensitive]) != nil {
+            let start = trimmedName.index(trimmedName.startIndex, offsetBy: prefix.count)
+            let cleaned = trimmedName[start...].trimmingCharacters(in: .whitespacesAndNewlines)
+            if !cleaned.isEmpty {
+                return cleaned
+            }
+        }
+    }
+
+    return trimmedName
+}
+
 enum ShoppingListItemStatus: String, Codable, CaseIterable, Hashable {
     case open
     case done
@@ -187,7 +226,11 @@ struct ShoppingListItem: Codable, Identifiable, Hashable {
             return nil
         }
 
-        let ingredient = ingredientName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let ingredient = cleanRecipeIngredientName(
+            ingredientName,
+            quantity: ingredientQuantity,
+            unit: ingredientUnit
+        )
         let amount = [ingredientQuantity, ingredientUnit]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }

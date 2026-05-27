@@ -317,7 +317,7 @@ struct RecipeIngredientList: View {
                                 Text(amount)
                                     .font(.subheadline.weight(.semibold))
                             }
-                            Text(ingredient.displayName)
+                            Text(ingredient.cleanDisplayName)
                                 .font(.subheadline)
                                 .foregroundStyle(.primary)
                         }
