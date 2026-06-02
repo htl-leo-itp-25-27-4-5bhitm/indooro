@@ -40,15 +40,15 @@ SET display_name = text_data.display_name,
     updated_at = NOW()
 FROM (
     VALUES
-        ('00000000-0000-0000-0000-000000000315'::uuid, 'Äpfel', 'äpfel', 'in Scheiben'),
+        ('00000000-0000-0000-0000-000000000315'::uuid, 'Äpfel', 'aepfel', 'in Scheiben'),
         ('00000000-0000-0000-0000-000000000318'::uuid, 'Zwiebel', 'zwiebel', 'gewürfelt'),
-        ('00000000-0000-0000-0000-000000000321'::uuid, 'Frischkäse', 'frischkäse', NULL),
-        ('00000000-0000-0000-0000-000000000323'::uuid, 'Frischkäse', 'frischkäse', NULL),
-        ('00000000-0000-0000-0000-000000000344'::uuid, 'Gouda', 'käse', 'gerieben oder Scheiben'),
-        ('00000000-0000-0000-0000-000000000355'::uuid, 'Äpfel', 'äpfel', NULL),
+        ('00000000-0000-0000-0000-000000000321'::uuid, 'Frischkäse', 'frischkaese', NULL),
+        ('00000000-0000-0000-0000-000000000323'::uuid, 'Frischkäse', 'frischkaese', NULL),
+        ('00000000-0000-0000-0000-000000000344'::uuid, 'Gouda', 'kaese', 'gerieben oder Scheiben'),
+        ('00000000-0000-0000-0000-000000000355'::uuid, 'Äpfel', 'aepfel', NULL),
         ('00000000-0000-0000-0000-000000000362'::uuid, 'Tomaten', 'tomaten', 'gewürfelt'),
-        ('00000000-0000-0000-0000-000000000363'::uuid, 'Frischkäse', 'frischkäse', NULL),
-        ('00000000-0000-0000-0000-000000000372'::uuid, 'Frischkäse', 'frischkäse', NULL),
+        ('00000000-0000-0000-0000-000000000363'::uuid, 'Frischkäse', 'frischkaese', NULL),
+        ('00000000-0000-0000-0000-000000000372'::uuid, 'Frischkäse', 'frischkaese', NULL),
         ('00000000-0000-0000-0000-000000000378'::uuid, 'Joghurt', 'joghurt', 'für Dressing')
 ) AS text_data(id, display_name, canonical_name, preparation_note)
 WHERE ingredient.id = text_data.id;
@@ -89,13 +89,6 @@ SET instruction = replace(instruction, 'Apfelstuecken', 'Apfelstücken'),
 WHERE instruction LIKE '%Apfelstuecken%';
 
 UPDATE ingredient_product_mappings
-SET canonical_name = 'äpfel',
-    product_name_snapshot = replace(product_name_snapshot, 'Aepfel', 'Äpfel'),
+SET product_name_snapshot = replace(product_name_snapshot, 'Aepfel', 'Äpfel'),
     updated_at = NOW()
-WHERE lower(coalesce(canonical_name, '')) = 'aepfel'
-   OR lower(product_name_snapshot) LIKE '%aepfel%';
-
-UPDATE ingredient_product_mappings
-SET canonical_name = 'käse',
-    updated_at = NOW()
-WHERE lower(coalesce(canonical_name, '')) = 'kaese';
+WHERE lower(product_name_snapshot) LIKE '%aepfel%';
