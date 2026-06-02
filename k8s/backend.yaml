@@ -59,7 +59,7 @@ spec:
             - name: OPENAI_UPSELL_MODEL
               value: "gpt-5.4-mini"
             - name: OPENAI_UPSELL_REASONING_EFFORT
-              value: "minimal"
+              value: "none"
             - name: OPENAI_UPSELL_TIMEOUT_MS
               value: "12000"
 

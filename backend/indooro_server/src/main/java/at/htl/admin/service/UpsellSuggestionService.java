@@ -84,7 +84,7 @@ public class UpsellSuggestionService {
     @ConfigProperty(name = "openai.upsell.model", defaultValue = "gpt-5.4-mini")
     String openAiModel;
 
-    @ConfigProperty(name = "openai.upsell.reasoning-effort", defaultValue = "minimal")
+    @ConfigProperty(name = "openai.upsell.reasoning-effort", defaultValue = "none")
     String openAiReasoningEffort;
 
     @ConfigProperty(name = "openai.upsell.timeout-ms", defaultValue = "12000")
