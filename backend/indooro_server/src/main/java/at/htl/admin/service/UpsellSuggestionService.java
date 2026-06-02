@@ -81,10 +81,13 @@ public class UpsellSuggestionService {
     @ConfigProperty(name = "openai.upsell.enabled", defaultValue = "false")
     boolean openAiEnabled;
 
-    @ConfigProperty(name = "openai.upsell.model", defaultValue = "gpt-4.1-mini")
+    @ConfigProperty(name = "openai.upsell.model", defaultValue = "gpt-5.4-mini")
     String openAiModel;
 
-    @ConfigProperty(name = "openai.upsell.timeout-ms", defaultValue = "3000")
+    @ConfigProperty(name = "openai.upsell.reasoning-effort", defaultValue = "minimal")
+    String openAiReasoningEffort;
+
+    @ConfigProperty(name = "openai.upsell.timeout-ms", defaultValue = "12000")
     long openAiTimeoutMs;
 
     public UpsellDtos.UpsellSuggestionResponse suggestions(UpsellDtos.UpsellSuggestionRequest request) {
@@ -343,27 +346,43 @@ public class UpsellSuggestionService {
                 "candidateProducts", candidates.stream().limit(Math.max(1, maxCandidates)).map(this::toAiSummary).toList()
         );
 
-        return Map.of(
-                "model", openAiModel,
-                "input", List.of(
-                        Map.of(
-                                "role", "system",
-                                "content", "Rank supermarket add-on products. Select only productIds from the provided candidates. Do not invent products. Reasons must be concise German customer-facing text."
-                        ),
-                        Map.of(
-                                "role", "user",
-                                "content", objectMapper.writeValueAsString(payload)
-                        )
+        Map<String, Object> requestBody = new LinkedHashMap<>();
+        requestBody.put("model", openAiModel);
+        requestBody.put("input", List.of(
+                Map.of(
+                        "role", "system",
+                        "content", "Rank supermarket add-on products. Select only productIds from the provided candidates. Do not invent products. Reasons must be concise German customer-facing text."
                 ),
-                "text", Map.of(
-                        "format", Map.of(
-                                "type", "json_schema",
-                                "name", "upsell_suggestions",
-                                "strict", true,
-                                "schema", schema
-                        )
+                Map.of(
+                        "role", "user",
+                        "content", objectMapper.writeValueAsString(payload)
                 )
-        );
+        ));
+        requestBody.put("text", Map.of(
+                "format", Map.of(
+                        "type", "json_schema",
+                        "name", "upsell_suggestions",
+                        "strict", true,
+                        "schema", schema
+                )
+        ));
+        requestBody.put("max_output_tokens", 800);
+
+        String reasoningEffort = normalizeOptional(openAiReasoningEffort);
+        if (reasoningEffort != null && supportsReasoning(openAiModel)) {
+            requestBody.put("reasoning", Map.of("effort", reasoningEffort));
+        }
+
+        return requestBody;
+    }
+
+    private boolean supportsReasoning(String model) {
+        String normalized = normalizeOptional(model);
+        if (normalized == null) {
+            return false;
+        }
+        String lower = normalized.toLowerCase(Locale.ROOT);
+        return lower.startsWith("gpt-5") || lower.startsWith("o1") || lower.startsWith("o3") || lower.startsWith("o4");
     }
 
     private Map<String, Object> toAiSummary(Product product) {

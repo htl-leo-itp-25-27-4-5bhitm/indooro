@@ -49,6 +49,20 @@ spec:
             - name: OPENSEARCH_PORT
               value: "9200"
 
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: indooro-openai-secret
+                  key: OPENAI_API_KEY
+            - name: OPENAI_UPSELL_ENABLED
+              value: "true"
+            - name: OPENAI_UPSELL_MODEL
+              value: "gpt-5.4-mini"
+            - name: OPENAI_UPSELL_REASONING_EFFORT
+              value: "minimal"
+            - name: OPENAI_UPSELL_TIMEOUT_MS
+              value: "12000"
+
             - name: QUARKUS_OIDC_AUTH_SERVER_URL
               value: "https://it220209.cloud.htl-leonding.ac.at/keycloak/realms/indooro"
             - name: QUARKUS_OIDC_CLIENT_ID
