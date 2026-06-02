@@ -136,6 +136,42 @@ public class OpenSearchService {
                 .collect(Collectors.toList());
     }
 
+    public List<Product> findUpsellCandidates(Integer size, String storeId, String storeCode) throws IOException {
+        final Integer finalSize = (size == null) ? 50 : Math.min(Math.max(size, 1), 200);
+        final String normalizedStoreId = normalizeOptionalFilter(storeId);
+        final String normalizedStoreCode = normalizeOptionalFilter(storeCode);
+
+        SearchRequest searchRequest = SearchRequest.of(s -> s
+                .index(indexName)
+                .query(q -> q.bool(b -> {
+                    b.must(m -> m.matchAll(ma -> ma));
+
+                    if (normalizedStoreId != null) {
+                        b.filter(filter -> filter.term(term -> term
+                                .field("storeId")
+                                .value(v -> v.stringValue(normalizedStoreId))
+                        ));
+                    }
+                    if (normalizedStoreCode != null) {
+                        b.filter(filter -> filter.term(term -> term
+                                .field("storeCode")
+                                .value(v -> v.stringValue(normalizedStoreCode))
+                        ));
+                    }
+
+                    return b;
+                }))
+                .size(finalSize)
+        );
+
+        SearchResponse<Product> response = client.search(searchRequest, Product.class);
+
+        return response.hits().hits().stream()
+                .map(Hit::source)
+                .filter(p -> p != null)
+                .collect(Collectors.toList());
+    }
+
     /**
      * Indexiert ein einzelnes Produkt
      */

@@ -1,0 +1,41 @@
+package at.htl.resource.mobile;
+
+import at.htl.admin.dto.UpsellDtos;
+import at.htl.admin.service.UpsellSuggestionService;
+import jakarta.inject.Inject;
+import jakarta.validation.Valid;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+
+@Path("/api/mobile/upsell")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public class MobileUpsellResource {
+
+    @Inject
+    UpsellSuggestionService upsellSuggestionService;
+
+    @POST
+    @Path("/suggestions")
+    public UpsellDtos.UpsellSuggestionResponse suggestions(@Valid UpsellDtos.UpsellSuggestionRequest request) {
+        return upsellSuggestionService.suggestions(request);
+    }
+
+    @POST
+    @Path("/events")
+    public Response recordEvent(@Valid UpsellDtos.UpsellEventRequest request) {
+        upsellSuggestionService.recordEvent(request);
+        return Response.accepted().build();
+    }
+
+    @POST
+    @Path("/dismiss")
+    public Response dismiss(@Valid UpsellDtos.UpsellDismissRequest request) {
+        upsellSuggestionService.dismiss(request);
+        return Response.accepted().build();
+    }
+}

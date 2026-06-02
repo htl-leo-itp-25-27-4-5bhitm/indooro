@@ -161,6 +161,78 @@ private struct ShoppingSelectionContext: Identifiable {
     let listID: UUID
 }
 
+struct UpsellPromptSheet: View {
+    let prompt: UpsellPrompt
+    let onAddSuggestion: (UpsellSuggestion) -> Void
+    let onDismiss: () -> Void
+    let onSuppressProduct: () -> Void
+
+    private let accent = Color(red: 0.00, green: 0.43, blue: 0.36)
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Zu \(prompt.checkedProductName) passt vielleicht noch:")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        ForEach(prompt.suggestions) { suggestion in
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(suggestion.product.name)
+                                            .font(.headline)
+                                            .lineLimit(2)
+
+                                        Text(suggestion.product.detailText)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    Spacer(minLength: 0)
+
+                                    Button {
+                                        onAddSuggestion(suggestion)
+                                    } label: {
+                                        Label("Hinzufügen", systemImage: "plus.circle.fill")
+                                            .labelStyle(.iconOnly)
+                                            .font(.title3)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(accent)
+                                    .accessibilityLabel("\(suggestion.product.name) hinzufügen")
+                                }
+
+                                Text(suggestion.reason)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(3)
+                            }
+                            .padding(.vertical, 5)
+                        }
+                    }
+                }
+
+                Section {
+                    Button("Nein danke") {
+                        onDismiss()
+                    }
+                    .foregroundStyle(.primary)
+
+                    Button("Nicht mehr für dieses Produkt") {
+                        onSuppressProduct()
+                    }
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Passt gut dazu")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+
 private enum ProductDiscoveryMode {
     case none
     case search
@@ -1071,6 +1143,7 @@ struct ShoppingListsPage: View {
     @ObservedObject var listManager: ShoppingListManager
     @ObservedObject var sessionManager: ShoppingSessionManager
     @ObservedObject var beaconManager: BeaconManager
+    @ObservedObject var upsellStore: UpsellSuggestionStore
     @Binding var pendingImportPackage: ShoppingTransferPackage?
     @Binding var importErrorMessage: String?
 
@@ -1099,6 +1172,21 @@ struct ShoppingListsPage: View {
 
     private var selectedList: ShoppingList? {
         listManager.selectedList
+    }
+
+    private var activeStore: MobileStoreSummary? {
+        beaconManager.activeLayoutStore ?? beaconManager.detectedStore
+    }
+
+    private var upsellPromptBinding: Binding<UpsellPrompt?> {
+        Binding(
+            get: { upsellStore.activePrompt },
+            set: { newValue in
+                if newValue == nil {
+                    upsellStore.clearPrompt()
+                }
+            }
+        )
     }
 
     private var selectedPreview: ShoppingRouteSnapshot? {
@@ -1227,6 +1315,22 @@ struct ShoppingListsPage: View {
             ShareSheet(activityItems: [presentation.fileURL]) { completed in
                 completeShare(presentation, completed: completed)
             }
+        }
+        .sheet(item: upsellPromptBinding) { prompt in
+            UpsellPromptSheet(
+                prompt: prompt,
+                onAddSuggestion: { suggestion in
+                    addUpsellSuggestion(suggestion, prompt: prompt)
+                },
+                onDismiss: {
+                    upsellStore.dismissCurrentPrompt()
+                },
+                onSuppressProduct: {
+                    upsellStore.dismissCurrentPrompt(suppressProduct: true)
+                }
+            )
+            .presentationDetents([.height(360), .medium])
+            .presentationDragIndicator(.visible)
         }
         .alert("Aktion fehlgeschlagen", isPresented: importErrorAlertBinding) {
             Button("OK", role: .cancel) {
@@ -1384,12 +1488,7 @@ struct ShoppingListsPage: View {
                         item: item,
                         isCompleted: false,
                         onToggle: {
-                            if let selectedList {
-                                listManager.updateItemStatus(item.id, in: selectedList.id, status: .done)
-                                if sessionManager.activeListID == selectedList.id {
-                                    sessionManager.sync(listManager: listManager, beaconManager: beaconManager)
-                                }
-                            }
+                            completeItem(item, status: .done, source: "shopping_list")
                         }
                     )
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -1416,12 +1515,7 @@ struct ShoppingListsPage: View {
                             item: item,
                             isCompleted: false,
                             onToggle: {
-                                if let selectedList {
-                                    listManager.updateItemStatus(item.id, in: selectedList.id, status: .missing)
-                                    if sessionManager.activeListID == selectedList.id {
-                                        sessionManager.sync(listManager: listManager, beaconManager: beaconManager)
-                                    }
-                                }
+                                completeItem(item, status: .missing, source: "shopping_list")
                             }
                         )
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -1495,6 +1589,41 @@ struct ShoppingListsPage: View {
             return "Die Tour ist aktiv. Hake ab, was du erledigt hast, oder setze die Route fort."
         }
         return "Prüfe kurz deine Artikel und starte dann deine Einkaufstour."
+    }
+
+    private func completeItem(
+        _ item: ShoppingListItem,
+        status: ShoppingListItemStatus,
+        source: String
+    ) {
+        guard let selectedList else {
+            return
+        }
+
+        listManager.updateItemStatus(item.id, in: selectedList.id, status: status)
+        if sessionManager.activeListID == selectedList.id {
+            sessionManager.sync(listManager: listManager, beaconManager: beaconManager)
+        }
+
+        guard item.productID != nil,
+              let updatedList = listManager.list(with: selectedList.id) else {
+            return
+        }
+
+        upsellStore.requestSuggestions(
+            checkedItem: item,
+            list: updatedList,
+            store: activeStore,
+            source: source
+        )
+    }
+
+    private func addUpsellSuggestion(_ suggestion: UpsellSuggestion, prompt: UpsellPrompt) {
+        _ = listManager.addProduct(suggestion.product.product, to: prompt.listID)
+        if sessionManager.activeListID == prompt.listID {
+            sessionManager.sync(listManager: listManager, beaconManager: beaconManager)
+        }
+        upsellStore.accept(suggestion, prompt: prompt)
     }
 
     private func handleFileImport(_ result: Result<URL, Error>) {

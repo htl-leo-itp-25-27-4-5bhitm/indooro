@@ -1,0 +1,92 @@
+import Foundation
+
+struct UpsellRequest: Encodable {
+    let storeId: UUID?
+    let storeCode: String?
+    let checkedProductId: Int
+    let shoppingListId: String?
+    let currentListProductIds: [Int]
+    let completedProductIds: [Int]
+    let source: String
+    let recipeId: UUID?
+}
+
+struct UpsellProductSummary: Decodable, Identifiable, Hashable {
+    let id: Int
+    let name: String
+    let price: Double?
+    let layoutCode: String?
+    let storeId: String?
+    let storeCode: String?
+    let brand: String?
+    let category: String?
+    let imageUrl: String?
+    let hasLayoutPosition: Bool
+
+    var product: Product {
+        Product(
+            id: id,
+            name: name,
+            price: price ?? 0,
+            layoutCode: layoutCode ?? ""
+        )
+    }
+
+    var detailText: String {
+        var parts: [String] = []
+        if let price, price > 0 {
+            parts.append(String(format: "%.2f EUR", price))
+        }
+        if hasLayoutPosition {
+            parts.append("im Markt auffindbar")
+        } else {
+            parts.append("ohne Regalposition")
+        }
+        return parts.joined(separator: " · ")
+    }
+}
+
+struct UpsellSuggestion: Decodable, Identifiable, Hashable {
+    var id: Int { product.id }
+
+    let product: UpsellProductSummary
+    let reason: String
+    let confidence: Double
+}
+
+struct UpsellSuggestionResponse: Decodable {
+    let checkedProductId: Int
+    let suggestions: [UpsellSuggestion]
+    let source: String?
+    let expiresAt: Date?
+}
+
+struct UpsellEventRequest: Encodable {
+    let eventType: String
+    let checkedProductId: Int?
+    let suggestedProductId: Int?
+    let storeId: UUID?
+    let storeCode: String?
+    let sessionId: String?
+    let source: String?
+    let metadataJson: String?
+}
+
+struct UpsellDismissRequest: Encodable {
+    let checkedProductId: Int
+    let suggestedProductId: Int?
+    let storeId: UUID?
+    let storeCode: String?
+    let sessionId: String?
+    let suppressMinutes: Int?
+}
+
+struct UpsellPrompt: Identifiable, Hashable {
+    let id = UUID()
+    let checkedProductId: Int
+    let checkedProductName: String
+    let listID: UUID
+    let store: MobileStoreSummary?
+    let source: String
+    let suggestions: [UpsellSuggestion]
+}

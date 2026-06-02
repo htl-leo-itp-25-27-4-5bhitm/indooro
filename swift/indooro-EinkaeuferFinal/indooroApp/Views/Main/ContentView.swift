@@ -15,6 +15,7 @@ struct ContentView: View {
     @StateObject private var mapProductSearch = ProductSearchStore()
     @StateObject private var productsSearch = ProductSearchStore()
     @StateObject private var recipeStore = RecipeStore()
+    @StateObject private var upsellStore = UpsellSuggestionStore()
 
     @State private var selectedSection: AppSection = .start
     @State private var targetProduct: Product?
@@ -68,6 +69,7 @@ struct ContentView: View {
                 listManager: shoppingListManager,
                 sessionManager: shoppingSessionManager,
                 beaconManager: beaconManager,
+                upsellStore: upsellStore,
                 pendingImportPackage: $pendingShoppingImportPackage,
                 importErrorMessage: $shoppingImportErrorMessage,
                 onStartSession: startShoppingSession,
@@ -83,6 +85,7 @@ struct ContentView: View {
                 shoppingListManager: shoppingListManager,
                 shoppingSessionManager: shoppingSessionManager,
                 productSearch: mapProductSearch,
+                upsellStore: upsellStore,
                 targetProduct: $targetProduct,
                 pendingLastStoreLayoutOpenRequest: $pendingLastStoreLayoutOpenRequest,
                 onNavigateToProduct: focusProductOnMap,
@@ -146,6 +149,7 @@ struct ContentView: View {
 
     private func startShoppingSession(for listID: UUID) {
         shoppingListManager.selectList(listID)
+        upsellStore.resetSession()
         withAnimation {
             targetProduct = nil
             pendingLastStoreLayoutOpenRequest = UUID()
@@ -161,6 +165,7 @@ struct ContentView: View {
     }
 
     private func stopShoppingSession() {
+        upsellStore.clearPrompt()
         shoppingSessionManager.stopSession(beaconManager: beaconManager)
     }
 

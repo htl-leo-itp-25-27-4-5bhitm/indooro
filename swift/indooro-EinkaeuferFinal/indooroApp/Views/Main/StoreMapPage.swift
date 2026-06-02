@@ -6,6 +6,7 @@ struct StoreMapPage: View {
     @ObservedObject var shoppingListManager: ShoppingListManager
     @ObservedObject var shoppingSessionManager: ShoppingSessionManager
     @ObservedObject var productSearch: ProductSearchStore
+    @ObservedObject var upsellStore: UpsellSuggestionStore
 
     @Binding var targetProduct: Product?
     @Binding var pendingLastStoreLayoutOpenRequest: UUID?
@@ -32,6 +33,21 @@ struct StoreMapPage: View {
 
     private var activeShoppingSnapshot: ShoppingRouteSnapshot? {
         shoppingSessionManager.snapshot
+    }
+
+    private var activeStore: MobileStoreSummary? {
+        beaconManager.activeLayoutStore ?? beaconManager.detectedStore
+    }
+
+    private var upsellPromptBinding: Binding<UpsellPrompt?> {
+        Binding(
+            get: { upsellStore.activePrompt },
+            set: { newValue in
+                if newValue == nil {
+                    upsellStore.clearPrompt()
+                }
+            }
+        )
     }
 
     private var displayUserPosition: CGPoint? {
@@ -146,6 +162,22 @@ struct StoreMapPage: View {
                 }
             )
             .presentationDetents([.medium])
+        }
+        .sheet(item: upsellPromptBinding) { prompt in
+            UpsellPromptSheet(
+                prompt: prompt,
+                onAddSuggestion: { suggestion in
+                    addUpsellSuggestion(suggestion, prompt: prompt)
+                },
+                onDismiss: {
+                    upsellStore.dismissCurrentPrompt()
+                },
+                onSuppressProduct: {
+                    upsellStore.dismissCurrentPrompt(suppressProduct: true)
+                }
+            )
+            .presentationDetents([.height(360), .medium])
+            .presentationDragIndicator(.visible)
         }
     }
 
@@ -505,10 +537,12 @@ struct StoreMapPage: View {
                 snapshot: snapshot,
                 onOpenList: onOpenLists,
                 onMarkCurrentStopDone: {
+                    let completedItems = activeShoppingSnapshot?.currentStop?.items ?? []
                     shoppingSessionManager.markCurrentStopDone(
                         listManager: shoppingListManager,
                         beaconManager: beaconManager
                     )
+                    requestUpsellForCompletedStopItems(completedItems)
                 },
                 onSkipCurrentStop: {
                     shoppingSessionManager.skipCurrentStop(
@@ -686,6 +720,32 @@ struct StoreMapPage: View {
         pendingStoreSelectionID = store.id
         targetProduct = nil
         beaconManager.loadStoreLayout(storeId: store.id)
+    }
+
+    private func requestUpsellForCompletedStopItems(_ items: [ShoppingListItem]) {
+        guard let checkedItem = items.first(where: { $0.productID != nil }),
+              let activeListID = shoppingSessionManager.activeListID,
+              let list = shoppingListManager.list(with: activeListID) else {
+            return
+        }
+
+        upsellStore.requestSuggestions(
+            checkedItem: checkedItem,
+            list: list,
+            store: activeStore,
+            source: "shopping_session"
+        )
+    }
+
+    private func addUpsellSuggestion(_ suggestion: UpsellSuggestion, prompt: UpsellPrompt) {
+        _ = shoppingListManager.addProduct(suggestion.product.product, to: prompt.listID)
+        if shoppingSessionManager.activeListID == prompt.listID {
+            shoppingSessionManager.sync(
+                listManager: shoppingListManager,
+                beaconManager: beaconManager
+            )
+        }
+        upsellStore.accept(suggestion, prompt: prompt)
     }
 
     private func showStoreOverview() {
