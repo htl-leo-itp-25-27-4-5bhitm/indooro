@@ -195,6 +195,8 @@ struct RecipeDetailView: View {
         }
         .navigationTitle(recipeStore.selectedRecipe?.id == recipeID ? recipeStore.selectedRecipe?.title ?? "Rezept" : "Rezept")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Color(uiColor: .systemGroupedBackground), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .onAppear(perform: loadRecipe)
     }
 
@@ -403,19 +405,22 @@ struct RecipeCard: View {
     var body: some View {
         HStack(spacing: 14) {
             RecipeImage(urlString: recipe.imageUrl, title: recipe.title)
-                .frame(width: 76, height: 76)
+                .frame(width: 88, height: 88)
+                .layoutPriority(1)
 
             VStack(alignment: .leading, spacing: 7) {
                 Text(recipe.title)
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 if let summary = recipe.summary, !summary.isEmpty {
                     Text(summary)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 HStack(spacing: 10) {
@@ -434,6 +439,7 @@ struct RecipeCard: View {
             Spacer(minLength: 0)
         }
         .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 116, alignment: .leading)
         .background(Color(uiColor: .systemBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -450,12 +456,13 @@ private struct RecipeHero: View {
         VStack(alignment: .leading, spacing: 14) {
             RecipeImage(urlString: recipe.imageUrl, title: recipe.title)
                 .frame(maxWidth: .infinity)
-                .frame(height: 210)
+                .frame(height: 168)
 
             VStack(alignment: .leading, spacing: 10) {
                 Text(recipe.title)
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
                     .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 if let summary = recipe.summary, !summary.isEmpty {
                     Text(summary)
@@ -477,7 +484,7 @@ private struct RecipeHero: View {
                 }
             }
         }
-        .padding(.top, 10)
+        .padding(.top, 14)
     }
 }
 
@@ -531,6 +538,8 @@ private struct RecipeImage: View {
                         image
                             .resizable()
                             .scaledToFill()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .clipped()
                     case .failure:
                         fallback
                     case .empty:
@@ -543,7 +552,9 @@ private struct RecipeImage: View {
                 fallback
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .accessibilityLabel("Bild zu \(title)")
     }
 
