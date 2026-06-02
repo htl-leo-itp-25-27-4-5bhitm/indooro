@@ -421,6 +421,7 @@ final class ShoppingListManager: ObservableObject {
         recipe: RecipeDetail,
         mapping: RecipeProductMappingResponse,
         includeFreeIngredients: Bool,
+        selectedIngredientIDs: Set<UUID>? = nil,
         to listID: UUID? = nil
     ) -> [ShoppingListItem] {
         let targetListID = resolvedTargetListID(preferred: listID)
@@ -437,10 +438,15 @@ final class ShoppingListManager: ObservableObject {
             var nextOrder = nextSortOrder(in: list.items)
 
             for ingredient in recipe.ingredients.sorted(by: { $0.position < $1.position }) {
+                if let selectedIngredientIDs,
+                   !selectedIngredientIDs.contains(ingredient.id) {
+                    continue
+                }
+
                 let mappingStatus = statusByIngredientID[ingredient.id]
                 let sourceNote = recipeIngredientNote(
                     ingredient: ingredient,
-                    recipeName: recipe.title
+                    recipeName: recipe.displayTitle
                 )
 
                 if let mappedProduct = mappingStatus?.product,
@@ -458,9 +464,9 @@ final class ShoppingListManager: ObservableObject {
                         list.items[existingIndex].sourceRecipeId = list.items[existingIndex].sourceRecipeId ?? recipe.id
                         list.items[existingIndex].sourceRecipeName = mergedSourceText(
                             existing: list.items[existingIndex].sourceRecipeName,
-                            incoming: recipe.title
+                            incoming: recipe.displayTitle
                         )
-                        list.items[existingIndex].ingredientName = list.items[existingIndex].ingredientName ?? ingredient.cleanDisplayName
+                        list.items[existingIndex].ingredientName = list.items[existingIndex].ingredientName ?? ingredient.cleanLocalizedDisplayName
                         list.items[existingIndex].ingredientQuantity = list.items[existingIndex].ingredientQuantity ?? ingredient.quantityTextForList
                         list.items[existingIndex].ingredientUnit = list.items[existingIndex].ingredientUnit ?? ingredient.displayUnitForList
                         list.items[existingIndex].mappingConfidence = mappingStatus?.confidence
@@ -472,8 +478,8 @@ final class ShoppingListManager: ObservableObject {
                             product: product,
                             sortOrder: nextOrder,
                             sourceRecipeId: recipe.id,
-                            sourceRecipeName: recipe.title,
-                            ingredientName: ingredient.cleanDisplayName,
+                            sourceRecipeName: recipe.displayTitle,
+                            ingredientName: ingredient.cleanLocalizedDisplayName,
                             ingredientQuantity: ingredient.quantityTextForList,
                             ingredientUnit: ingredient.displayUnitForList,
                             mappingConfidence: mappingStatus?.confidence,
@@ -490,7 +496,7 @@ final class ShoppingListManager: ObservableObject {
                     continue
                 }
 
-                let normalizedName = normalizedIngredientName(ingredient.cleanDisplayName)
+                let normalizedName = normalizedIngredientName(ingredient.cleanLocalizedDisplayName)
                 if let existingIndex = list.items.firstIndex(where: {
                     $0.productID == nil
                         && $0.status == .open
@@ -506,10 +512,10 @@ final class ShoppingListManager: ObservableObject {
                     changedItems.append(list.items[existingIndex])
                 } else {
                     let item = ShoppingListItem(
-                        freeIngredientName: ingredient.cleanDisplayName,
+                        freeIngredientName: ingredient.cleanLocalizedDisplayName,
                         sortOrder: nextOrder,
                         sourceRecipeId: recipe.id,
-                        sourceRecipeName: recipe.title,
+                        sourceRecipeName: recipe.displayTitle,
                         ingredientQuantity: ingredient.quantityTextForList,
                         ingredientUnit: ingredient.displayUnitForList
                     )

@@ -193,7 +193,7 @@ struct RecipeDetailView: View {
                 )
             }
         }
-        .navigationTitle(recipeStore.selectedRecipe?.id == recipeID ? recipeStore.selectedRecipe?.title ?? "Rezept" : "Rezept")
+        .navigationTitle(recipeStore.selectedRecipe?.id == recipeID ? recipeStore.selectedRecipe?.displayTitle ?? "Rezept" : "Rezept")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color(uiColor: .systemGroupedBackground), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
@@ -215,6 +215,7 @@ struct AddRecipeToShoppingListSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var includeFreeIngredients: Bool
+    @State private var selectedIngredientIDs: Set<UUID>
     @State private var selectedListID: UUID?
 
     init(
@@ -230,15 +231,29 @@ struct AddRecipeToShoppingListSheet: View {
         self.includeFreeIngredientsDefault = includeFreeIngredientsDefault
         self.onAdded = onAdded
         _includeFreeIngredients = State(initialValue: includeFreeIngredientsDefault)
+        _selectedIngredientIDs = State(initialValue: Set(recipe.ingredients.map(\.id)))
         _selectedListID = State(initialValue: listManager.selectedList?.id)
     }
 
     private var mappedCount: Int {
-        mapping.ingredients.filter { $0.product != nil }.count
+        mapping.ingredients.filter {
+            selectedIngredientIDs.contains($0.ingredientId) && $0.product?.product != nil
+        }.count
     }
 
     private var unmappedCount: Int {
-        max(0, recipe.ingredients.count - mappedCount)
+        recipe.ingredients.filter { ingredient in
+            selectedIngredientIDs.contains(ingredient.id)
+                && mapping.ingredients.first(where: { $0.ingredientId == ingredient.id })?.product?.product == nil
+        }.count
+    }
+
+    private var selectedCount: Int {
+        selectedIngredientIDs.count
+    }
+
+    private var canAdd: Bool {
+        selectedListID != nil && !selectedIngredientIDs.isEmpty
     }
 
     var body: some View {
@@ -251,23 +266,33 @@ struct AddRecipeToShoppingListSheet: View {
                         }
                     }
 
-                    Toggle("Nicht gemappte Zutaten als freie Einträge behalten", isOn: $includeFreeIngredients)
+                    Toggle("Zutaten ohne Marktprodukt als freie Einträge behalten", isOn: $includeFreeIngredients)
                 }
 
                 Section("Vorschau") {
-                    Label("\(mappedCount) gemappte Zutaten werden als Produkte hinzugefügt", systemImage: "checkmark.circle.fill")
+                    Label("\(mappedCount) Zutaten werden als Marktprodukte hinzugefügt", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                     if unmappedCount > 0 {
                         Label("\(unmappedCount) Zutaten ohne Produkt bleiben sichtbar", systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
                     }
+                    if selectedCount == 0 {
+                        Label("Wähle mindestens eine Zutat aus", systemImage: "info.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
-                Section("Zutaten") {
-                    RecipeIngredientList(
-                        ingredients: recipe.ingredients,
-                        mappings: mapping.ingredients
-                    )
+                Section("Zutaten auswählen") {
+                    ForEach(recipe.ingredients.sorted(by: { $0.position < $1.position })) { ingredient in
+                        AddRecipeIngredientSelectionRow(
+                            ingredient: ingredient,
+                            status: mapping.ingredients.first(where: { $0.ingredientId == ingredient.id }),
+                            isSelected: selectedIngredientIDs.contains(ingredient.id),
+                            onToggle: {
+                                toggleIngredient(ingredient.id)
+                            }
+                        )
+                    }
                 }
             }
             .navigationTitle("Rezept hinzufügen")
@@ -284,6 +309,7 @@ struct AddRecipeToShoppingListSheet: View {
                             recipe: recipe,
                             mapping: mapping,
                             includeFreeIngredients: includeFreeIngredients,
+                            selectedIngredientIDs: selectedIngredientIDs,
                             to: selectedListID
                         )
                         if !changed.isEmpty {
@@ -291,9 +317,17 @@ struct AddRecipeToShoppingListSheet: View {
                         }
                         dismiss()
                     }
-                    .disabled(selectedListID == nil)
+                    .disabled(!canAdd)
                 }
             }
+        }
+    }
+
+    private func toggleIngredient(_ id: UUID) {
+        if selectedIngredientIDs.contains(id) {
+            selectedIngredientIDs.remove(id)
+        } else {
+            selectedIngredientIDs.insert(id)
         }
     }
 }
@@ -319,12 +353,12 @@ struct RecipeIngredientList: View {
                                 Text(amount)
                                     .font(.subheadline.weight(.semibold))
                             }
-                            Text(ingredient.cleanDisplayName)
+                            Text(ingredient.cleanLocalizedDisplayName)
                                 .font(.subheadline)
                                 .foregroundStyle(.primary)
                         }
 
-                        if let note = ingredient.preparationNote, !note.isEmpty {
+                        if let note = ingredient.localizedPreparationNote, !note.isEmpty {
                             Text(note)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -346,18 +380,18 @@ struct IngredientMappingStatusView: View {
     let status: RecipeIngredientMappingStatus?
 
     private var title: String {
-        guard let status else { return "Ohne Mapping" }
+        guard let status else { return "Nicht gefunden" }
         switch status.status {
         case .mapped:
-            return "Gemappt"
+            return "Im Markt"
         case .productWithoutLayout:
             return "Ohne Regal"
         case .multipleCandidates:
-            return "Auswahl offen"
+            return "Auswahl nötig"
         case .unavailableInStore:
-            return "Nicht im Store"
+            return "Nicht im Markt"
         case .unmapped:
-            return "Ohne Mapping"
+            return "Nicht gefunden"
         }
     }
 
@@ -397,25 +431,68 @@ struct IngredientMappingStatusView: View {
     }
 }
 
+private struct AddRecipeIngredientSelectionRow: View {
+    let ingredient: RecipeIngredient
+    let status: RecipeIngredientMappingStatus?
+    let isSelected: Bool
+    let onToggle: () -> Void
+
+    var body: some View {
+        Button(action: onToggle) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(isSelected ? Color(red: 0.00, green: 0.43, blue: 0.36) : .secondary)
+                    .frame(width: 28)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        if let amount = ingredient.amountText {
+                            Text(amount)
+                                .font(.subheadline.weight(.bold))
+                        }
+                        Text(ingredient.cleanLocalizedDisplayName)
+                            .font(.subheadline)
+                    }
+                    if let note = ingredient.localizedPreparationNote, !note.isEmpty {
+                        Text(note)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer(minLength: 8)
+
+                IngredientMappingStatusView(status: status)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(ingredient.amountText.map { "\($0) " } ?? "")\(ingredient.cleanLocalizedDisplayName)")
+        .accessibilityValue(isSelected ? "Wird hinzugefügt" : "Wird nicht hinzugefügt")
+    }
+}
+
 struct RecipeCard: View {
     let recipe: RecipeSummary
 
     private let accent = Color(red: 0.00, green: 0.43, blue: 0.36)
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(alignment: .top, spacing: 18) {
             RecipeImage(urlString: recipe.imageUrl, title: recipe.title)
-                .frame(width: 88, height: 88)
-                .layoutPriority(1)
+                .frame(width: 108, height: 96)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .shadow(color: .black.opacity(0.06), radius: 5, x: 0, y: 3)
 
             VStack(alignment: .leading, spacing: 7) {
-                Text(recipe.title)
+                Text(recipe.displayTitle)
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
-                if let summary = recipe.summary, !summary.isEmpty {
+                if let summary = recipe.displaySummary, !summary.isEmpty {
                     Text(summary)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -438,8 +515,8 @@ struct RecipeCard: View {
 
             Spacer(minLength: 0)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 116, alignment: .leading)
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 128, alignment: .leading)
         .background(Color(uiColor: .systemBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -454,37 +531,55 @@ private struct RecipeHero: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            RecipeImage(urlString: recipe.imageUrl, title: recipe.title)
-                .frame(maxWidth: .infinity)
-                .frame(height: 168)
+            ZStack(alignment: .bottomLeading) {
+                RecipeImage(urlString: recipe.imageUrl, title: recipe.title)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 260)
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text(recipe.title)
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
+                LinearGradient(
+                    colors: [
+                        .clear,
+                        Color(uiColor: .systemBackground).opacity(0.82),
+                        Color(uiColor: .systemBackground)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 150)
 
-                if let summary = recipe.summary, !summary.isEmpty {
-                    Text(summary)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(recipe.displayTitle)
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                HStack(spacing: 12) {
-                    Label("\(recipe.servings) Portionen", systemImage: "person.2")
-                    if let total = recipe.totalTimeMinutes {
-                        Label("\(total) min", systemImage: "clock")
+                    if let summary = recipe.displaySummary, !summary.isEmpty {
+                        Text(summary)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
                     }
-                }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color(red: 0.00, green: 0.43, blue: 0.36))
 
-                if !recipe.tags.isEmpty {
-                    FlowTagRow(tags: recipe.tags)
+                    HStack(spacing: 12) {
+                        Label("\(recipe.servings) Portionen", systemImage: "person.2")
+                        if let total = recipe.totalTimeMinutes {
+                            Label("\(total) min", systemImage: "clock")
+                        }
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color(red: 0.00, green: 0.43, blue: 0.36))
                 }
+                .padding(18)
+            }
+            .background(Color(uiColor: .systemBackground), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 8)
+
+            if !recipe.tags.isEmpty {
+                FlowTagRow(tags: recipe.tags)
             }
         }
-        .padding(.top, 14)
+        .padding(.top, 16)
     }
 }
 
@@ -505,7 +600,7 @@ private struct RecipeStepsView: View {
                         .background(Color(red: 0.00, green: 0.43, blue: 0.36), in: Circle())
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(step.instruction)
+                        Text(step.displayInstruction)
                             .font(.subheadline)
                         if let duration = step.durationMinutes {
                             Text("\(duration) min")
@@ -572,7 +667,7 @@ private struct FlowTagRow: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(tags) { tag in
-                    Text(tag.name)
+                    Text(tag.displayName)
                         .font(.caption.weight(.semibold))
                         .padding(.horizontal, 9)
                         .padding(.vertical, 5)

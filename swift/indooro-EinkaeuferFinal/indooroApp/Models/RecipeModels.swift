@@ -1,11 +1,55 @@
 import Foundation
 
+private func recipeDisplayText(_ value: String) -> String {
+    let replacements = [
+        ("Frueh", "Früh"),
+        ("frueh", "früh"),
+        ("Muesli", "Müsli"),
+        ("muesli", "müsli"),
+        ("Gemuese", "Gemüse"),
+        ("gemuese", "gemüse"),
+        ("Kaese", "Käse"),
+        ("kaese", "käse"),
+        ("Kuehl", "Kühl"),
+        ("kuehl", "kühl"),
+        ("Kraeuter", "Kräuter"),
+        ("kraeuter", "kräuter"),
+        ("Suesse", "Süße"),
+        ("suesse", "süße"),
+        ("Saett", "Sätt"),
+        ("saett", "sätt"),
+        ("Waerm", "Wärm"),
+        ("waerm", "wärm"),
+        ("ueber", "über"),
+        ("Ueber", "Über"),
+        ("ruehr", "rühr"),
+        ("Ruehr", "Rühr"),
+        ("wuerz", "würz"),
+        ("Wuerz", "Würz"),
+        ("gewuer", "gewür"),
+        ("Gewuer", "Gewür"),
+        ("Aepfel", "Äpfel"),
+        ("aepfel", "äpfel"),
+        ("Apfelstueck", "Apfelstück"),
+        ("apfelstueck", "apfelstück"),
+        ("fuer", "für")
+    ]
+
+    return replacements.reduce(value) { result, replacement in
+        result.replacingOccurrences(of: replacement.0, with: replacement.1)
+    }
+}
+
 struct RecipeTag: Codable, Identifiable, Hashable {
     let id: UUID
     let code: String
     let name: String
     let kind: String?
     let status: String?
+
+    var displayName: String {
+        recipeDisplayText(name)
+    }
 }
 
 struct RecipeSummary: Codable, Identifiable, Hashable {
@@ -23,6 +67,14 @@ struct RecipeSummary: Codable, Identifiable, Hashable {
     let mappedIngredientCount: Int?
     let totalIngredientCount: Int?
     let tags: [RecipeTag]
+
+    var displayTitle: String {
+        recipeDisplayText(title)
+    }
+
+    var displaySummary: String? {
+        summary.map(recipeDisplayText)
+    }
 }
 
 struct RecipeDetail: Codable, Identifiable, Hashable {
@@ -45,6 +97,14 @@ struct RecipeDetail: Codable, Identifiable, Hashable {
     let tags: [RecipeTag]
     let ingredients: [RecipeIngredient]
     let steps: [RecipeStep]
+
+    var displayTitle: String {
+        recipeDisplayText(title)
+    }
+
+    var displaySummary: String? {
+        summary.map(recipeDisplayText)
+    }
 }
 
 struct RecipeIngredient: Codable, Identifiable, Hashable {
@@ -58,6 +118,10 @@ struct RecipeIngredient: Codable, Identifiable, Hashable {
     let unitDisplayName: String?
     let preparationNote: String?
     let optional: Bool
+
+    var localizedPreparationNote: String? {
+        preparationNote.map(recipeDisplayText)
+    }
 
     var displayUnitForList: String? {
         guard let unitCode else {
@@ -142,6 +206,10 @@ struct RecipeIngredient: Codable, Identifiable, Hashable {
 
         return trimmedName
     }
+
+    var cleanLocalizedDisplayName: String {
+        recipeDisplayText(cleanDisplayName)
+    }
 }
 
 struct RecipeStep: Codable, Identifiable, Hashable {
@@ -149,6 +217,10 @@ struct RecipeStep: Codable, Identifiable, Hashable {
     let position: Int
     let instruction: String
     let durationMinutes: Int?
+
+    var displayInstruction: String {
+        recipeDisplayText(instruction)
+    }
 }
 
 struct RecipeProductMappingResponse: Codable, Hashable {
