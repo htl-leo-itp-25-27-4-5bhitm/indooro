@@ -79,7 +79,8 @@ public final class UpsellDtos {
     public record UpsellPlanResponse(
             List<UpsellOpportunityResponse> opportunities,
             String source,
-            Instant expiresAt
+            Instant expiresAt,
+            UpsellPlanDebug debug
     ) {
     }
 
@@ -87,6 +88,23 @@ public final class UpsellDtos {
             String opportunityId,
             List<Integer> triggerProductIds,
             List<UpsellSuggestion> suggestions
+    ) {
+    }
+
+    public record UpsellPlanDebug(
+            String requestId,
+            String model,
+            String responseSource,
+            Long elapsedMs,
+            Long openAiElapsedMs,
+            Integer inputTokens,
+            Integer outputTokens,
+            Integer totalTokens,
+            Integer cachedInputTokens,
+            Integer reasoningTokens,
+            String fallbackReason,
+            Integer opportunityCount,
+            Integer candidateCount
     ) {
     }
 

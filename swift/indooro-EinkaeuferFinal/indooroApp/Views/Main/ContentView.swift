@@ -128,6 +128,33 @@ struct ContentView: View {
         .onOpenURL { url in
             handleIncomingShoppingTransfer(url)
         }
+        .sheet(item: upsellPromptBinding) { prompt in
+            UpsellPromptSheet(
+                prompt: prompt,
+                onAddSuggestion: { suggestion in
+                    addUpsellSuggestion(suggestion, prompt: prompt)
+                },
+                onDismiss: {
+                    upsellStore.dismissCurrentPrompt()
+                },
+                onSuppressProduct: {
+                    upsellStore.dismissCurrentPrompt(suppressProduct: true)
+                }
+            )
+            .presentationDetents([.height(360), .medium])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var upsellPromptBinding: Binding<UpsellPrompt?> {
+        Binding(
+            get: { upsellStore.activePrompt },
+            set: { newValue in
+                if newValue == nil {
+                    upsellStore.clearPrompt(reason: "sheet_binding_nil")
+                }
+            }
+        )
     }
 
     private func focusProductOnMap(_ product: Product) {
@@ -145,6 +172,18 @@ struct ContentView: View {
         if shoppingSessionManager.activeListID == targetListID {
             syncShoppingSession()
         }
+    }
+
+    private func addUpsellSuggestion(_ suggestion: UpsellSuggestion, prompt: UpsellPrompt) {
+        _ = shoppingListManager.addProduct(
+            suggestion.product.product,
+            to: prompt.listID,
+            addedFromUpsell: true
+        )
+        if shoppingSessionManager.activeListID == prompt.listID {
+            syncShoppingSession()
+        }
+        upsellStore.accept(suggestion, prompt: prompt)
     }
 
     private func startShoppingSession(for listID: UUID) {
@@ -165,7 +204,7 @@ struct ContentView: View {
     }
 
     private func stopShoppingSession() {
-        upsellStore.clearPrompt()
+        upsellStore.clearPrompt(reason: "stop_shopping_session")
         shoppingSessionManager.stopSession(beaconManager: beaconManager)
     }
 

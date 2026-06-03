@@ -24,6 +24,7 @@ final class UpsellSuggestionStore: ObservableObject {
     private let maxPromptsPerSession = 4
     private let maxSuggestionsShown = 3
     private let minConfidence = 0.45
+    private let debugEnabled = true
     private let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
@@ -39,6 +40,7 @@ final class UpsellSuggestionStore: ObservableObject {
     private var cachedOpportunities: [PlanKey: CachedOpportunity] = [:]
 
     func resetSession() {
+        debugLog("resetSession cachedOpportunities=\(cachedOpportunities.count) activePrompt=\(activePrompt?.opportunityId ?? "nil")")
         planTask?.cancel()
         planTask = nil
         cachedOpportunities.removeAll()
@@ -50,7 +52,8 @@ final class UpsellSuggestionStore: ObservableObject {
         dismissedProductIDs.removeAll()
     }
 
-    func clearPrompt() {
+    func clearPrompt(reason: String = "manual") {
+        debugLog("clearPrompt reason=\(reason) activePrompt=\(activePrompt?.opportunityId ?? "nil")")
         activePrompt = nil
     }
 
@@ -70,6 +73,7 @@ final class UpsellSuggestionStore: ObservableObject {
         source: String
     ) {
         guard shownCountForSession < maxPromptsPerSession else {
+            debugLog("preloadPlan skipped reason=session_limit shownCount=\(shownCountForSession)")
             return
         }
 
@@ -78,6 +82,9 @@ final class UpsellSuggestionStore: ObservableObject {
             stops: stops,
             unresolvedItems: unresolvedItems
         )
+        debugLog(
+            "preloadPlan begin list=\(list.id.uuidString) source=\(source) store=\(storeDebug(store)) stops=\(stops.count) unresolved=\(unresolvedItems.count) opportunities=\(opportunities.map(\.opportunityId))"
+        )
         guard !opportunities.isEmpty,
               let urlRequest = makePlanRequest(
                 list: list,
@@ -85,19 +92,35 @@ final class UpsellSuggestionStore: ObservableObject {
                 store: store,
                 source: source
               ) else {
+            debugLog("preloadPlan skipped reason=no_opportunities_or_request")
             return
         }
 
         let requestID = UUID()
         latestPlanRequestID = requestID
+        if planTask != nil {
+            debugLog("preloadPlan cancels previous request newRequestId=\(requestID.uuidString)")
+        }
         planTask?.cancel()
         isLoading = true
+        debugLog("preloadPlan requestId=\(requestID.uuidString) timeout=\(urlRequest.timeoutInterval)s")
 
         let task = URLSession.shared.dataTask(with: urlRequest) { [weak self] data, response, error in
             Task { @MainActor in
-                guard let self, self.latestPlanRequestID == requestID else { return }
+                guard let self else { return }
+                guard self.latestPlanRequestID == requestID else {
+                    self.debugLog("preloadPlan staleResponse ignored requestId=\(requestID.uuidString)")
+                    return
+                }
                 self.planTask = nil
                 self.isLoading = false
+
+                let statusCode = (response as? HTTPURLResponse)?.statusCode
+                if let data, let raw = String(data: data, encoding: .utf8) {
+                    self.debugLog("preloadPlan rawResponse requestId=\(requestID.uuidString) status=\(statusCode.map(String.init) ?? "nil") body=\(raw)")
+                } else {
+                    self.debugLog("preloadPlan rawResponse requestId=\(requestID.uuidString) status=\(statusCode.map(String.init) ?? "nil") body=nil")
+                }
 
                 guard error == nil,
                       let httpResponse = response as? HTTPURLResponse,
@@ -115,11 +138,15 @@ final class UpsellSuggestionStore: ObservableObject {
                             "reason": error == nil ? "http_or_decode" : "network"
                         ])
                     )
+                    self.debugLog("preloadPlan failed requestId=\(requestID.uuidString) error=\(error?.localizedDescription ?? "http_or_decode")")
                     return
                 }
 
                 let expiresAt = decoded.expiresAt ?? Date().addingTimeInterval(60)
                 let responseSource = decoded.source ?? "unknown"
+                self.debugLog(
+                    "preloadPlan decoded requestId=\(requestID.uuidString) source=\(responseSource) debug=\(self.debugSummary(decoded.debug)) opportunities=\(decoded.opportunities.map { "\($0.opportunityId):\($0.suggestions.map { $0.product.id })" })"
+                )
                 for opportunity in decoded.opportunities where !opportunity.suggestions.isEmpty {
                     let key = self.makePlanKey(
                         opportunityId: opportunity.opportunityId,
@@ -132,6 +159,7 @@ final class UpsellSuggestionStore: ObservableObject {
                         responseSource: responseSource,
                         expiresAt: expiresAt
                     )
+                    self.debugLog("preloadPlan cached key=\(self.keyDebug(key)) suggestions=\(opportunity.suggestions.map { "\($0.product.id):\($0.product.name)" }) expiresAt=\(expiresAt)")
                 }
             }
         }
@@ -147,9 +175,16 @@ final class UpsellSuggestionStore: ObservableObject {
         source: String
     ) {
         let triggerItems = checkedItems.filter { $0.productID != nil && !$0.addedFromUpsell }
+        debugLog(
+            "showOpportunity requested opportunity=\(opportunityId) source=\(source) store=\(storeDebug(store)) checkedItems=\(checkedItems.map { "\($0.name)#\($0.productID.map(String.init) ?? "nil") upsell=\($0.addedFromUpsell)" })"
+        )
         guard let firstTrigger = triggerItems.first,
-              let checkedProductId = firstTrigger.productID,
-              canShowPrompt(for: checkedProductId) else {
+              let checkedProductId = firstTrigger.productID else {
+            debugLog("showOpportunity skipped opportunity=\(opportunityId) reason=no_trigger_items")
+            return
+        }
+        if let blockReason = promptBlockReason(for: checkedProductId) {
+            debugLog("showOpportunity skipped opportunity=\(opportunityId) reason=\(blockReason)")
             return
         }
 
@@ -160,6 +195,7 @@ final class UpsellSuggestionStore: ObservableObject {
             source: source
         )
         guard let cached = cachedOpportunity(for: key) else {
+            debugLog("showOpportunity skipped opportunity=\(opportunityId) reason=cache_miss key=\(keyDebug(key)) cachedKeys=\(cachedOpportunities.keys.map(keyDebug))")
             return
         }
 
@@ -174,9 +210,11 @@ final class UpsellSuggestionStore: ObservableObject {
             .prefix(maxSuggestionsShown)
 
         guard !suggestions.isEmpty else {
+            debugLog("showOpportunity skipped opportunity=\(opportunityId) reason=no_suggestions_after_filter currentListProductIds=\(Array(currentListProductIds).sorted()) cachedSuggestions=\(cached.response.suggestions.map { $0.product.id })")
             return
         }
 
+        cachedOpportunities[key] = nil
         activePrompt = UpsellPrompt(
             opportunityId: opportunityId,
             checkedProductId: checkedProductId,
@@ -187,6 +225,7 @@ final class UpsellSuggestionStore: ObservableObject {
             source: source,
             suggestions: Array(suggestions)
         )
+        debugLog("showOpportunity activePrompt opportunity=\(opportunityId) checkedProductId=\(checkedProductId) suggestions=\(suggestions.map { "\($0.product.id):\($0.product.name) conf=\($0.confidence)" })")
         lastPromptShownAt = Date()
         shownCountForSession += 1
         reportEvent(
@@ -215,6 +254,7 @@ final class UpsellSuggestionStore: ObservableObject {
             metadata = nil
         }
 
+        debugLog("accept suggestion=\(suggestion.product.id):\(suggestion.product.name) prompt=\(prompt?.opportunityId ?? "nil")")
         reportEvent(
             eventType: "accepted",
             checkedProductId: prompt?.checkedProductId,
@@ -228,9 +268,11 @@ final class UpsellSuggestionStore: ObservableObject {
 
     func dismissCurrentPrompt(suppressProduct: Bool = false) {
         guard let prompt = activePrompt else {
+            debugLog("dismissCurrentPrompt skipped reason=no_active_prompt suppress=\(suppressProduct)")
             return
         }
 
+        debugLog("dismissCurrentPrompt opportunity=\(prompt.opportunityId) suppress=\(suppressProduct)")
         if suppressProduct {
             dismissedProductIDs.formUnion(prompt.triggerProductIds)
             reportDismissal(prompt: prompt)
@@ -321,38 +363,46 @@ final class UpsellSuggestionStore: ObservableObject {
 
         do {
             urlRequest.httpBody = try encoder.encode(request)
+            if let body = urlRequest.httpBody,
+               let raw = String(data: body, encoding: .utf8) {
+                debugLog("preloadPlan requestBody=\(raw)")
+            }
             return urlRequest
         } catch {
+            debugLog("preloadPlan encodeFailed error=\(error.localizedDescription)")
             return nil
         }
     }
 
     private func cachedOpportunity(for key: PlanKey) -> CachedOpportunity? {
         guard let cached = cachedOpportunities[key] else {
+            debugLog("cache miss key=\(keyDebug(key))")
             return nil
         }
         if cached.expiresAt <= Date() {
             cachedOpportunities[key] = nil
+            debugLog("cache expired key=\(keyDebug(key)) expiresAt=\(cached.expiresAt)")
             return nil
         }
+        debugLog("cache hit key=\(keyDebug(key)) source=\(cached.responseSource) suggestions=\(cached.response.suggestions.map { $0.product.id })")
         return cached
     }
 
-    private func canShowPrompt(for checkedProductId: Int) -> Bool {
+    private func promptBlockReason(for checkedProductId: Int) -> String? {
         guard activePrompt == nil else {
-            return false
+            return "active_prompt=\(activePrompt?.opportunityId ?? "unknown")"
         }
         guard shownCountForSession < maxPromptsPerSession else {
-            return false
+            return "session_limit shownCount=\(shownCountForSession)"
         }
         guard !dismissedProductIDs.contains(checkedProductId) else {
-            return false
+            return "dismissed_product checkedProductId=\(checkedProductId)"
         }
         if let lastPromptShownAt,
            Date().timeIntervalSince(lastPromptShownAt) < minSecondsBetweenPrompts {
-            return false
+            return "cooldown remaining=\(String(format: "%.2f", minSecondsBetweenPrompts - Date().timeIntervalSince(lastPromptShownAt)))s"
         }
-        return true
+        return nil
     }
 
     private func makePlanKey(
@@ -439,5 +489,30 @@ final class UpsellSuggestionStore: ObservableObject {
             return nil
         }
         return String(data: data, encoding: .utf8)
+    }
+
+    private func debugLog(_ message: String) {
+        guard debugEnabled else {
+            return
+        }
+        print("[UpsellDebug] \(message)")
+    }
+
+    private func keyDebug(_ key: PlanKey) -> String {
+        "\(key.opportunityId)|list=\(key.listID.uuidString)|store=\(key.storeId?.uuidString ?? key.storeCode ?? "nil")|source=\(key.source)"
+    }
+
+    private func storeDebug(_ store: MobileStoreSummary?) -> String {
+        guard let store else {
+            return "nil"
+        }
+        return "\(store.name)#\(store.id.uuidString)#\(store.storeCode)"
+    }
+
+    private func debugSummary(_ debug: UpsellPlanDebug?) -> String {
+        guard let debug else {
+            return "nil"
+        }
+        return "requestId=\(debug.requestId ?? "nil") model=\(debug.model ?? "nil") source=\(debug.responseSource ?? "nil") elapsedMs=\(debug.elapsedMs.map(String.init) ?? "nil") openAiElapsedMs=\(debug.openAiElapsedMs.map(String.init) ?? "nil") inputTokens=\(debug.inputTokens.map(String.init) ?? "nil") outputTokens=\(debug.outputTokens.map(String.init) ?? "nil") totalTokens=\(debug.totalTokens.map(String.init) ?? "nil") cachedInputTokens=\(debug.cachedInputTokens.map(String.init) ?? "nil") reasoningTokens=\(debug.reasoningTokens.map(String.init) ?? "nil") fallbackReason=\(debug.fallbackReason ?? "nil") opportunities=\(debug.opportunityCount.map(String.init) ?? "nil") candidates=\(debug.candidateCount.map(String.init) ?? "nil")"
     }
 }

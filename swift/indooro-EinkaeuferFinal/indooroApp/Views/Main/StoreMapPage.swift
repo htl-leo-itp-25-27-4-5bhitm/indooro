@@ -39,17 +39,6 @@ struct StoreMapPage: View {
         beaconManager.activeLayoutStore ?? beaconManager.detectedStore
     }
 
-    private var upsellPromptBinding: Binding<UpsellPrompt?> {
-        Binding(
-            get: { upsellStore.activePrompt },
-            set: { newValue in
-                if newValue == nil {
-                    upsellStore.clearPrompt()
-                }
-            }
-        )
-    }
-
     private var displayUserPosition: CGPoint? {
         beaconManager.userPosition ?? beaconManager.rawUserPosition
     }
@@ -177,22 +166,6 @@ struct StoreMapPage: View {
                 }
             )
             .presentationDetents([.medium])
-        }
-        .sheet(item: upsellPromptBinding) { prompt in
-            UpsellPromptSheet(
-                prompt: prompt,
-                onAddSuggestion: { suggestion in
-                    addUpsellSuggestion(suggestion, prompt: prompt)
-                },
-                onDismiss: {
-                    upsellStore.dismissCurrentPrompt()
-                },
-                onSuppressProduct: {
-                    upsellStore.dismissCurrentPrompt(suppressProduct: true)
-                }
-            )
-            .presentationDetents([.height(360), .medium])
-            .presentationDragIndicator(.visible)
         }
     }
 
@@ -768,22 +741,6 @@ struct StoreMapPage: View {
             store: activeStore,
             source: "shopping_session"
         )
-    }
-
-    private func addUpsellSuggestion(_ suggestion: UpsellSuggestion, prompt: UpsellPrompt) {
-        _ = shoppingListManager.addProduct(
-            suggestion.product.product,
-            to: prompt.listID,
-            addedFromUpsell: true
-        )
-        if shoppingSessionManager.activeListID == prompt.listID {
-            shoppingSessionManager.sync(
-                listManager: shoppingListManager,
-                beaconManager: beaconManager
-            )
-        }
-        upsellStore.accept(suggestion, prompt: prompt)
-        preloadUpcomingSessionUpsells()
     }
 
     private func showStoreOverview() {

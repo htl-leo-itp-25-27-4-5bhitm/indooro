@@ -98,7 +98,8 @@ class MobileUpsellResourceTest {
                                 ))
                         )),
                         "fallback",
-                        Instant.parse("2026-06-02T12:00:00Z")
+                        Instant.parse("2026-06-02T12:00:00Z"),
+                        null
                 ));
 
         given()

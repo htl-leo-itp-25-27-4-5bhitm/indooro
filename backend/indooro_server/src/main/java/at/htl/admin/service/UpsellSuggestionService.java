@@ -146,8 +146,12 @@ public class UpsellSuggestionService {
 
     @Transactional
     public UpsellDtos.UpsellPlanResponse plan(UpsellDtos.UpsellPlanRequest request) {
+        String requestId = UUID.randomUUID().toString();
+        long planStartedNanos = System.nanoTime();
         if (!upsellEnabled) {
-            return emptyPlanResponse(List.of(), "disabled");
+            return emptyPlanResponse(List.of(), "disabled", planDebug(
+                    requestId, "disabled", planStartedNanos, null, null, "upsell_disabled", 0, 0
+            ));
         }
         if (request == null || request.opportunities() == null || request.opportunities().isEmpty()) {
             throw new WebApplicationException("Mindestens eine Upsell-Station ist erforderlich.", Response.Status.BAD_REQUEST);
@@ -155,19 +159,27 @@ public class UpsellSuggestionService {
 
         List<UpsellDtos.UpsellOpportunityRequest> opportunities = normalizedOpportunities(request.opportunities());
         if (opportunities.isEmpty()) {
-            return emptyPlanResponse(List.of(), "none");
+            return emptyPlanResponse(List.of(), "none", planDebug(
+                    requestId, "none", planStartedNanos, null, null, "no_valid_opportunities", 0, 0
+            ));
         }
 
         String contextHash = planContextHash(request, opportunities);
         Optional<UpsellDtos.UpsellPlanResponse> cached = findCachedPlanResponse(contextHash);
         if (cached.isPresent()) {
-            return cached.get();
+            UpsellDtos.UpsellPlanResponse response = cached.get();
+            logPlanResult(response);
+            return response;
         }
 
         List<Product> candidates = loadPlanCandidates(request, opportunities);
         if (candidates.isEmpty()) {
-            UpsellDtos.UpsellPlanResponse response = emptyPlanResponse(opportunities, "none");
+            UpsellDtos.UpsellPlanDebug debug = planDebug(
+                    requestId, "none", planStartedNanos, null, null, "no_candidates", opportunities.size(), 0
+            );
+            UpsellDtos.UpsellPlanResponse response = emptyPlanResponse(opportunities, "none", debug);
             storeCachedPlanResponse(request, contextHash, response);
+            logPlanResult(response);
             return response;
         }
 
@@ -175,9 +187,22 @@ public class UpsellSuggestionService {
                 .filter(product -> product.getId() != null)
                 .collect(Collectors.toMap(Product::getId, product -> product, (first, ignored) -> first, LinkedHashMap::new));
 
-        PlanRankingResult ranking = rankPlanWithOpenAi(opportunities, candidates)
-                .map(suggestions -> new PlanRankingResult(suggestions, "openai"))
+        Optional<OpenAiPlanResult> openAiResult = rankPlanWithOpenAi(opportunities, candidates, requestId);
+        PlanRankingResult ranking = openAiResult
+                .map(result -> new PlanRankingResult(result.opportunities(), "openai"))
                 .orElseGet(() -> new PlanRankingResult(fallbackPlanRank(opportunities, candidates), "fallback"));
+        UpsellDtos.UpsellPlanDebug debug = openAiResult
+                .map(OpenAiPlanResult::debug)
+                .orElseGet(() -> planDebug(
+                        requestId,
+                        "fallback",
+                        planStartedNanos,
+                        null,
+                        null,
+                        "openai_unavailable_timeout_or_invalid",
+                        opportunities.size(),
+                        candidates.size()
+                ));
 
         Map<String, List<UpsellDtos.AiSuggestion>> rankedByOpportunity = ranking.opportunities().stream()
                 .filter(opportunity -> opportunity != null && normalizeOptional(opportunity.opportunityId()) != null)
@@ -208,9 +233,11 @@ public class UpsellSuggestionService {
         UpsellDtos.UpsellPlanResponse response = new UpsellDtos.UpsellPlanResponse(
                 responses,
                 source,
-                Instant.now().plus(Duration.ofMinutes(Math.max(1, cacheTtlMinutes)))
+                Instant.now().plus(Duration.ofMinutes(Math.max(1, cacheTtlMinutes))),
+                withPlanElapsed(debug, source, planStartedNanos)
         );
         storeCachedPlanResponse(request, contextHash, response);
+        logPlanResult(response);
         return response;
     }
 
@@ -243,10 +270,28 @@ public class UpsellSuggestionService {
                                 entity.responseJson,
                                 UpsellDtos.UpsellPlanResponse.class
                         );
+                        UpsellDtos.UpsellPlanDebug cachedDebug = cached.debug();
                         return Optional.of(new UpsellDtos.UpsellPlanResponse(
                                 cached.opportunities(),
                                 "cache",
-                                entity.expiresAt
+                                entity.expiresAt,
+                                cachedDebug == null
+                                        ? null
+                                        : new UpsellDtos.UpsellPlanDebug(
+                                        cachedDebug.requestId(),
+                                        cachedDebug.model(),
+                                        "cache",
+                                        cachedDebug.elapsedMs(),
+                                        cachedDebug.openAiElapsedMs(),
+                                        cachedDebug.inputTokens(),
+                                        cachedDebug.outputTokens(),
+                                        cachedDebug.totalTokens(),
+                                        cachedDebug.cachedInputTokens(),
+                                        cachedDebug.reasoningTokens(),
+                                        cachedDebug.fallbackReason(),
+                                        cachedDebug.opportunityCount(),
+                                        cachedDebug.candidateCount()
+                                )
                         ));
                     } catch (Exception exception) {
                         LOG.warn("Upsell plan cache entry could not be parsed", exception);
@@ -299,6 +344,21 @@ public class UpsellSuggestionService {
     }
 
     private record PlanRankingResult(List<UpsellDtos.AiOpportunitySuggestion> opportunities, String source) {
+    }
+
+    private record OpenAiPlanResult(
+            List<UpsellDtos.AiOpportunitySuggestion> opportunities,
+            UpsellDtos.UpsellPlanDebug debug
+    ) {
+    }
+
+    private record OpenAiUsage(
+            Integer inputTokens,
+            Integer outputTokens,
+            Integer totalTokens,
+            Integer cachedInputTokens,
+            Integer reasoningTokens
+    ) {
     }
 
     @Transactional
@@ -526,15 +586,25 @@ public class UpsellSuggestionService {
         }
     }
 
-    Optional<List<UpsellDtos.AiOpportunitySuggestion>> rankPlanWithOpenAi(
+    Optional<OpenAiPlanResult> rankPlanWithOpenAi(
             List<UpsellDtos.UpsellOpportunityRequest> opportunities,
-            List<Product> candidates
+            List<Product> candidates,
+            String requestId
     ) {
         Optional<String> apiKey = openAiApiKey.filter(key -> !key.isBlank());
         if (!openAiEnabled || apiKey.isEmpty() || candidates.isEmpty() || opportunities.isEmpty()) {
+            LOG.infof(
+                    "Upsell plan OpenAI skipped requestId=%s enabled=%s hasApiKey=%s opportunities=%d candidates=%d",
+                    requestId,
+                    openAiEnabled,
+                    apiKey.isPresent(),
+                    opportunities.size(),
+                    candidates.size()
+            );
             return Optional.empty();
         }
 
+        long openAiStartedNanos = System.nanoTime();
         try {
             HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofMillis(Math.max(500, openAiTimeoutMs)))
@@ -548,20 +618,73 @@ public class UpsellSuggestionService {
                     .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
                     .build();
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            long openAiElapsedMs = elapsedMs(openAiStartedNanos);
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                LOG.warn("OpenAI upsell plan ranking failed with status " + response.statusCode());
+                LOG.warnf(
+                        "OpenAI upsell plan ranking failed requestId=%s status=%d elapsedMs=%d response=%s",
+                        requestId,
+                        response.statusCode(),
+                        openAiElapsedMs,
+                        truncateForLog(response.body(), 500)
+                );
                 return Optional.empty();
             }
 
             String outputJson = extractResponsesText(response.body());
             if (outputJson == null || outputJson.isBlank()) {
+                LOG.warnf(
+                        "OpenAI upsell plan ranking returned empty output requestId=%s elapsedMs=%d",
+                        requestId,
+                        openAiElapsedMs
+                );
                 return Optional.empty();
             }
 
             UpsellDtos.AiPlanResponse parsed = objectMapper.readValue(outputJson, UpsellDtos.AiPlanResponse.class);
-            return Optional.ofNullable(parsed.opportunities()).filter(list -> !list.isEmpty());
+            OpenAiUsage usage = extractOpenAiUsage(response.body());
+            LOG.infof(
+                    "OpenAI upsell plan ranking succeeded requestId=%s model=%s elapsedMs=%d inputTokens=%s outputTokens=%s totalTokens=%s cachedInputTokens=%s reasoningTokens=%s opportunities=%d candidates=%d output=%s",
+                    requestId,
+                    openAiModel,
+                    openAiElapsedMs,
+                    usage.inputTokens(),
+                    usage.outputTokens(),
+                    usage.totalTokens(),
+                    usage.cachedInputTokens(),
+                    usage.reasoningTokens(),
+                    opportunities.size(),
+                    candidates.size(),
+                    truncateForLog(outputJson, 1200)
+            );
+            return Optional.ofNullable(parsed.opportunities())
+                    .filter(list -> !list.isEmpty())
+                    .map(list -> new OpenAiPlanResult(
+                            list,
+                            new UpsellDtos.UpsellPlanDebug(
+                                    requestId,
+                                    openAiModel,
+                                    "openai",
+                                    null,
+                                    openAiElapsedMs,
+                                    usage.inputTokens(),
+                                    usage.outputTokens(),
+                                    usage.totalTokens(),
+                                    usage.cachedInputTokens(),
+                                    usage.reasoningTokens(),
+                                    null,
+                                    opportunities.size(),
+                                    candidates.size()
+                            )
+                    ));
         } catch (Exception exception) {
-            LOG.warn("OpenAI upsell plan ranking failed; falling back", exception);
+            LOG.warnf(
+                    exception,
+                    "OpenAI upsell plan ranking failed; falling back requestId=%s elapsedMs=%d opportunities=%d candidates=%d",
+                    requestId,
+                    elapsedMs(openAiStartedNanos),
+                    opportunities.size(),
+                    candidates.size()
+            );
             return Optional.empty();
         }
     }
@@ -802,6 +925,42 @@ public class UpsellSuggestionService {
         return null;
     }
 
+    private OpenAiUsage extractOpenAiUsage(String body) {
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            JsonNode usage = root.get("usage");
+            if (usage == null || !usage.isObject()) {
+                return new OpenAiUsage(null, null, null, null, null);
+            }
+            JsonNode inputDetails = usage.get("input_tokens_details");
+            JsonNode outputDetails = usage.get("output_tokens_details");
+            return new OpenAiUsage(
+                    intOrNull(usage.get("input_tokens")),
+                    intOrNull(usage.get("output_tokens")),
+                    intOrNull(usage.get("total_tokens")),
+                    inputDetails == null ? null : intOrNull(inputDetails.get("cached_tokens")),
+                    outputDetails == null ? null : intOrNull(outputDetails.get("reasoning_tokens"))
+            );
+        } catch (Exception exception) {
+            return new OpenAiUsage(null, null, null, null, null);
+        }
+    }
+
+    private Integer intOrNull(JsonNode node) {
+        return node != null && node.canConvertToInt() ? node.asInt() : null;
+    }
+
+    private long elapsedMs(long startedNanos) {
+        return Duration.ofNanos(System.nanoTime() - startedNanos).toMillis();
+    }
+
+    private String truncateForLog(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, Math.max(0, maxLength - 3)) + "...";
+    }
+
     private Comparator<Product> candidateComparator(Product checkedProduct, UpsellDtos.UpsellSuggestionRequest request) {
         String checkedCategory = categoryCode(checkedProduct == null ? null : checkedProduct.getLayoutCode());
         Set<String> complements = complementaryCategories(checkedCategory);
@@ -895,7 +1054,8 @@ public class UpsellSuggestionService {
 
     private UpsellDtos.UpsellPlanResponse emptyPlanResponse(
             List<UpsellDtos.UpsellOpportunityRequest> opportunities,
-            String source
+            String source,
+            UpsellDtos.UpsellPlanDebug debug
     ) {
         List<UpsellDtos.UpsellOpportunityResponse> responses = opportunities.stream()
                 .map(opportunity -> new UpsellDtos.UpsellOpportunityResponse(
@@ -907,7 +1067,81 @@ public class UpsellSuggestionService {
         return new UpsellDtos.UpsellPlanResponse(
                 responses,
                 source,
-                Instant.now().plus(Duration.ofMinutes(Math.max(1, cacheTtlMinutes)))
+                Instant.now().plus(Duration.ofMinutes(Math.max(1, cacheTtlMinutes))),
+                debug
+        );
+    }
+
+    private UpsellDtos.UpsellPlanDebug planDebug(
+            String requestId,
+            String source,
+            long planStartedNanos,
+            Long openAiElapsedMs,
+            OpenAiUsage usage,
+            String fallbackReason,
+            int opportunityCount,
+            int candidateCount
+    ) {
+        return new UpsellDtos.UpsellPlanDebug(
+                requestId,
+                openAiModel,
+                source,
+                elapsedMs(planStartedNanos),
+                openAiElapsedMs,
+                usage == null ? null : usage.inputTokens(),
+                usage == null ? null : usage.outputTokens(),
+                usage == null ? null : usage.totalTokens(),
+                usage == null ? null : usage.cachedInputTokens(),
+                usage == null ? null : usage.reasoningTokens(),
+                fallbackReason,
+                opportunityCount,
+                candidateCount
+        );
+    }
+
+    private UpsellDtos.UpsellPlanDebug withPlanElapsed(
+            UpsellDtos.UpsellPlanDebug debug,
+            String source,
+            long planStartedNanos
+    ) {
+        if (debug == null) {
+            return null;
+        }
+        return new UpsellDtos.UpsellPlanDebug(
+                debug.requestId(),
+                debug.model(),
+                source,
+                elapsedMs(planStartedNanos),
+                debug.openAiElapsedMs(),
+                debug.inputTokens(),
+                debug.outputTokens(),
+                debug.totalTokens(),
+                debug.cachedInputTokens(),
+                debug.reasoningTokens(),
+                debug.fallbackReason(),
+                debug.opportunityCount(),
+                debug.candidateCount()
+        );
+    }
+
+    private void logPlanResult(UpsellDtos.UpsellPlanResponse response) {
+        UpsellDtos.UpsellPlanDebug debug = response.debug();
+        String requestId = debug == null ? "unknown" : debug.requestId();
+        int suggestionCount = response.opportunities() == null
+                ? 0
+                : response.opportunities().stream().mapToInt(opportunity -> opportunity.suggestions().size()).sum();
+        LOG.infof(
+                "Upsell plan response requestId=%s source=%s elapsedMs=%s openAiElapsedMs=%s inputTokens=%s outputTokens=%s totalTokens=%s fallbackReason=%s opportunities=%d suggestions=%d",
+                requestId,
+                response.source(),
+                debug == null ? null : debug.elapsedMs(),
+                debug == null ? null : debug.openAiElapsedMs(),
+                debug == null ? null : debug.inputTokens(),
+                debug == null ? null : debug.outputTokens(),
+                debug == null ? null : debug.totalTokens(),
+                debug == null ? null : debug.fallbackReason(),
+                response.opportunities() == null ? 0 : response.opportunities().size(),
+                suggestionCount
         );
     }
 

@@ -1178,17 +1178,6 @@ struct ShoppingListsPage: View {
         beaconManager.activeLayoutStore ?? beaconManager.detectedStore
     }
 
-    private var upsellPromptBinding: Binding<UpsellPrompt?> {
-        Binding(
-            get: { upsellStore.activePrompt },
-            set: { newValue in
-                if newValue == nil {
-                    upsellStore.clearPrompt()
-                }
-            }
-        )
-    }
-
     private var selectedPreview: ShoppingRouteSnapshot? {
         guard let selectedList else {
             return nil
@@ -1315,22 +1304,6 @@ struct ShoppingListsPage: View {
             ShareSheet(activityItems: [presentation.fileURL]) { completed in
                 completeShare(presentation, completed: completed)
             }
-        }
-        .sheet(item: upsellPromptBinding) { prompt in
-            UpsellPromptSheet(
-                prompt: prompt,
-                onAddSuggestion: { suggestion in
-                    addUpsellSuggestion(suggestion, prompt: prompt)
-                },
-                onDismiss: {
-                    upsellStore.dismissCurrentPrompt()
-                },
-                onSuppressProduct: {
-                    upsellStore.dismissCurrentPrompt(suppressProduct: true)
-                }
-            )
-            .presentationDetents([.height(360), .medium])
-            .presentationDragIndicator(.visible)
         }
         .onAppear {
             preloadUpcomingUpsells()
@@ -1643,21 +1616,6 @@ struct ShoppingListsPage: View {
             store: activeStore,
             source: "shopping_list"
         )
-    }
-
-    private func addUpsellSuggestion(_ suggestion: UpsellSuggestion, prompt: UpsellPrompt) {
-        _ = listManager.addProduct(
-            suggestion.product.product,
-            to: prompt.listID,
-            addedFromUpsell: true
-        )
-        if sessionManager.activeListID == prompt.listID {
-            sessionManager.sync(listManager: listManager, beaconManager: beaconManager)
-        }
-        upsellStore.accept(suggestion, prompt: prompt)
-        if let list = listManager.list(with: prompt.listID) {
-            preloadUpcomingUpsells(for: list)
-        }
     }
 
     private func handleFileImport(_ result: Result<URL, Error>) {

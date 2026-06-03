@@ -81,12 +81,29 @@ struct UpsellPlanResponse: Decodable {
     let opportunities: [UpsellOpportunityResponse]
     let source: String?
     let expiresAt: Date?
+    let debug: UpsellPlanDebug?
 }
 
 struct UpsellOpportunityResponse: Decodable, Hashable {
     let opportunityId: String
     let triggerProductIds: [Int]
     let suggestions: [UpsellSuggestion]
+}
+
+struct UpsellPlanDebug: Decodable, Hashable {
+    let requestId: String?
+    let model: String?
+    let responseSource: String?
+    let elapsedMs: Int?
+    let openAiElapsedMs: Int?
+    let inputTokens: Int?
+    let outputTokens: Int?
+    let totalTokens: Int?
+    let cachedInputTokens: Int?
+    let reasoningTokens: Int?
+    let fallbackReason: String?
+    let opportunityCount: Int?
+    let candidateCount: Int?
 }
 
 struct UpsellEventRequest: Encodable {

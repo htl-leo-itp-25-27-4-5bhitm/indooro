@@ -115,6 +115,21 @@ Das Backend ersetzt die AI-IDs durch echte Katalogprodukte, filtert ungueltige I
 {
   "source": "openai",
   "expiresAt": "2026-06-03T10:30:00Z",
+  "debug": {
+    "requestId": "a-runtime-uuid",
+    "model": "gpt-5.4-mini",
+    "responseSource": "openai",
+    "elapsedMs": 1320,
+    "openAiElapsedMs": 1190,
+    "inputTokens": 480,
+    "outputTokens": 96,
+    "totalTokens": 576,
+    "cachedInputTokens": 0,
+    "reasoningTokens": 0,
+    "fallbackReason": null,
+    "opportunityCount": 1,
+    "candidateCount": 50
+  },
   "opportunities": [
     {
       "opportunityId": "station:shelf-430",
@@ -149,3 +164,4 @@ Das Backend ersetzt die AI-IDs durch echte Katalogprodukte, filtert ungueltige I
 - Bereits offene, erledigte und Trigger-Produkte werden ausgeschlossen.
 - Stationen werden ueber `opportunityId` gebunden, dadurch kann keine alte Antwort fuer eine andere Station erscheinen.
 - Produkte, die aus Vorschlaegen hinzugefuegt wurden, bekommen `addedFromUpsell=true` und triggern keine neue Upsell-Suche.
+- Debug-Ausgaben verwenden in iOS den Prefix `[UpsellDebug]`; Backend-Logs enthalten Request-ID, Source, Dauer und Token-Usage, aber keinen API-Key.
