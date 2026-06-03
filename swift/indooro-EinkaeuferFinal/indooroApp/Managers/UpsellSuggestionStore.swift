@@ -127,22 +127,26 @@ final class UpsellSuggestionStore: ObservableObject {
             stops: stops,
             unresolvedItems: unresolvedItems
         )
-        debugLog(
-            "preloadPlan begin list=\(list.id.uuidString) source=\(source) store=\(storeDebug(store)) stops=\(stops.count) unresolved=\(unresolvedItems.count) opportunities=\(opportunities.map(\.opportunityId))"
-        )
-        guard !opportunities.isEmpty,
-              let urlRequest = makePlanRequest(
-                list: list,
-                opportunities: opportunities,
-                store: store,
-                source: source
-              ) else {
-            debugLog("preloadPlan skipped reason=no_opportunities_or_request")
+        guard !opportunities.isEmpty else {
+            debugLog("preloadPlan skipped reason=no_opportunities")
             return
         }
+        let uncachedOpportunities = opportunities.filter { opportunity in
+            !hasFreshCachedOpportunity(
+                opportunityId: opportunity.opportunityId,
+                listID: list.id,
+                store: store,
+                source: source
+            )
+        }
+        guard !uncachedOpportunities.isEmpty else {
+            debugLog("preloadPlan skipped reason=all_opportunities_cached list=\(list.id.uuidString) source=\(source) store=\(storeDebug(store)) opportunities=\(opportunities.map(\.opportunityId))")
+            return
+        }
+
         let signature = makePlanSignature(
             list: list,
-            opportunities: opportunities,
+            opportunities: uncachedOpportunities,
             store: store,
             source: source
         )
@@ -152,6 +156,18 @@ final class UpsellSuggestionStore: ObservableObject {
         }
         if lastCompletedPlanSignature == signature {
             debugLog("preloadPlan skipped reason=duplicate_completed signature=\(signatureDebug(signature))")
+            return
+        }
+        debugLog(
+            "preloadPlan begin list=\(list.id.uuidString) source=\(source) store=\(storeDebug(store)) stops=\(stops.count) unresolved=\(unresolvedItems.count) opportunities=\(uncachedOpportunities.map(\.opportunityId)) cachedSkipped=\(opportunities.count - uncachedOpportunities.count)"
+        )
+        guard let urlRequest = makePlanRequest(
+            list: list,
+            opportunities: uncachedOpportunities,
+            store: store,
+            source: source
+        ) else {
+            debugLog("preloadPlan skipped reason=request_build_failed")
             return
         }
 
@@ -481,6 +497,29 @@ final class UpsellSuggestionStore: ObservableObject {
         }
         debugLog("cache hit key=\(keyDebug(key)) source=\(cached.responseSource) suggestions=\(cached.response.suggestions.map { $0.product.id })")
         return cached
+    }
+
+    private func hasFreshCachedOpportunity(
+        opportunityId: String,
+        listID: UUID,
+        store: MobileStoreSummary,
+        source: String
+    ) -> Bool {
+        let key = makePlanKey(
+            opportunityId: opportunityId,
+            listID: listID,
+            store: store,
+            source: source
+        )
+        guard let cached = cachedOpportunities[key] else {
+            return false
+        }
+        if cached.expiresAt <= Date() {
+            cachedOpportunities[key] = nil
+            debugLog("preloadPlan cached opportunity expired key=\(keyDebug(key)) expiresAt=\(cached.expiresAt)")
+            return false
+        }
+        return true
     }
 
     private func promptBlockReason(for checkedProductId: Int) -> String? {
