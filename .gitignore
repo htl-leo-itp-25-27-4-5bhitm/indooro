@@ -24,6 +24,9 @@ logs/
 *.out
 *.err
 
+# Local secret runbooks
+/documentation/leocloud-openai-secret.local.md
+
 # OS generated files
 Thumbs.db
 Desktop.ini
