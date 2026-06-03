@@ -13,6 +13,11 @@ The mobile app SHALL allow product completion in shopping-list and active-sessio
 - **WHEN** the customer marks the current stop done
 - **THEN** the route advances as before and the app can evaluate one upsell prompt opportunity for the completed stop
 
+#### Scenario: Current route stop is skipped
+- **GIVEN** an active shopping session has a current route stop with product-backed items
+- **WHEN** the customer skips the current stop
+- **THEN** the route advances as before and the app can evaluate one upsell prompt opportunity for the skipped stop without blocking navigation
+
 #### Scenario: Upsell request fails
 - **GIVEN** an upsell request fails, times out, or returns no suggestions
 - **WHEN** the customer has marked an item done

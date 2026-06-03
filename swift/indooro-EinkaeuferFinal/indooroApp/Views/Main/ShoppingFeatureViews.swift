@@ -1332,6 +1332,18 @@ struct ShoppingListsPage: View {
             .presentationDetents([.height(360), .medium])
             .presentationDragIndicator(.visible)
         }
+        .onAppear {
+            preloadUpcomingUpsells()
+        }
+        .onChange(of: selectedList?.id, initial: false) { _, _ in
+            preloadUpcomingUpsells()
+        }
+        .onChange(of: openItems.compactMap { $0.productID }, initial: false) { _, _ in
+            preloadUpcomingUpsells()
+        }
+        .onChange(of: activeStore?.id, initial: false) { _, _ in
+            preloadUpcomingUpsells()
+        }
         .alert("Aktion fehlgeschlagen", isPresented: importErrorAlertBinding) {
             Button("OK", role: .cancel) {
                 importErrorMessage = nil
@@ -1616,6 +1628,22 @@ struct ShoppingListsPage: View {
             store: activeStore,
             source: source
         )
+        preloadUpcomingUpsells(for: updatedList)
+    }
+
+    private func preloadUpcomingUpsells(for list: ShoppingList? = nil) {
+        guard let list = list ?? selectedList else {
+            return
+        }
+        let items = list.items
+            .filter { $0.status == .open }
+            .sorted(by: ShoppingListItem.sortByListOrder)
+        upsellStore.preloadSuggestions(
+            for: items,
+            list: list,
+            store: activeStore,
+            source: "shopping_list"
+        )
     }
 
     private func addUpsellSuggestion(_ suggestion: UpsellSuggestion, prompt: UpsellPrompt) {
@@ -1624,6 +1652,9 @@ struct ShoppingListsPage: View {
             sessionManager.sync(listManager: listManager, beaconManager: beaconManager)
         }
         upsellStore.accept(suggestion, prompt: prompt)
+        if let list = listManager.list(with: prompt.listID) {
+            preloadUpcomingUpsells(for: list)
+        }
     }
 
     private func handleFileImport(_ result: Result<URL, Error>) {

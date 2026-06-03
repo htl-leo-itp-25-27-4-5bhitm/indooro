@@ -5,10 +5,37 @@ final class UpsellSuggestionStore: ObservableObject {
     @Published var activePrompt: UpsellPrompt?
     @Published private(set) var isLoading = false
 
+    private struct CacheKey: Hashable {
+        let checkedProductId: Int
+        let listID: UUID
+        let storeId: UUID?
+        let storeCode: String?
+        let source: String
+        let currentProductIds: [Int]
+        let completedProductIds: [Int]
+    }
+
+    private struct PendingContext {
+        let requestID: UUID
+        let cacheKey: CacheKey
+        let checkedProductId: Int
+        let checkedProductName: String
+        let listID: UUID
+        let store: MobileStoreSummary?
+        let source: String
+        let currentListProductIds: Set<Int>
+    }
+
+    private struct CachedResponse {
+        let response: UpsellSuggestionResponse
+        let expiresAt: Date
+    }
+
     private let apiBase = "https://it220209.cloud.htl-leonding.ac.at/api"
     private let minSecondsBetweenPrompts: TimeInterval = 45
     private let maxPromptsPerSession = 4
     private let maxSuggestionsShown = 3
+    private let maxPreloadItems = 3
     private let minConfidence = 0.45
     private let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
@@ -21,13 +48,22 @@ final class UpsellSuggestionStore: ObservableObject {
     private var shownCountForSession = 0
     private var dismissedProductIDs: Set<Int> = []
     private var latestRequestID = UUID()
+    private var activeDisplayTask: URLSessionDataTask?
+    private var preloadTasks: [CacheKey: URLSessionDataTask] = [:]
+    private var preloadedResponses: [CacheKey: CachedResponse] = [:]
 
     func resetSession() {
+        activeDisplayTask?.cancel()
+        preloadTasks.values.forEach { $0.cancel() }
+        activeDisplayTask = nil
+        preloadTasks.removeAll()
+        preloadedResponses.removeAll()
         activePrompt = nil
         isLoading = false
         latestRequestID = UUID()
         lastPromptShownAt = nil
         shownCountForSession = 0
+        dismissedProductIDs.removeAll()
     }
 
     func clearPrompt() {
@@ -40,50 +76,53 @@ final class UpsellSuggestionStore: ObservableObject {
         store: MobileStoreSummary?,
         source: String
     ) {
-        guard let checkedProductId = checkedItem.productID else {
-            return
-        }
-        guard canRequestPrompt(for: checkedProductId) else {
-            return
-        }
-        guard let url = URL(string: "\(apiBase)/mobile/upsell/suggestions") else {
+        guard let checkedProductId = checkedItem.productID,
+              canShowPrompt(for: checkedProductId) else {
             return
         }
 
-        let requestID = UUID()
-        latestRequestID = requestID
-        isLoading = true
-
-        let request = UpsellRequest(
-            storeId: store?.id,
-            storeCode: store?.storeCode,
+        let cacheKey = makeCacheKey(
             checkedProductId: checkedProductId,
-            shoppingListId: list.id.uuidString,
-            currentListProductIds: list.items.compactMap { item in
-                item.status == .open ? item.productID : nil
-            },
-            completedProductIds: list.items.compactMap { item in
-                item.status.isCompleted ? item.productID : nil
-            },
+            list: list,
+            store: store,
+            source: source
+        )
+        let context = PendingContext(
+            requestID: UUID(),
+            cacheKey: cacheKey,
+            checkedProductId: checkedProductId,
+            checkedProductName: checkedItem.name,
+            listID: list.id,
+            store: store,
             source: source,
-            recipeId: checkedItem.sourceRecipeId
+            currentListProductIds: Set(list.items.compactMap(\.productID))
         )
 
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.timeoutInterval = 5
+        latestRequestID = context.requestID
+        activeDisplayTask?.cancel()
+        activeDisplayTask = nil
+        isLoading = false
 
-        do {
-            urlRequest.httpBody = try encoder.encode(request)
-        } catch {
-            isLoading = false
+        if let cached = cachedResponse(for: cacheKey) {
+            displayPrompt(from: cached, context: context)
             return
         }
 
-        URLSession.shared.dataTask(with: urlRequest) { [weak self] data, response, error in
+        guard let urlRequest = makeSuggestionsRequest(
+            checkedProductId: checkedProductId,
+            list: list,
+            store: store,
+            source: source,
+            timeout: 5
+        ) else {
+            return
+        }
+
+        isLoading = true
+        let task = URLSession.shared.dataTask(with: urlRequest) { [weak self] data, response, error in
             Task { @MainActor in
-                guard let self, self.latestRequestID == requestID else { return }
+                guard let self, self.latestRequestID == context.requestID else { return }
+                self.activeDisplayTask = nil
                 self.isLoading = false
 
                 guard error == nil,
@@ -96,38 +135,21 @@ final class UpsellSuggestionStore: ObservableObject {
                         suggestedProductId: nil,
                         store: store,
                         source: source,
-                        metadataJson: nil
+                        metadataJson: self.metadataJson([
+                            "stage": "display",
+                            "reason": error == nil ? "http" : "network"
+                        ])
                     )
                     return
                 }
 
                 do {
                     let response = try self.decoder.decode(UpsellSuggestionResponse.self, from: data)
-                    let suggestions = response.suggestions
-                        .filter { $0.confidence >= self.minConfidence }
-                        .prefix(self.maxSuggestionsShown)
-                    guard !suggestions.isEmpty, self.canRequestPrompt(for: checkedProductId) else {
-                        return
-                    }
-
-                    self.activePrompt = UpsellPrompt(
-                        checkedProductId: checkedProductId,
-                        checkedProductName: checkedItem.name,
-                        listID: list.id,
-                        store: store,
-                        source: source,
-                        suggestions: Array(suggestions)
+                    self.preloadedResponses[cacheKey] = CachedResponse(
+                        response: response,
+                        expiresAt: response.expiresAt ?? Date().addingTimeInterval(60)
                     )
-                    self.lastPromptShownAt = Date()
-                    self.shownCountForSession += 1
-                    self.reportEvent(
-                        eventType: "shown",
-                        checkedProductId: checkedProductId,
-                        suggestedProductId: nil,
-                        store: store,
-                        source: source,
-                        metadataJson: nil
-                    )
+                    self.displayPrompt(from: response, context: context)
                 } catch {
                     self.reportEvent(
                         eventType: "failed",
@@ -135,11 +157,78 @@ final class UpsellSuggestionStore: ObservableObject {
                         suggestedProductId: nil,
                         store: store,
                         source: source,
-                        metadataJson: nil
+                        metadataJson: self.metadataJson([
+                            "stage": "display",
+                            "reason": "decode"
+                        ])
                     )
                 }
             }
-        }.resume()
+        }
+        activeDisplayTask = task
+        task.resume()
+    }
+
+    func preloadSuggestions(
+        for items: [ShoppingListItem],
+        list: ShoppingList,
+        store: MobileStoreSummary?,
+        source: String
+    ) {
+        guard shownCountForSession < maxPromptsPerSession else {
+            return
+        }
+
+        let eligibleItems = items
+            .filter { item in
+                guard let productID = item.productID else { return false }
+                return !dismissedProductIDs.contains(productID)
+            }
+            .prefix(maxPreloadItems)
+
+        for item in eligibleItems {
+            guard let checkedProductId = item.productID else { continue }
+            let cacheKey = makeCacheKey(
+                checkedProductId: checkedProductId,
+                list: list,
+                store: store,
+                source: source
+            )
+            guard cachedResponse(for: cacheKey) == nil,
+                  preloadTasks[cacheKey] == nil,
+                  let urlRequest = makeSuggestionsRequest(
+                    checkedProductId: checkedProductId,
+                    list: list,
+                    store: store,
+                    source: source,
+                    timeout: 6
+                  ) else {
+                continue
+            }
+
+            let task = URLSession.shared.dataTask(with: urlRequest) { [weak self] data, response, error in
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.preloadTasks[cacheKey] = nil
+
+                    guard error == nil,
+                          let httpResponse = response as? HTTPURLResponse,
+                          (200..<300).contains(httpResponse.statusCode),
+                          let data,
+                          let decoded = try? self.decoder.decode(UpsellSuggestionResponse.self, from: data),
+                          !decoded.suggestions.isEmpty else {
+                        return
+                    }
+
+                    self.preloadedResponses[cacheKey] = CachedResponse(
+                        response: decoded,
+                        expiresAt: decoded.expiresAt ?? Date().addingTimeInterval(60)
+                    )
+                }
+            }
+            preloadTasks[cacheKey] = task
+            task.resume()
+        }
     }
 
     func accept(_ suggestion: UpsellSuggestion, prompt: UpsellPrompt?) {
@@ -175,8 +264,60 @@ final class UpsellSuggestionStore: ObservableObject {
         activePrompt = nil
     }
 
-    private func canRequestPrompt(for checkedProductId: Int) -> Bool {
-        guard activePrompt == nil, !isLoading else {
+    private func displayPrompt(from response: UpsellSuggestionResponse, context: PendingContext) {
+        guard latestRequestID == context.requestID,
+              response.checkedProductId == context.checkedProductId,
+              canShowPrompt(for: context.checkedProductId) else {
+            return
+        }
+
+        let suggestions = response.suggestions
+            .filter { suggestion in
+                suggestion.confidence >= minConfidence &&
+                !context.currentListProductIds.contains(suggestion.product.id)
+            }
+            .prefix(maxSuggestionsShown)
+
+        guard !suggestions.isEmpty else {
+            return
+        }
+
+        activePrompt = UpsellPrompt(
+            checkedProductId: context.checkedProductId,
+            checkedProductName: context.checkedProductName,
+            listID: context.listID,
+            store: context.store,
+            source: context.source,
+            suggestions: Array(suggestions)
+        )
+        lastPromptShownAt = Date()
+        shownCountForSession += 1
+        reportEvent(
+            eventType: "shown",
+            checkedProductId: context.checkedProductId,
+            suggestedProductId: nil,
+            store: context.store,
+            source: context.source,
+            metadataJson: metadataJson([
+                "responseSource": response.source ?? "unknown",
+                "preloaded": response.source == "cache" ? "backend_cache" : "local_or_network"
+            ])
+        )
+    }
+
+    private func cachedResponse(for key: CacheKey) -> UpsellSuggestionResponse? {
+        guard let cached = preloadedResponses[key] else {
+            return nil
+        }
+        if cached.expiresAt <= Date() {
+            preloadedResponses[key] = nil
+            return nil
+        }
+        return cached.response
+    }
+
+    private func canShowPrompt(for checkedProductId: Int) -> Bool {
+        guard activePrompt == nil else {
             return false
         }
         guard shownCountForSession < maxPromptsPerSession else {
@@ -190,6 +331,77 @@ final class UpsellSuggestionStore: ObservableObject {
             return false
         }
         return true
+    }
+
+    private func makeSuggestionsRequest(
+        checkedProductId: Int,
+        list: ShoppingList,
+        store: MobileStoreSummary?,
+        source: String,
+        timeout: TimeInterval
+    ) -> URLRequest? {
+        guard let url = URL(string: "\(apiBase)/mobile/upsell/suggestions") else {
+            return nil
+        }
+
+        let request = UpsellRequest(
+            storeId: store?.id,
+            storeCode: store?.storeCode,
+            checkedProductId: checkedProductId,
+            shoppingListId: list.id.uuidString,
+            currentListProductIds: list.items.compactMap { item in
+                item.status == .open ? item.productID : nil
+            },
+            completedProductIds: list.items.compactMap { item in
+                item.status.isCompleted ? item.productID : nil
+            },
+            source: source,
+            recipeId: list.items.first(where: { $0.productID == checkedProductId })?.sourceRecipeId
+        )
+
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.timeoutInterval = timeout
+
+        do {
+            urlRequest.httpBody = try encoder.encode(request)
+            return urlRequest
+        } catch {
+            return nil
+        }
+    }
+
+    private func makeCacheKey(
+        checkedProductId: Int,
+        list: ShoppingList,
+        store: MobileStoreSummary?,
+        source: String
+    ) -> CacheKey {
+        let currentProductIds = list.items.compactMap { item -> Int? in
+            guard item.status == .open,
+                  item.productID != checkedProductId else {
+                return nil
+            }
+            return item.productID
+        }
+        let completedProductIds = list.items.compactMap { item -> Int? in
+            guard item.status.isCompleted,
+                  item.productID != checkedProductId else {
+                return nil
+            }
+            return item.productID
+        } + [checkedProductId]
+
+        return CacheKey(
+            checkedProductId: checkedProductId,
+            listID: list.id,
+            storeId: store?.id,
+            storeCode: store?.storeCode.lowercased(),
+            source: source,
+            currentProductIds: Array(Set(currentProductIds)).sorted(),
+            completedProductIds: Array(Set(completedProductIds)).sorted()
+        )
     }
 
     private func reportEvent(
@@ -246,5 +458,12 @@ final class UpsellSuggestionStore: ObservableObject {
         }
 
         URLSession.shared.dataTask(with: urlRequest).resume()
+    }
+
+    private func metadataJson(_ values: [String: String]) -> String? {
+        guard let data = try? JSONSerialization.data(withJSONObject: values, options: [.sortedKeys]) else {
+            return nil
+        }
+        return String(data: data, encoding: .utf8)
     }
 }

@@ -80,6 +80,7 @@ struct StoreMapPage: View {
             if beaconManager.mobileStores.isEmpty {
                 beaconManager.refreshMobileStores()
             }
+            preloadUpcomingSessionUpsells()
             if openLastStoreLayoutIfRequested() {
                 return
             }
@@ -136,6 +137,13 @@ struct StoreMapPage: View {
         .onChange(of: shoppingSessionManager.activeListID, initial: false) { _, newValue in
             guard newValue != nil else { return }
             clearSearchAndDismissKeyboard()
+            preloadUpcomingSessionUpsells()
+        }
+        .onChange(of: activeShoppingSnapshot?.currentStop?.id, initial: false) { _, _ in
+            preloadUpcomingSessionUpsells()
+        }
+        .onChange(of: activeStore?.id, initial: false) { _, _ in
+            preloadUpcomingSessionUpsells()
         }
         .onChange(of: targetProduct, initial: false) { _, newValue in
             guard newValue == nil else { return }
@@ -545,10 +553,12 @@ struct StoreMapPage: View {
                     requestUpsellForCompletedStopItems(completedItems)
                 },
                 onSkipCurrentStop: {
+                    let skippedItems = activeShoppingSnapshot?.currentStop?.items ?? []
                     shoppingSessionManager.skipCurrentStop(
                         listManager: shoppingListManager,
                         beaconManager: beaconManager
                     )
+                    requestUpsellForCompletedStopItems(skippedItems)
                 },
                 onToggleMode: {
                     shoppingSessionManager.toggleRouteMode(
@@ -735,6 +745,22 @@ struct StoreMapPage: View {
             store: activeStore,
             source: "shopping_session"
         )
+        preloadUpcomingSessionUpsells()
+    }
+
+    private func preloadUpcomingSessionUpsells() {
+        guard let activeListID = shoppingSessionManager.activeListID,
+              let list = shoppingListManager.list(with: activeListID) else {
+            return
+        }
+        let upcomingItems = activeShoppingSnapshot?.currentStop?.items
+            ?? list.items.filter { $0.status == .open }.sorted(by: ShoppingListItem.sortByListOrder)
+        upsellStore.preloadSuggestions(
+            for: upcomingItems,
+            list: list,
+            store: activeStore,
+            source: "shopping_session"
+        )
     }
 
     private func addUpsellSuggestion(_ suggestion: UpsellSuggestion, prompt: UpsellPrompt) {
@@ -746,6 +772,7 @@ struct StoreMapPage: View {
             )
         }
         upsellStore.accept(suggestion, prompt: prompt)
+        preloadUpcomingSessionUpsells()
     }
 
     private func showStoreOverview() {

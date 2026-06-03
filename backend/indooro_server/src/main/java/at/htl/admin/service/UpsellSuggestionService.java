@@ -3,8 +3,10 @@ package at.htl.admin.service;
 import at.htl.admin.dto.UpsellDtos;
 import at.htl.admin.entity.UpsellDismissalEntity;
 import at.htl.admin.entity.UpsellEventEntity;
+import at.htl.admin.entity.UpsellSuggestionCacheEntity;
 import at.htl.admin.repository.UpsellDismissalRepository;
 import at.htl.admin.repository.UpsellEventRepository;
+import at.htl.admin.repository.UpsellSuggestionCacheRepository;
 import at.htl.model.Product;
 import at.htl.service.OpenSearchService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -47,6 +49,7 @@ public class UpsellSuggestionService {
 
     private static final Logger LOG = Logger.getLogger(UpsellSuggestionService.class);
     private static final String GENERIC_REASON = "Ergaenzt den gerade erledigten Artikel.";
+    private static final String CACHE_CONTEXT_VERSION = "upsell-v2";
 
     @Inject
     OpenSearchService openSearchService;
@@ -59,6 +62,9 @@ public class UpsellSuggestionService {
 
     @Inject
     UpsellDismissalRepository dismissalRepository;
+
+    @Inject
+    UpsellSuggestionCacheRepository cacheRepository;
 
     @ConfigProperty(name = "upsell.enabled", defaultValue = "true")
     boolean upsellEnabled;
@@ -87,9 +93,10 @@ public class UpsellSuggestionService {
     @ConfigProperty(name = "openai.upsell.reasoning-effort", defaultValue = "none")
     String openAiReasoningEffort;
 
-    @ConfigProperty(name = "openai.upsell.timeout-ms", defaultValue = "12000")
+    @ConfigProperty(name = "openai.upsell.timeout-ms", defaultValue = "4500")
     long openAiTimeoutMs;
 
+    @Transactional
     public UpsellDtos.UpsellSuggestionResponse suggestions(UpsellDtos.UpsellSuggestionRequest request) {
         if (!upsellEnabled) {
             return emptyResponse(request == null ? null : request.checkedProductId(), "disabled");
@@ -98,31 +105,86 @@ public class UpsellSuggestionService {
             throw new WebApplicationException("checkedProductId ist erforderlich.", Response.Status.BAD_REQUEST);
         }
 
+        String contextHash = contextHash(request);
+        Optional<UpsellDtos.UpsellSuggestionResponse> cached = findCachedResponse(contextHash);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
+
         Product checkedProduct = resolveProduct(request.checkedProductId());
         List<Product> candidates = loadCandidates(request, checkedProduct);
         if (candidates.isEmpty()) {
-            return emptyResponse(request.checkedProductId(), "none");
+            UpsellDtos.UpsellSuggestionResponse response = emptyResponse(request.checkedProductId(), "none");
+            storeCachedResponse(request, contextHash, response);
+            return response;
         }
 
         Map<Integer, Product> candidateMap = candidates.stream()
                 .filter(product -> product.getId() != null)
                 .collect(Collectors.toMap(Product::getId, product -> product, (first, ignored) -> first, LinkedHashMap::new));
 
-        List<UpsellDtos.AiSuggestion> ranked = rankWithOpenAi(checkedProduct, candidates)
-                .orElseGet(() -> fallbackRank(checkedProduct, candidates));
+        RankingResult ranking = rankWithOpenAi(checkedProduct, candidates)
+                .map(suggestions -> new RankingResult(suggestions, "openai"))
+                .orElseGet(() -> new RankingResult(fallbackRank(checkedProduct, candidates), "fallback"));
 
-        List<UpsellDtos.UpsellSuggestion> suggestions = validatedSuggestions(ranked, candidateMap);
-        String source = openAiEnabled && openAiApiKey.filter(key -> !key.isBlank()).isPresent() ? "openai_or_fallback" : "fallback";
-        if (suggestions.isEmpty() && !ranked.isEmpty()) {
+        List<UpsellDtos.UpsellSuggestion> suggestions = validatedSuggestions(ranking.suggestions(), candidateMap);
+        String source = ranking.source();
+        if (suggestions.isEmpty() && !ranking.suggestions().isEmpty()) {
             source = "filtered";
         }
 
-        return new UpsellDtos.UpsellSuggestionResponse(
+        UpsellDtos.UpsellSuggestionResponse response = new UpsellDtos.UpsellSuggestionResponse(
                 request.checkedProductId(),
                 suggestions,
                 source,
                 Instant.now().plus(Duration.ofMinutes(Math.max(1, cacheTtlMinutes)))
         );
+        storeCachedResponse(request, contextHash, response);
+        return response;
+    }
+
+    private Optional<UpsellDtos.UpsellSuggestionResponse> findCachedResponse(String contextHash) {
+        return cacheRepository.findFreshByContextHash(contextHash, Instant.now())
+                .flatMap(entity -> {
+                    try {
+                        UpsellDtos.UpsellSuggestionResponse cached = objectMapper.readValue(
+                                entity.responseJson,
+                                UpsellDtos.UpsellSuggestionResponse.class
+                        );
+                        return Optional.of(new UpsellDtos.UpsellSuggestionResponse(
+                                cached.checkedProductId(),
+                                cached.suggestions(),
+                                "cache",
+                                entity.expiresAt
+                        ));
+                    } catch (Exception exception) {
+                        LOG.warn("Upsell cache entry could not be parsed", exception);
+                        return Optional.empty();
+                    }
+                });
+    }
+
+    private void storeCachedResponse(
+            UpsellDtos.UpsellSuggestionRequest request,
+            String contextHash,
+            UpsellDtos.UpsellSuggestionResponse response
+    ) {
+        try {
+            UpsellSuggestionCacheEntity entity = new UpsellSuggestionCacheEntity();
+            entity.checkedProductId = request.checkedProductId();
+            entity.storeId = request.storeId();
+            entity.storeCode = normalizeOptional(request.storeCode());
+            entity.contextHash = contextHash;
+            entity.responseJson = objectMapper.writeValueAsString(response);
+            entity.source = normalizeOptional(response.source()) == null ? "unknown" : response.source();
+            entity.expiresAt = response.expiresAt();
+            cacheRepository.upsert(entity);
+        } catch (Exception exception) {
+            LOG.warn("Upsell cache write failed", exception);
+        }
+    }
+
+    private record RankingResult(List<UpsellDtos.AiSuggestion> suggestions, String source) {
     }
 
     @Transactional
@@ -517,14 +579,51 @@ public class UpsellSuggestionService {
         return value.trim();
     }
 
+    String contextHash(UpsellDtos.UpsellSuggestionRequest request) {
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("version", CACHE_CONTEXT_VERSION);
+        context.put("checkedProductId", request.checkedProductId());
+        context.put("storeId", request.storeId() == null ? null : request.storeId().toString());
+        context.put("storeCode", normalizeOptional(request.storeCode()) == null ? null : normalizeOptional(request.storeCode()).toLowerCase(Locale.ROOT));
+        context.put("shoppingListId", normalizeOptional(request.shoppingListId()));
+        context.put("currentListProductIds", normalizedProductIds(request.currentListProductIds(), request.checkedProductId(), false));
+        context.put("completedProductIds", normalizedProductIds(request.completedProductIds(), request.checkedProductId(), true));
+        context.put("maxSuggestions", Math.max(1, maxSuggestions));
+        context.put("minConfidence", minConfidence);
+        try {
+            return sha256(objectMapper.writeValueAsString(context));
+        } catch (Exception exception) {
+            return sha256(context.toString());
+        }
+    }
+
+    private List<Integer> normalizedProductIds(List<Integer> productIds, Integer checkedProductId, boolean includeChecked) {
+        Set<Integer> normalized = new HashSet<>();
+        if (productIds != null) {
+            for (Integer productId : productIds) {
+                if (productId != null && !Objects.equals(productId, checkedProductId)) {
+                    normalized.add(productId);
+                }
+            }
+        }
+        if (includeChecked && checkedProductId != null) {
+            normalized.add(checkedProductId);
+        }
+        return normalized.stream().sorted().toList();
+    }
+
     private String hashOptional(String value) {
         String normalized = normalizeOptional(value);
         if (normalized == null) {
             return null;
         }
+        return sha256(normalized);
+    }
+
+    private String sha256(String value) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(normalized.getBytes(StandardCharsets.UTF_8));
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
             StringBuilder builder = new StringBuilder();
             for (byte b : hash) {
                 builder.append(String.format("%02x", b));

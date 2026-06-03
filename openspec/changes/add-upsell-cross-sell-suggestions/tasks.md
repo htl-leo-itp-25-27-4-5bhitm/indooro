@@ -76,3 +76,11 @@
 - [ ] 10.2 Check that existing mobile store routes, product search routes, recipe routes, and admin auth boundaries still work.
 - [x] 10.3 Review prompt text, suggestion reasons, and UX frequency on a realistic shopping-list flow.
 - [ ] 10.4 Record final changed files, test commands, build results, skipped checks, and remaining risks before archive/verification.
+
+## 11. Phase 11 Upsell Reliability Follow-Up
+
+- [x] 11.1 Use the backend suggestion cache so repeated matching contexts return without another OpenAI call and expose accurate response source values.
+- [x] 11.2 Prevent stale iOS upsell responses from showing prompts for a previously completed product/list context.
+- [x] 11.3 Preload upcoming upsell opportunities during active shopping sessions so many prompts are ready before the customer checks or skips a stop.
+- [x] 11.4 Ensure direct completion, missing/skipped completion, route-stop completion, and route-stop skip remain non-blocking and can still trigger valid suggestions.
+- [x] 11.5 Verify latency, stale-response protection, backend cache behavior, and existing shopping flows after the reliability changes.

@@ -108,6 +108,37 @@ The upsell workflow SHALL fall back to rule-ranked catalog suggestions or no sug
 - **WHEN** the backend builds the mobile response
 - **THEN** it returns an empty suggestions list with a successful response status
 
+### Requirement: Suggestion responses remain bound to the current completion context
+The mobile app SHALL NOT display an upsell prompt returned for an older product/list context after the customer has completed or skipped a different product opportunity.
+
+#### Scenario: Previous product response arrives late
+- **GIVEN** a suggestion request for product A is still in flight
+- **WHEN** the customer completes or skips product B and product A's response arrives afterward
+- **THEN** the app discards product A's response instead of showing product A suggestions for product B's action
+
+#### Scenario: Active list context changes while request is in flight
+- **GIVEN** an upsell request was created for a specific shopping list
+- **WHEN** the active shopping context moves to another list or session before the response arrives
+- **THEN** the app ignores the stale response and keeps the shopping flow unchanged
+
+### Requirement: Upcoming upsell opportunities can be preloaded
+The mobile app SHALL preload upsell suggestions for upcoming product-backed shopping opportunities where enough list and store context is available, so a prompt can be displayed quickly when the customer later completes or skips that opportunity.
+
+#### Scenario: Preloaded suggestion is available
+- **GIVEN** suggestions for an upcoming product have already been loaded for the current list and store context
+- **WHEN** the customer completes or skips that product opportunity
+- **THEN** the app may show the preloaded prompt without waiting for a new network call
+
+#### Scenario: Preload is unavailable
+- **GIVEN** no fresh preloaded suggestions exist for the completed or skipped product
+- **WHEN** the customer completes or skips that product opportunity
+- **THEN** the app keeps the item/route action immediate and may request suggestions in the background
+
+#### Scenario: Backend cache hit
+- **GIVEN** the backend has a fresh suggestion cache entry for the same product/store/list exclusion context
+- **WHEN** the mobile app requests suggestions
+- **THEN** the backend returns the cached suggestions without calling OpenAI again
+
 ### Requirement: Suggestion prompts are throttled
 The mobile app SHALL limit how often upsell prompts are displayed in a shopping session and SHALL reduce prompting after repeated dismissals.
 
