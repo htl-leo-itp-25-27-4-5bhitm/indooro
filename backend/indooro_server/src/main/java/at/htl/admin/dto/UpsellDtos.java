@@ -58,6 +58,38 @@ public final class UpsellDtos {
     ) {
     }
 
+    public record UpsellPlanRequest(
+            UUID storeId,
+            @Size(max = 50) String storeCode,
+            @Size(max = 80) String shoppingListId,
+            List<Integer> currentListProductIds,
+            List<Integer> completedProductIds,
+            @Size(max = 50) String source,
+            @Size(max = 80) List<UpsellOpportunityRequest> opportunities
+    ) {
+    }
+
+    public record UpsellOpportunityRequest(
+            @NotBlank @Size(max = 100) String opportunityId,
+            @Size(max = 20) List<Integer> triggerProductIds,
+            @Size(max = 20) List<@Size(max = 120) String> triggerProductNames
+    ) {
+    }
+
+    public record UpsellPlanResponse(
+            List<UpsellOpportunityResponse> opportunities,
+            String source,
+            Instant expiresAt
+    ) {
+    }
+
+    public record UpsellOpportunityResponse(
+            String opportunityId,
+            List<Integer> triggerProductIds,
+            List<UpsellSuggestion> suggestions
+    ) {
+    }
+
     public record UpsellEventRequest(
             @NotBlank @Size(max = 40) String eventType,
             Integer checkedProductId,
@@ -89,6 +121,17 @@ public final class UpsellDtos {
 
     public record AiSuggestionResponse(
             List<AiSuggestion> suggestions
+    ) {
+    }
+
+    public record AiOpportunitySuggestion(
+            @NotBlank @Size(max = 100) String opportunityId,
+            List<AiSuggestion> suggestions
+    ) {
+    }
+
+    public record AiPlanResponse(
+            List<AiOpportunitySuggestion> opportunities
     ) {
     }
 }

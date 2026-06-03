@@ -75,7 +75,7 @@
 - [x] 10.1 Check changed backend routes with representative HTTP requests for normal, no-candidate, and fallback responses.
 - [x] 10.2 Check that existing mobile store routes, product search routes, recipe routes, and admin auth boundaries still work.
 - [x] 10.3 Review prompt text, suggestion reasons, and UX frequency on a realistic shopping-list flow.
-- [ ] 10.4 Record final changed files, test commands, build results, skipped checks, and remaining risks before archive/verification.
+- [x] 10.4 Record final changed files, test commands, build results, skipped checks, and remaining risks before archive/verification.
 
 ## 11. Phase 11 Upsell Reliability Follow-Up
 
@@ -84,3 +84,13 @@
 - [x] 11.3 Preload upcoming upsell opportunities during active shopping sessions so many prompts are ready before the customer checks or skips a stop.
 - [x] 11.4 Ensure direct completion, missing/skipped completion, route-stop completion, and route-stop skip remain non-blocking and can still trigger valid suggestions.
 - [x] 11.5 Verify latency, stale-response protection, backend cache behavior, and existing shopping flows after the reliability changes.
+
+## 12. Phase 12 Station-Based Upsell Plan
+
+- [x] 12.1 Add `POST /api/mobile/upsell/plan` so the backend can rank all current shopping opportunities in one bounded OpenAI request.
+- [x] 12.2 Bind plan responses to explicit `opportunityId` values such as `station:<shelf-id>` and `item:<item-uuid>` so late or stale suggestions cannot appear for another station.
+- [x] 12.3 Group all products from the same shopping stop into one station opportunity and show at most one prompt when that stop is completed or skipped.
+- [x] 12.4 Update iOS preload logic to request the plan after store/layout/session context is available and display prompts from local cached plan data without a new network call on check-off.
+- [x] 12.5 Mark products added from upsell suggestions and exclude them from future upsell trigger opportunities.
+- [x] 12.6 Add backend service/resource tests for plan responses, station grouping, exclusion filtering, and cache hits.
+- [x] 12.7 Verify backend tests and the final iOS app build after the plan rewrite.

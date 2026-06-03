@@ -26,6 +26,12 @@ public class MobileUpsellResource {
     }
 
     @POST
+    @Path("/plan")
+    public UpsellDtos.UpsellPlanResponse plan(@Valid UpsellDtos.UpsellPlanRequest request) {
+        return upsellSuggestionService.plan(request);
+    }
+
+    @POST
     @Path("/events")
     public Response recordEvent(@Valid UpsellDtos.UpsellEventRequest request) {
         upsellSuggestionService.recordEvent(request);

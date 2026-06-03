@@ -50,6 +50,7 @@ public class UpsellSuggestionService {
     private static final Logger LOG = Logger.getLogger(UpsellSuggestionService.class);
     private static final String GENERIC_REASON = "Ergaenzt den gerade erledigten Artikel.";
     private static final String CACHE_CONTEXT_VERSION = "upsell-v2";
+    private static final String PLAN_CACHE_CONTEXT_VERSION = "upsell-plan-v1";
 
     @Inject
     OpenSearchService openSearchService;
@@ -143,6 +144,76 @@ public class UpsellSuggestionService {
         return response;
     }
 
+    @Transactional
+    public UpsellDtos.UpsellPlanResponse plan(UpsellDtos.UpsellPlanRequest request) {
+        if (!upsellEnabled) {
+            return emptyPlanResponse(List.of(), "disabled");
+        }
+        if (request == null || request.opportunities() == null || request.opportunities().isEmpty()) {
+            throw new WebApplicationException("Mindestens eine Upsell-Station ist erforderlich.", Response.Status.BAD_REQUEST);
+        }
+
+        List<UpsellDtos.UpsellOpportunityRequest> opportunities = normalizedOpportunities(request.opportunities());
+        if (opportunities.isEmpty()) {
+            return emptyPlanResponse(List.of(), "none");
+        }
+
+        String contextHash = planContextHash(request, opportunities);
+        Optional<UpsellDtos.UpsellPlanResponse> cached = findCachedPlanResponse(contextHash);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
+
+        List<Product> candidates = loadPlanCandidates(request, opportunities);
+        if (candidates.isEmpty()) {
+            UpsellDtos.UpsellPlanResponse response = emptyPlanResponse(opportunities, "none");
+            storeCachedPlanResponse(request, contextHash, response);
+            return response;
+        }
+
+        Map<Integer, Product> candidateMap = candidates.stream()
+                .filter(product -> product.getId() != null)
+                .collect(Collectors.toMap(Product::getId, product -> product, (first, ignored) -> first, LinkedHashMap::new));
+
+        PlanRankingResult ranking = rankPlanWithOpenAi(opportunities, candidates)
+                .map(suggestions -> new PlanRankingResult(suggestions, "openai"))
+                .orElseGet(() -> new PlanRankingResult(fallbackPlanRank(opportunities, candidates), "fallback"));
+
+        Map<String, List<UpsellDtos.AiSuggestion>> rankedByOpportunity = ranking.opportunities().stream()
+                .filter(opportunity -> opportunity != null && normalizeOptional(opportunity.opportunityId()) != null)
+                .collect(Collectors.toMap(
+                        opportunity -> normalizeOptional(opportunity.opportunityId()),
+                        opportunity -> opportunity.suggestions() == null ? List.of() : opportunity.suggestions(),
+                        (first, ignored) -> first,
+                        LinkedHashMap::new
+                ));
+
+        List<UpsellDtos.UpsellOpportunityResponse> responses = new ArrayList<>();
+        boolean hadRankedSuggestions = false;
+        for (UpsellDtos.UpsellOpportunityRequest opportunity : opportunities) {
+            List<UpsellDtos.AiSuggestion> ranked = rankedByOpportunity.getOrDefault(opportunity.opportunityId(), List.of());
+            hadRankedSuggestions = hadRankedSuggestions || !ranked.isEmpty();
+            responses.add(new UpsellDtos.UpsellOpportunityResponse(
+                    opportunity.opportunityId(),
+                    normalizedProductIds(opportunity.triggerProductIds(), null, false),
+                    validatedSuggestions(ranked, candidateMap)
+            ));
+        }
+
+        String source = ranking.source();
+        if (responses.stream().allMatch(response -> response.suggestions().isEmpty()) && hadRankedSuggestions) {
+            source = "filtered";
+        }
+
+        UpsellDtos.UpsellPlanResponse response = new UpsellDtos.UpsellPlanResponse(
+                responses,
+                source,
+                Instant.now().plus(Duration.ofMinutes(Math.max(1, cacheTtlMinutes)))
+        );
+        storeCachedPlanResponse(request, contextHash, response);
+        return response;
+    }
+
     private Optional<UpsellDtos.UpsellSuggestionResponse> findCachedResponse(String contextHash) {
         return cacheRepository.findFreshByContextHash(contextHash, Instant.now())
                 .flatMap(entity -> {
@@ -159,6 +230,26 @@ public class UpsellSuggestionService {
                         ));
                     } catch (Exception exception) {
                         LOG.warn("Upsell cache entry could not be parsed", exception);
+                        return Optional.empty();
+                    }
+                });
+    }
+
+    private Optional<UpsellDtos.UpsellPlanResponse> findCachedPlanResponse(String contextHash) {
+        return cacheRepository.findFreshByContextHash(contextHash, Instant.now())
+                .flatMap(entity -> {
+                    try {
+                        UpsellDtos.UpsellPlanResponse cached = objectMapper.readValue(
+                                entity.responseJson,
+                                UpsellDtos.UpsellPlanResponse.class
+                        );
+                        return Optional.of(new UpsellDtos.UpsellPlanResponse(
+                                cached.opportunities(),
+                                "cache",
+                                entity.expiresAt
+                        ));
+                    } catch (Exception exception) {
+                        LOG.warn("Upsell plan cache entry could not be parsed", exception);
                         return Optional.empty();
                     }
                 });
@@ -184,7 +275,30 @@ public class UpsellSuggestionService {
         }
     }
 
+    private void storeCachedPlanResponse(
+            UpsellDtos.UpsellPlanRequest request,
+            String contextHash,
+            UpsellDtos.UpsellPlanResponse response
+    ) {
+        try {
+            UpsellSuggestionCacheEntity entity = new UpsellSuggestionCacheEntity();
+            entity.checkedProductId = 0;
+            entity.storeId = request.storeId();
+            entity.storeCode = normalizeOptional(request.storeCode());
+            entity.contextHash = contextHash;
+            entity.responseJson = objectMapper.writeValueAsString(response);
+            entity.source = normalizeOptional(response.source()) == null ? "unknown" : response.source();
+            entity.expiresAt = response.expiresAt();
+            cacheRepository.upsert(entity);
+        } catch (Exception exception) {
+            LOG.warn("Upsell plan cache write failed", exception);
+        }
+    }
+
     private record RankingResult(List<UpsellDtos.AiSuggestion> suggestions, String source) {
+    }
+
+    private record PlanRankingResult(List<UpsellDtos.AiOpportunitySuggestion> opportunities, String source) {
     }
 
     @Transactional
@@ -265,6 +379,38 @@ public class UpsellSuggestionService {
         }
     }
 
+    List<Product> loadPlanCandidates(
+            UpsellDtos.UpsellPlanRequest request,
+            List<UpsellDtos.UpsellOpportunityRequest> opportunities
+    ) {
+        try {
+            List<Product> storeScoped = openSearchService.findUpsellCandidates(
+                    Math.max(maxCandidates, maxSuggestions),
+                    request.storeId() == null ? null : request.storeId().toString(),
+                    request.storeCode()
+            );
+            List<Product> candidates = filterPlanCandidates(request, opportunities, storeScoped);
+
+            if (candidates.size() < maxSuggestions && (request.storeId() != null || normalizeOptional(request.storeCode()) != null)) {
+                List<Product> fallback = openSearchService.findUpsellCandidates(Math.max(maxCandidates, maxSuggestions), null, null);
+                candidates = mergeCandidates(candidates, filterPlanCandidates(request, opportunities, fallback));
+            }
+
+            String storeId = request.storeId() == null ? null : request.storeId().toString();
+            String storeCode = normalizeOptional(request.storeCode());
+            return candidates.stream()
+                    .sorted(Comparator
+                            .comparingInt((Product product) -> storeScore(product, storeId, storeCode)).reversed()
+                            .thenComparingInt(product -> hasLayoutPosition(product) ? 1 : 0).reversed()
+                            .thenComparing(product -> product.getName() == null ? "" : product.getName(), String.CASE_INSENSITIVE_ORDER))
+                    .limit(Math.max(1, maxCandidates))
+                    .toList();
+        } catch (IOException exception) {
+            LOG.warn("Upsell plan candidate lookup failed", exception);
+            return List.of();
+        }
+    }
+
     List<Product> filterCandidates(UpsellDtos.UpsellSuggestionRequest request, Product checkedProduct, List<Product> rawCandidates) {
         Set<Integer> excluded = new HashSet<>();
         excluded.add(request.checkedProductId());
@@ -289,11 +435,57 @@ public class UpsellSuggestionService {
         return new ArrayList<>(unique.values());
     }
 
+    List<Product> filterPlanCandidates(
+            UpsellDtos.UpsellPlanRequest request,
+            List<UpsellDtos.UpsellOpportunityRequest> opportunities,
+            List<Product> rawCandidates
+    ) {
+        Set<Integer> excluded = new HashSet<>();
+        if (request.currentListProductIds() != null) {
+            excluded.addAll(request.currentListProductIds());
+        }
+        if (request.completedProductIds() != null) {
+            excluded.addAll(request.completedProductIds());
+        }
+        for (UpsellDtos.UpsellOpportunityRequest opportunity : opportunities == null ? List.<UpsellDtos.UpsellOpportunityRequest>of() : opportunities) {
+            if (opportunity.triggerProductIds() != null) {
+                excluded.addAll(opportunity.triggerProductIds());
+            }
+        }
+
+        Map<Integer, Product> unique = new LinkedHashMap<>();
+        for (Product candidate : rawCandidates == null ? List.<Product>of() : rawCandidates) {
+            if (candidate == null || candidate.getId() == null || candidate.getName() == null || candidate.getName().isBlank()) {
+                continue;
+            }
+            if (excluded.contains(candidate.getId())) {
+                continue;
+            }
+            unique.putIfAbsent(candidate.getId(), candidate);
+        }
+
+        return new ArrayList<>(unique.values());
+    }
+
     List<UpsellDtos.AiSuggestion> fallbackRank(Product checkedProduct, List<Product> candidates) {
         return candidates.stream()
                 .sorted(candidateComparator(checkedProduct, null))
                 .limit(Math.max(1, maxSuggestions))
                 .map(product -> new UpsellDtos.AiSuggestion(product.getId(), GENERIC_REASON, 0.62))
+                .toList();
+    }
+
+    List<UpsellDtos.AiOpportunitySuggestion> fallbackPlanRank(
+            List<UpsellDtos.UpsellOpportunityRequest> opportunities,
+            List<Product> candidates
+    ) {
+        List<UpsellDtos.AiSuggestion> ranked = candidates.stream()
+                .limit(Math.max(1, maxSuggestions))
+                .map(product -> new UpsellDtos.AiSuggestion(product.getId(), GENERIC_REASON, 0.62))
+                .toList();
+
+        return opportunities.stream()
+                .map(opportunity -> new UpsellDtos.AiOpportunitySuggestion(opportunity.opportunityId(), ranked))
                 .toList();
     }
 
@@ -330,6 +522,46 @@ public class UpsellSuggestionService {
             return Optional.ofNullable(parsed.suggestions()).filter(list -> !list.isEmpty());
         } catch (Exception exception) {
             LOG.warn("OpenAI upsell ranking failed; falling back", exception);
+            return Optional.empty();
+        }
+    }
+
+    Optional<List<UpsellDtos.AiOpportunitySuggestion>> rankPlanWithOpenAi(
+            List<UpsellDtos.UpsellOpportunityRequest> opportunities,
+            List<Product> candidates
+    ) {
+        Optional<String> apiKey = openAiApiKey.filter(key -> !key.isBlank());
+        if (!openAiEnabled || apiKey.isEmpty() || candidates.isEmpty() || opportunities.isEmpty()) {
+            return Optional.empty();
+        }
+
+        try {
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofMillis(Math.max(500, openAiTimeoutMs)))
+                    .build();
+            String body = objectMapper.writeValueAsString(openAiPlanRequestBody(opportunities, candidates));
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.openai.com/v1/responses"))
+                    .timeout(Duration.ofMillis(Math.max(500, openAiTimeoutMs)))
+                    .header("Authorization", "Bearer " + apiKey.get())
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
+                    .build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                LOG.warn("OpenAI upsell plan ranking failed with status " + response.statusCode());
+                return Optional.empty();
+            }
+
+            String outputJson = extractResponsesText(response.body());
+            if (outputJson == null || outputJson.isBlank()) {
+                return Optional.empty();
+            }
+
+            UpsellDtos.AiPlanResponse parsed = objectMapper.readValue(outputJson, UpsellDtos.AiPlanResponse.class);
+            return Optional.ofNullable(parsed.opportunities()).filter(list -> !list.isEmpty());
+        } catch (Exception exception) {
+            LOG.warn("OpenAI upsell plan ranking failed; falling back", exception);
             return Optional.empty();
         }
     }
@@ -438,6 +670,81 @@ public class UpsellSuggestionService {
         return requestBody;
     }
 
+    private Map<String, Object> openAiPlanRequestBody(
+            List<UpsellDtos.UpsellOpportunityRequest> opportunities,
+            List<Product> candidates
+    ) throws IOException {
+        Map<String, Object> suggestionSchema = Map.of(
+                "type", "object",
+                "additionalProperties", false,
+                "required", List.of("productId", "reason", "confidence"),
+                "properties", Map.of(
+                        "productId", Map.of("type", "integer"),
+                        "reason", Map.of("type", "string", "maxLength", 180),
+                        "confidence", Map.of("type", "number", "minimum", 0, "maximum", 1)
+                )
+        );
+        Map<String, Object> schema = Map.of(
+                "type", "object",
+                "additionalProperties", false,
+                "required", List.of("opportunities"),
+                "properties", Map.of(
+                        "opportunities", Map.of(
+                                "type", "array",
+                                "maxItems", Math.max(1, opportunities.size()),
+                                "items", Map.of(
+                                        "type", "object",
+                                        "additionalProperties", false,
+                                        "required", List.of("opportunityId", "suggestions"),
+                                        "properties", Map.of(
+                                                "opportunityId", Map.of("type", "string"),
+                                                "suggestions", Map.of(
+                                                        "type", "array",
+                                                        "maxItems", Math.max(1, maxSuggestions),
+                                                        "items", suggestionSchema
+                                                )
+                                        )
+                                )
+                        )
+                )
+        );
+
+        Map<String, Object> payload = Map.of(
+                "opportunities", opportunities.stream().map(this::toAiOpportunity).toList(),
+                "candidateProducts", candidates.stream().limit(Math.max(1, maxCandidates)).map(this::toAiSummary).toList(),
+                "maxSuggestionsPerOpportunity", Math.max(1, maxSuggestions)
+        );
+
+        Map<String, Object> requestBody = new LinkedHashMap<>();
+        requestBody.put("model", openAiModel);
+        requestBody.put("input", List.of(
+                Map.of(
+                        "role", "system",
+                        "content", "Rank supermarket add-on products for each shopping station. Select only productIds from candidateProducts and only opportunityIds from opportunities. Do not invent products or opportunityIds. Reasons must be concise German customer-facing text."
+                ),
+                Map.of(
+                        "role", "user",
+                        "content", objectMapper.writeValueAsString(payload)
+                )
+        ));
+        requestBody.put("text", Map.of(
+                "format", Map.of(
+                        "type", "json_schema",
+                        "name", "upsell_plan",
+                        "strict", true,
+                        "schema", schema
+                )
+        ));
+        requestBody.put("max_output_tokens", Math.max(800, opportunities.size() * 220));
+
+        String reasoningEffort = normalizeOptional(openAiReasoningEffort);
+        if (reasoningEffort != null && supportsReasoning(openAiModel)) {
+            requestBody.put("reasoning", Map.of("effort", reasoningEffort));
+        }
+
+        return requestBody;
+    }
+
     private boolean supportsReasoning(String model) {
         String normalized = normalizeOptional(model);
         if (normalized == null) {
@@ -454,6 +761,20 @@ public class UpsellSuggestionService {
         summary.put("categoryCode", categoryCode(product.getLayoutCode()));
         summary.put("layoutCode", normalizeOptional(product.getLayoutCode()));
         summary.put("hasLayoutPosition", hasLayoutPosition(product));
+        return summary;
+    }
+
+    private Map<String, Object> toAiOpportunity(UpsellDtos.UpsellOpportunityRequest opportunity) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("opportunityId", opportunity.opportunityId());
+        summary.put("triggerProductIds", normalizedProductIds(opportunity.triggerProductIds(), null, false));
+        summary.put("triggerProductNames", opportunity.triggerProductNames() == null
+                ? List.of()
+                : opportunity.triggerProductNames().stream()
+                .map(this::normalizeOptional)
+                .filter(Objects::nonNull)
+                .limit(20)
+                .toList());
         return summary;
     }
 
@@ -572,6 +893,49 @@ public class UpsellSuggestionService {
         );
     }
 
+    private UpsellDtos.UpsellPlanResponse emptyPlanResponse(
+            List<UpsellDtos.UpsellOpportunityRequest> opportunities,
+            String source
+    ) {
+        List<UpsellDtos.UpsellOpportunityResponse> responses = opportunities.stream()
+                .map(opportunity -> new UpsellDtos.UpsellOpportunityResponse(
+                        opportunity.opportunityId(),
+                        normalizedProductIds(opportunity.triggerProductIds(), null, false),
+                        List.of()
+                ))
+                .toList();
+        return new UpsellDtos.UpsellPlanResponse(
+                responses,
+                source,
+                Instant.now().plus(Duration.ofMinutes(Math.max(1, cacheTtlMinutes)))
+        );
+    }
+
+    private List<UpsellDtos.UpsellOpportunityRequest> normalizedOpportunities(
+            List<UpsellDtos.UpsellOpportunityRequest> rawOpportunities
+    ) {
+        Map<String, UpsellDtos.UpsellOpportunityRequest> unique = new LinkedHashMap<>();
+        for (UpsellDtos.UpsellOpportunityRequest opportunity : rawOpportunities == null ? List.<UpsellDtos.UpsellOpportunityRequest>of() : rawOpportunities) {
+            String id = opportunity == null ? null : normalizeOptional(opportunity.opportunityId());
+            if (id == null || unique.containsKey(id)) {
+                continue;
+            }
+            List<Integer> triggerProductIds = normalizedProductIds(opportunity.triggerProductIds(), null, false);
+            List<String> triggerNames = opportunity.triggerProductNames() == null
+                    ? List.of()
+                    : opportunity.triggerProductNames().stream()
+                    .map(this::normalizeOptional)
+                    .filter(Objects::nonNull)
+                    .limit(20)
+                    .toList();
+            if (triggerProductIds.isEmpty() && triggerNames.isEmpty()) {
+                continue;
+            }
+            unique.put(id, new UpsellDtos.UpsellOpportunityRequest(id, triggerProductIds, triggerNames));
+        }
+        return new ArrayList<>(unique.values());
+    }
+
     private String normalizeOptional(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -588,6 +952,33 @@ public class UpsellSuggestionService {
         context.put("shoppingListId", normalizeOptional(request.shoppingListId()));
         context.put("currentListProductIds", normalizedProductIds(request.currentListProductIds(), request.checkedProductId(), false));
         context.put("completedProductIds", normalizedProductIds(request.completedProductIds(), request.checkedProductId(), true));
+        context.put("maxSuggestions", Math.max(1, maxSuggestions));
+        context.put("minConfidence", minConfidence);
+        try {
+            return sha256(objectMapper.writeValueAsString(context));
+        } catch (Exception exception) {
+            return sha256(context.toString());
+        }
+    }
+
+    String planContextHash(
+            UpsellDtos.UpsellPlanRequest request,
+            List<UpsellDtos.UpsellOpportunityRequest> opportunities
+    ) {
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("version", PLAN_CACHE_CONTEXT_VERSION);
+        context.put("storeId", request.storeId() == null ? null : request.storeId().toString());
+        context.put("storeCode", normalizeOptional(request.storeCode()) == null ? null : normalizeOptional(request.storeCode()).toLowerCase(Locale.ROOT));
+        context.put("shoppingListId", normalizeOptional(request.shoppingListId()));
+        context.put("currentListProductIds", normalizedProductIds(request.currentListProductIds(), null, false));
+        context.put("completedProductIds", normalizedProductIds(request.completedProductIds(), null, false));
+        context.put("opportunities", opportunities.stream()
+                .map(opportunity -> Map.of(
+                        "opportunityId", opportunity.opportunityId(),
+                        "triggerProductIds", normalizedProductIds(opportunity.triggerProductIds(), null, false),
+                        "triggerProductNames", opportunity.triggerProductNames() == null ? List.of() : opportunity.triggerProductNames()
+                ))
+                .toList());
         context.put("maxSuggestions", Math.max(1, maxSuggestions));
         context.put("minConfidence", minConfidence);
         try {

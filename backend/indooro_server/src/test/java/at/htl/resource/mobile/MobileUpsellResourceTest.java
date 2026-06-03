@@ -74,6 +74,62 @@ class MobileUpsellResourceTest {
     }
 
     @Test
+    void returnsPlannedStationSuggestions() {
+        when(upsellSuggestionService.plan(any()))
+                .thenReturn(new UpsellDtos.UpsellPlanResponse(
+                        List.of(new UpsellDtos.UpsellOpportunityResponse(
+                                "station:shelf-430",
+                                List.of(1, 3),
+                                List.of(new UpsellDtos.UpsellSuggestion(
+                                        new UpsellDtos.UpsellProductSummary(
+                                                2,
+                                                "Parmesan",
+                                                2.99,
+                                                "525/1/1/1",
+                                                STORE_ID.toString(),
+                                                "demo-store",
+                                                null,
+                                                "525",
+                                                null,
+                                                true
+                                        ),
+                                        "Passt gut zur Station.",
+                                        0.88
+                                ))
+                        )),
+                        "fallback",
+                        Instant.parse("2026-06-02T12:00:00Z")
+                ));
+
+        given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "storeId": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                          "storeCode": "demo-store",
+                          "shoppingListId": "local-list",
+                          "currentListProductIds": [1, 3],
+                          "completedProductIds": [],
+                          "source": "shopping_session",
+                          "opportunities": [
+                            {
+                              "opportunityId": "station:shelf-430",
+                              "triggerProductIds": [1, 3],
+                              "triggerProductNames": ["Spaghetti", "Tomatensauce"]
+                            }
+                          ]
+                        }
+                        """)
+                .when().post("/api/mobile/upsell/plan")
+                .then()
+                .statusCode(200)
+                .body("source", equalTo("fallback"))
+                .body("opportunities[0].opportunityId", equalTo("station:shelf-430"))
+                .body("opportunities[0].triggerProductIds[1]", equalTo(3))
+                .body("opportunities[0].suggestions[0].product.id", equalTo(2));
+    }
+
+    @Test
     void invalidCheckedProductReturnsNotFound() {
         when(upsellSuggestionService.suggestions(any()))
                 .thenThrow(new WebApplicationException("Produkt nicht gefunden.", Response.Status.NOT_FOUND));

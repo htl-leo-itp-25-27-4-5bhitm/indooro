@@ -85,6 +85,63 @@ Add `POST /api/mobile/upsell/events` for accepted, shown, dismissed, and failed 
 
 Alternative considered: route suggestions through `/api/products/search`. This was rejected because upsell needs checked-product context, exclusion lists, OpenAI/fallback metadata, validation, and event logging that would blur the product search contract.
 
+Follow-up decision: add `POST /api/mobile/upsell/plan` for active shopping sessions and store-based route preloading. The single-product `/suggestions` endpoint remains available for compatibility, but the iOS shopping flow uses `/plan` so OpenAI is called before the customer checks off a station.
+
+Plan request shape:
+
+```json
+{
+  "storeId": "uuid-or-null",
+  "storeCode": "SPAR_POST",
+  "shoppingListId": "local-uuid-string",
+  "currentListProductIds": [101, 102, 103],
+  "completedProductIds": [],
+  "source": "shopping_session",
+  "opportunities": [
+    {
+      "opportunityId": "station:shelf-430",
+      "triggerProductIds": [101, 102],
+      "triggerProductNames": ["Aepfel", "Bananen"]
+    }
+  ]
+}
+```
+
+Plan response shape:
+
+```json
+{
+  "source": "openai",
+  "expiresAt": "2026-06-03T10:30:00Z",
+  "opportunities": [
+    {
+      "opportunityId": "station:shelf-430",
+      "triggerProductIds": [101, 102],
+      "suggestions": [
+        {
+          "product": {
+            "id": 789,
+            "name": "Joghurt",
+            "price": 1.29,
+            "layoutCode": "445/1/1/1",
+            "storeId": "uuid-or-null",
+            "storeCode": "SPAR_POST",
+            "brand": null,
+            "category": "445",
+            "imageUrl": null,
+            "hasLayoutPosition": true
+          },
+          "reason": "Passt als frische Ergaenzung zu Obst.",
+          "confidence": 0.81
+        }
+      ]
+    }
+  ]
+}
+```
+
+The plan cache uses a separate context hash from the single-product suggestion cache and includes the opportunity ids and trigger ids. The app keys local prompt lookup by `station:<shelf-id>` for grouped route stops and `item:<uuid>` for non-routed list rows.
+
 ### Decision: Candidate retrieval is backend-owned and bounded
 
 `UpsellSuggestionService` first resolves the checked product through `OpenSearchService.getProductById`. It then retrieves a bounded candidate pool from existing OpenSearch product data:
@@ -139,6 +196,23 @@ Use the Responses API with `text.format`/`json_schema` and `strict: true` when s
 
 Alternative considered: generate product names from OpenAI and then search for them. This was rejected because it invites hallucinated products and ambiguous matching.
 
+For `/plan`, OpenAI receives multiple opportunities and one bounded candidate list. The structured output is:
+
+```json
+{
+  "opportunities": [
+    {
+      "opportunityId": "station:shelf-430",
+      "suggestions": [
+        { "productId": 789, "reason": "Kurzer deutscher Grund.", "confidence": 0.81 }
+      ]
+    }
+  ]
+}
+```
+
+The backend rejects unknown `opportunityId` values, unknown `productId` values, already-listed products, trigger products, and low-confidence results after parsing.
+
 ### Decision: Add lightweight persistence for cache and events
 
 MVP database additions:
@@ -173,6 +247,8 @@ Add `UpsellSuggestionStore: ObservableObject` with:
 - `dismissSuggestion(...)`
 
 The store follows the existing direct `URLSession` pattern used by `ProductSearchStore` and `RecipeStore` to keep the change small.
+
+Follow-up decision: `UpsellSuggestionStore` now owns a station plan cache. It preloads the plan after store/layout/session context is available, then `showOpportunity(...)` only reads local cached plan data when the user completes or skips a stop. Suggested products added through the prompt are stored with `addedFromUpsell = true` and are not used as future upsell triggers.
 
 Integration points:
 

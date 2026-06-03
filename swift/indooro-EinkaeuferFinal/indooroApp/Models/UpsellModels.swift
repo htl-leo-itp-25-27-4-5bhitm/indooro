@@ -61,6 +61,34 @@ struct UpsellSuggestionResponse: Decodable {
     let expiresAt: Date?
 }
 
+struct UpsellPlanRequest: Encodable {
+    let storeId: UUID?
+    let storeCode: String?
+    let shoppingListId: String?
+    let currentListProductIds: [Int]
+    let completedProductIds: [Int]
+    let source: String
+    let opportunities: [UpsellOpportunityRequest]
+}
+
+struct UpsellOpportunityRequest: Encodable, Hashable {
+    let opportunityId: String
+    let triggerProductIds: [Int]
+    let triggerProductNames: [String]
+}
+
+struct UpsellPlanResponse: Decodable {
+    let opportunities: [UpsellOpportunityResponse]
+    let source: String?
+    let expiresAt: Date?
+}
+
+struct UpsellOpportunityResponse: Decodable, Hashable {
+    let opportunityId: String
+    let triggerProductIds: [Int]
+    let suggestions: [UpsellSuggestion]
+}
+
 struct UpsellEventRequest: Encodable {
     let eventType: String
     let checkedProductId: Int?
@@ -83,8 +111,10 @@ struct UpsellDismissRequest: Encodable {
 
 struct UpsellPrompt: Identifiable, Hashable {
     let id = UUID()
+    let opportunityId: String
     let checkedProductId: Int
     let checkedProductName: String
+    let triggerProductIds: [Int]
     let listID: UUID
     let store: MobileStoreSummary?
     let source: String

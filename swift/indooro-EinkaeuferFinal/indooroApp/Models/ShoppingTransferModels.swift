@@ -109,5 +109,6 @@ extension ShoppingListItem {
         self.status = transferItem.status
         self.addedAt = Date()
         self.updatedAt = Date()
+        self.addedFromUpsell = false
     }
 }

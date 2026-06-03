@@ -1622,8 +1622,9 @@ struct ShoppingListsPage: View {
             return
         }
 
-        upsellStore.requestSuggestions(
-            checkedItem: item,
+        upsellStore.showOpportunity(
+            opportunityId: UpsellSuggestionStore.itemOpportunityId(for: item),
+            checkedItems: [item],
             list: updatedList,
             store: activeStore,
             source: source
@@ -1635,19 +1636,21 @@ struct ShoppingListsPage: View {
         guard let list = list ?? selectedList else {
             return
         }
-        let items = list.items
-            .filter { $0.status == .open }
-            .sorted(by: ShoppingListItem.sortByListOrder)
-        upsellStore.preloadSuggestions(
-            for: items,
-            list: list,
+        upsellStore.preloadPlan(
+            for: list,
+            stops: [],
+            unresolvedItems: [],
             store: activeStore,
             source: "shopping_list"
         )
     }
 
     private func addUpsellSuggestion(_ suggestion: UpsellSuggestion, prompt: UpsellPrompt) {
-        _ = listManager.addProduct(suggestion.product.product, to: prompt.listID)
+        _ = listManager.addProduct(
+            suggestion.product.product,
+            to: prompt.listID,
+            addedFromUpsell: true
+        )
         if sessionManager.activeListID == prompt.listID {
             sessionManager.sync(listManager: listManager, beaconManager: beaconManager)
         }

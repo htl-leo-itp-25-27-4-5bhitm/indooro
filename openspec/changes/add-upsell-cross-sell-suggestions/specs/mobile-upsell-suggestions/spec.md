@@ -139,6 +139,34 @@ The mobile app SHALL preload upsell suggestions for upcoming product-backed shop
 - **WHEN** the mobile app requests suggestions
 - **THEN** the backend returns the cached suggestions without calling OpenAI again
 
+### Requirement: Shopping-session upsells are planned per station
+The backend SHALL support a batch upsell plan for the current shopping list and store context, and the mobile app SHALL use that plan to display station-bound suggestions without making a new AI request when the station is checked off.
+
+#### Scenario: Supermarket route plan is requested
+- **GIVEN** the customer starts or opens a shopping session for a selected store
+- **WHEN** the app has the current route stops and shopping list context
+- **THEN** it sends one upsell plan request containing station opportunities, open product ids, completed product ids, and store context
+
+#### Scenario: Multiple products share one station
+- **GIVEN** apples and bananas are grouped into the same shopping stop
+- **WHEN** the app builds the upsell plan request
+- **THEN** it sends one station opportunity containing both trigger product ids and names rather than separate live requests per product
+
+#### Scenario: Station is completed or skipped
+- **GIVEN** a fresh preloaded plan response exists for `station:<shelf-id>`
+- **WHEN** the customer completes or skips that station
+- **THEN** the app looks up that station opportunity locally and may show the prepared suggestions without waiting for OpenAI or the backend
+
+#### Scenario: Plan response arrives late
+- **GIVEN** a plan request is still in flight
+- **WHEN** the customer checks off a station before the plan is available
+- **THEN** the station action remains immediate and no late response is shown for the already-handled station action
+
+#### Scenario: Suggested product is added to the list
+- **GIVEN** the customer adds a product from an upsell prompt
+- **WHEN** that added product later appears in the shopping route
+- **THEN** it is excluded as a trigger for new upsell opportunities
+
 ### Requirement: Suggestion prompts are throttled
 The mobile app SHALL limit how often upsell prompts are displayed in a shopping session and SHALL reduce prompting after repeated dismissals.
 

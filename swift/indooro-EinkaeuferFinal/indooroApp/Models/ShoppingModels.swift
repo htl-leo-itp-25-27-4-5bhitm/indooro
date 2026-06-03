@@ -101,6 +101,7 @@ struct ShoppingListItem: Codable, Identifiable, Hashable {
     var ingredientUnit: String?
     var mappingConfidence: Double?
     var manuallyConfirmed: Bool?
+    var addedFromUpsell: Bool
 
     init(
         product: Product,
@@ -113,7 +114,8 @@ struct ShoppingListItem: Codable, Identifiable, Hashable {
         ingredientQuantity: String? = nil,
         ingredientUnit: String? = nil,
         mappingConfidence: Double? = nil,
-        manuallyConfirmed: Bool? = nil
+        manuallyConfirmed: Bool? = nil,
+        addedFromUpsell: Bool = false
     ) {
         self.id = UUID()
         self.productID = product.id
@@ -133,6 +135,7 @@ struct ShoppingListItem: Codable, Identifiable, Hashable {
         self.ingredientUnit = ingredientUnit
         self.mappingConfidence = mappingConfidence
         self.manuallyConfirmed = manuallyConfirmed
+        self.addedFromUpsell = addedFromUpsell
     }
 
     init(
@@ -163,6 +166,7 @@ struct ShoppingListItem: Codable, Identifiable, Hashable {
         self.ingredientUnit = ingredientUnit
         self.mappingConfidence = nil
         self.manuallyConfirmed = false
+        self.addedFromUpsell = false
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -184,6 +188,7 @@ struct ShoppingListItem: Codable, Identifiable, Hashable {
         case ingredientUnit
         case mappingConfidence
         case manuallyConfirmed
+        case addedFromUpsell
     }
 
     init(from decoder: Decoder) throws {
@@ -206,6 +211,7 @@ struct ShoppingListItem: Codable, Identifiable, Hashable {
         ingredientUnit = try container.decodeIfPresent(String.self, forKey: .ingredientUnit)
         mappingConfidence = try container.decodeIfPresent(Double.self, forKey: .mappingConfidence)
         manuallyConfirmed = try container.decodeIfPresent(Bool.self, forKey: .manuallyConfirmed)
+        addedFromUpsell = try container.decodeIfPresent(Bool.self, forKey: .addedFromUpsell) ?? false
     }
 
     var effectiveSortOrder: Int {

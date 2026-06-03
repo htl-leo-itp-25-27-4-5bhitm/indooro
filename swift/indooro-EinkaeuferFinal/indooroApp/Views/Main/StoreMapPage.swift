@@ -115,6 +115,13 @@ struct StoreMapPage: View {
         }
         .onChange(of: beaconManager.isLoadingLayout, initial: false) { _, isLoading in
             guard !isLoading else { return }
+            if shoppingSessionManager.activeListID != nil {
+                shoppingSessionManager.sync(
+                    listManager: shoppingListManager,
+                    beaconManager: beaconManager
+                )
+                preloadUpcomingSessionUpsells()
+            }
             if let pendingStoreSelectionID,
                beaconManager.activeLayoutStore?.id == pendingStoreSelectionID {
                 self.pendingStoreSelectionID = nil
@@ -545,20 +552,20 @@ struct StoreMapPage: View {
                 snapshot: snapshot,
                 onOpenList: onOpenLists,
                 onMarkCurrentStopDone: {
-                    let completedItems = activeShoppingSnapshot?.currentStop?.items ?? []
+                    let completedStop = activeShoppingSnapshot?.currentStop
                     shoppingSessionManager.markCurrentStopDone(
                         listManager: shoppingListManager,
                         beaconManager: beaconManager
                     )
-                    requestUpsellForCompletedStopItems(completedItems)
+                    requestUpsellForCompletedStop(completedStop)
                 },
                 onSkipCurrentStop: {
-                    let skippedItems = activeShoppingSnapshot?.currentStop?.items ?? []
+                    let skippedStop = activeShoppingSnapshot?.currentStop
                     shoppingSessionManager.skipCurrentStop(
                         listManager: shoppingListManager,
                         beaconManager: beaconManager
                     )
-                    requestUpsellForCompletedStopItems(skippedItems)
+                    requestUpsellForCompletedStop(skippedStop)
                 },
                 onToggleMode: {
                     shoppingSessionManager.toggleRouteMode(
@@ -732,15 +739,16 @@ struct StoreMapPage: View {
         beaconManager.loadStoreLayout(storeId: store.id)
     }
 
-    private func requestUpsellForCompletedStopItems(_ items: [ShoppingListItem]) {
-        guard let checkedItem = items.first(where: { $0.productID != nil }),
+    private func requestUpsellForCompletedStop(_ stop: ShoppingStop?) {
+        guard let stop,
               let activeListID = shoppingSessionManager.activeListID,
               let list = shoppingListManager.list(with: activeListID) else {
             return
         }
 
-        upsellStore.requestSuggestions(
-            checkedItem: checkedItem,
+        upsellStore.showOpportunity(
+            opportunityId: UpsellSuggestionStore.stationOpportunityId(for: stop),
+            checkedItems: stop.items,
             list: list,
             store: activeStore,
             source: "shopping_session"
@@ -753,18 +761,21 @@ struct StoreMapPage: View {
               let list = shoppingListManager.list(with: activeListID) else {
             return
         }
-        let upcomingItems = activeShoppingSnapshot?.currentStop?.items
-            ?? list.items.filter { $0.status == .open }.sorted(by: ShoppingListItem.sortByListOrder)
-        upsellStore.preloadSuggestions(
-            for: upcomingItems,
-            list: list,
+        upsellStore.preloadPlan(
+            for: list,
+            stops: activeShoppingSnapshot?.orderedStops ?? [],
+            unresolvedItems: activeShoppingSnapshot?.unresolvedItems ?? [],
             store: activeStore,
             source: "shopping_session"
         )
     }
 
     private func addUpsellSuggestion(_ suggestion: UpsellSuggestion, prompt: UpsellPrompt) {
-        _ = shoppingListManager.addProduct(suggestion.product.product, to: prompt.listID)
+        _ = shoppingListManager.addProduct(
+            suggestion.product.product,
+            to: prompt.listID,
+            addedFromUpsell: true
+        )
         if shoppingSessionManager.activeListID == prompt.listID {
             shoppingSessionManager.sync(
                 listManager: shoppingListManager,

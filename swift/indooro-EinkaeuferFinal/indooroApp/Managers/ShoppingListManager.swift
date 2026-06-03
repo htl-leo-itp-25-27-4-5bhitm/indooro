@@ -388,7 +388,11 @@ final class ShoppingListManager: ObservableObject {
     }
 
     @discardableResult
-    func addProduct(_ product: Product, to listID: UUID? = nil) -> ShoppingListItem? {
+    func addProduct(
+        _ product: Product,
+        to listID: UUID? = nil,
+        addedFromUpsell: Bool = false
+    ) -> ShoppingListItem? {
         let targetListID = resolvedTargetListID(preferred: listID)
         guard let targetListID else {
             return nil
@@ -401,11 +405,13 @@ final class ShoppingListManager: ObservableObject {
             }) {
                 list.items[existingIndex].quantity += 1
                 list.items[existingIndex].updatedAt = Date()
+                list.items[existingIndex].addedFromUpsell = list.items[existingIndex].addedFromUpsell || addedFromUpsell
                 createdItem = list.items[existingIndex]
             } else {
                 let item = ShoppingListItem(
                     product: product,
-                    sortOrder: nextSortOrder(in: list.items)
+                    sortOrder: nextSortOrder(in: list.items),
+                    addedFromUpsell: addedFromUpsell
                 )
                 list.items.append(item)
                 createdItem = item

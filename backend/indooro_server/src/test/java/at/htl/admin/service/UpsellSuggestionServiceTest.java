@@ -93,6 +93,65 @@ class UpsellSuggestionServiceTest {
     }
 
     @Test
+    void planResponsesGroupStationOpportunitiesAndExcludeListProducts() {
+        UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
+                null,
+                "SPAR",
+                "local-list",
+                List.of(1, 3),
+                List.of(),
+                "shopping_session",
+                List.of(new UpsellDtos.UpsellOpportunityRequest(
+                        "station:shelf-430",
+                        List.of(1, 3),
+                        List.of("Spaghetti", "Tomatensauce")
+                ))
+        ));
+
+        assertEquals("fallback", response.source());
+        assertEquals(1, response.opportunities().size());
+        assertEquals("station:shelf-430", response.opportunities().get(0).opportunityId());
+
+        List<Integer> ids = response.opportunities().get(0).suggestions().stream()
+                .map(suggestion -> suggestion.product().id())
+                .toList();
+
+        assertFalse(ids.contains(1));
+        assertFalse(ids.contains(3));
+        assertTrue(ids.contains(2));
+    }
+
+    @Test
+    void planResponsesAreReturnedFromCacheForMatchingRouteContext() {
+        UpsellDtos.UpsellPlanRequest request = new UpsellDtos.UpsellPlanRequest(
+                null,
+                "SPAR",
+                "local-list",
+                List.of(1, 3),
+                List.of(),
+                "shopping_session",
+                List.of(new UpsellDtos.UpsellOpportunityRequest(
+                        "station:shelf-430",
+                        List.of(1, 3),
+                        List.of("Spaghetti", "Tomatensauce")
+                ))
+        );
+
+        UpsellDtos.UpsellPlanResponse first = service.plan(request);
+        int lookupsAfterFirstCall = openSearchService.productLookups;
+
+        UpsellDtos.UpsellPlanResponse second = service.plan(request);
+
+        assertEquals("fallback", first.source());
+        assertEquals("cache", second.source());
+        assertEquals(lookupsAfterFirstCall, openSearchService.productLookups);
+        assertEquals(
+                first.opportunities().get(0).suggestions().stream().map(suggestion -> suggestion.product().id()).toList(),
+                second.opportunities().get(0).suggestions().stream().map(suggestion -> suggestion.product().id()).toList()
+        );
+    }
+
+    @Test
     void contextHashMatchesPreloadAndCompletedFormsForSameOpportunity() {
         UpsellDtos.UpsellSuggestionRequest preload = new UpsellDtos.UpsellSuggestionRequest(
                 null,
