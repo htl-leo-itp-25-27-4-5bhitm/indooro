@@ -261,7 +261,7 @@ final class UpsellSuggestionStore: ObservableObject {
             debugLog("showOpportunity skipped opportunity=\(opportunityId) reason=no_trigger_items")
             return
         }
-        if let blockReason = promptBlockReason(for: checkedProductId) {
+        if let blockReason = promptBlockReason(for: checkedProductId, source: source) {
             debugLog("showOpportunity skipped opportunity=\(opportunityId) reason=\(blockReason)")
             return
         }
@@ -522,7 +522,7 @@ final class UpsellSuggestionStore: ObservableObject {
         return true
     }
 
-    private func promptBlockReason(for checkedProductId: Int) -> String? {
+    private func promptBlockReason(for checkedProductId: Int, source: String) -> String? {
         guard activePrompt == nil else {
             return "active_prompt=\(activePrompt?.opportunityId ?? "unknown")"
         }
@@ -531,6 +531,9 @@ final class UpsellSuggestionStore: ObservableObject {
         }
         guard !dismissedProductIDs.contains(checkedProductId) else {
             return "dismissed_product checkedProductId=\(checkedProductId)"
+        }
+        guard source != "shopping_session" else {
+            return nil
         }
         if let lastPromptShownAt,
            Date().timeIntervalSince(lastPromptShownAt) < minSecondsBetweenPrompts {
