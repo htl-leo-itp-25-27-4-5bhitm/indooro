@@ -707,6 +707,7 @@ struct StoreMapPage: View {
             return
         }
 
+        upsellStore.authorizePlanPreloading(for: store, reason: "manual_store_tap")
         pendingStoreSelectionID = store.id
         targetProduct = nil
         beaconManager.loadStoreLayout(storeId: store.id)

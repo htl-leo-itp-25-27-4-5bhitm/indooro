@@ -19,6 +19,21 @@ final class UpsellSuggestionStore: ObservableObject {
         let expiresAt: Date
     }
 
+    private struct OpportunitySignature: Hashable {
+        let opportunityId: String
+        let triggerProductIds: [Int]
+    }
+
+    private struct PlanRequestSignature: Hashable {
+        let listID: UUID
+        let storeId: UUID
+        let storeCode: String?
+        let source: String
+        let currentProductIds: [Int]
+        let completedProductIds: [Int]
+        let opportunities: [OpportunitySignature]
+    }
+
     private let apiBase = "https://it220209.cloud.htl-leonding.ac.at/api"
     private let minSecondsBetweenPrompts: TimeInterval = 8
     private let maxPromptsPerSession = 4
@@ -38,6 +53,9 @@ final class UpsellSuggestionStore: ObservableObject {
     private var planTask: URLSessionDataTask?
     private var latestPlanRequestID = UUID()
     private var cachedOpportunities: [PlanKey: CachedOpportunity] = [:]
+    private var authorizedStoreId: UUID?
+    private var activePlanSignature: PlanRequestSignature?
+    private var lastCompletedPlanSignature: PlanRequestSignature?
 
     func resetSession() {
         debugLog("resetSession cachedOpportunities=\(cachedOpportunities.count) activePrompt=\(activePrompt?.opportunityId ?? "nil")")
@@ -50,6 +68,9 @@ final class UpsellSuggestionStore: ObservableObject {
         lastPromptShownAt = nil
         shownCountForSession = 0
         dismissedProductIDs.removeAll()
+        authorizedStoreId = nil
+        activePlanSignature = nil
+        lastCompletedPlanSignature = nil
     }
 
     func clearPrompt(reason: String = "manual") {
@@ -65,6 +86,22 @@ final class UpsellSuggestionStore: ObservableObject {
         "item:\(item.id.uuidString)"
     }
 
+    func authorizePlanPreloading(for store: MobileStoreSummary, reason: String) {
+        if authorizedStoreId != store.id {
+            debugLog("authorizePlanPreloading store=\(storeDebug(store)) reason=\(reason) previous=\(authorizedStoreId?.uuidString ?? "nil") clearsCache=true")
+            planTask?.cancel()
+            planTask = nil
+            latestPlanRequestID = UUID()
+            isLoading = false
+            cachedOpportunities.removeAll()
+            activePlanSignature = nil
+            lastCompletedPlanSignature = nil
+        } else {
+            debugLog("authorizePlanPreloading store=\(storeDebug(store)) reason=\(reason) alreadyAuthorized=true")
+        }
+        authorizedStoreId = store.id
+    }
+
     func preloadPlan(
         for list: ShoppingList,
         stops: [ShoppingStop],
@@ -74,6 +111,14 @@ final class UpsellSuggestionStore: ObservableObject {
     ) {
         guard shownCountForSession < maxPromptsPerSession else {
             debugLog("preloadPlan skipped reason=session_limit shownCount=\(shownCountForSession)")
+            return
+        }
+        guard let store else {
+            debugLog("preloadPlan skipped reason=no_store source=\(source)")
+            return
+        }
+        guard authorizedStoreId == store.id else {
+            debugLog("preloadPlan skipped reason=store_not_authorized store=\(storeDebug(store)) authorizedStoreId=\(authorizedStoreId?.uuidString ?? "nil") source=\(source)")
             return
         }
 
@@ -95,6 +140,20 @@ final class UpsellSuggestionStore: ObservableObject {
             debugLog("preloadPlan skipped reason=no_opportunities_or_request")
             return
         }
+        let signature = makePlanSignature(
+            list: list,
+            opportunities: opportunities,
+            store: store,
+            source: source
+        )
+        if activePlanSignature == signature {
+            debugLog("preloadPlan skipped reason=duplicate_in_flight signature=\(signatureDebug(signature))")
+            return
+        }
+        if lastCompletedPlanSignature == signature {
+            debugLog("preloadPlan skipped reason=duplicate_completed signature=\(signatureDebug(signature))")
+            return
+        }
 
         let requestID = UUID()
         latestPlanRequestID = requestID
@@ -102,6 +161,7 @@ final class UpsellSuggestionStore: ObservableObject {
             debugLog("preloadPlan cancels previous request newRequestId=\(requestID.uuidString)")
         }
         planTask?.cancel()
+        activePlanSignature = signature
         isLoading = true
         debugLog("preloadPlan requestId=\(requestID.uuidString) timeout=\(urlRequest.timeoutInterval)s")
 
@@ -113,6 +173,7 @@ final class UpsellSuggestionStore: ObservableObject {
                     return
                 }
                 self.planTask = nil
+                self.activePlanSignature = nil
                 self.isLoading = false
 
                 let statusCode = (response as? HTTPURLResponse)?.statusCode
@@ -142,6 +203,7 @@ final class UpsellSuggestionStore: ObservableObject {
                     return
                 }
 
+                self.lastCompletedPlanSignature = signature
                 let expiresAt = decoded.expiresAt ?? Date().addingTimeInterval(60)
                 let responseSource = decoded.source ?? "unknown"
                 self.debugLog(
@@ -374,6 +436,39 @@ final class UpsellSuggestionStore: ObservableObject {
         }
     }
 
+    private func makePlanSignature(
+        list: ShoppingList,
+        opportunities: [UpsellOpportunityRequest],
+        store: MobileStoreSummary,
+        source: String
+    ) -> PlanRequestSignature {
+        PlanRequestSignature(
+            listID: list.id,
+            storeId: store.id,
+            storeCode: store.storeCode.lowercased(),
+            source: source,
+            currentProductIds: normalizedIds(list.items.compactMap { item in
+                item.status == .open ? item.productID : nil
+            }),
+            completedProductIds: normalizedIds(list.items.compactMap { item in
+                item.status.isCompleted ? item.productID : nil
+            }),
+            opportunities: opportunities
+                .map { opportunity in
+                    OpportunitySignature(
+                        opportunityId: opportunity.opportunityId,
+                        triggerProductIds: normalizedIds(opportunity.triggerProductIds)
+                    )
+                }
+                .sorted { lhs, rhs in
+                    if lhs.opportunityId == rhs.opportunityId {
+                        return lhs.triggerProductIds.lexicographicallyPrecedes(rhs.triggerProductIds)
+                    }
+                    return lhs.opportunityId < rhs.opportunityId
+                }
+        )
+    }
+
     private func cachedOpportunity(for key: PlanKey) -> CachedOpportunity? {
         guard let cached = cachedOpportunities[key] else {
             debugLog("cache miss key=\(keyDebug(key))")
@@ -502,11 +597,22 @@ final class UpsellSuggestionStore: ObservableObject {
         "\(key.opportunityId)|list=\(key.listID.uuidString)|store=\(key.storeId?.uuidString ?? key.storeCode ?? "nil")|source=\(key.source)"
     }
 
+    private func signatureDebug(_ signature: PlanRequestSignature) -> String {
+        let opportunities = signature.opportunities
+            .map { "\($0.opportunityId):\($0.triggerProductIds)" }
+            .joined(separator: ";")
+        return "list=\(signature.listID.uuidString)|store=\(signature.storeId.uuidString)|source=\(signature.source)|current=\(signature.currentProductIds)|completed=\(signature.completedProductIds)|opps=\(opportunities)"
+    }
+
     private func storeDebug(_ store: MobileStoreSummary?) -> String {
         guard let store else {
             return "nil"
         }
         return "\(store.name)#\(store.id.uuidString)#\(store.storeCode)"
+    }
+
+    private func normalizedIds(_ ids: [Int]) -> [Int] {
+        Array(Set(ids)).sorted()
     }
 
     private func debugSummary(_ debug: UpsellPlanDebug?) -> String {

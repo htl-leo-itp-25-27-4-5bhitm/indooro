@@ -1609,6 +1609,9 @@ struct ShoppingListsPage: View {
         guard let list = list ?? selectedList else {
             return
         }
+        guard sessionManager.activeListID != list.id else {
+            return
+        }
         upsellStore.preloadPlan(
             for: list,
             stops: [],
