@@ -72,8 +72,8 @@
 
 ## 10. Phase 10 Build/QA
 
-- [ ] 10.1 Check changed backend routes with representative HTTP requests for normal, no-candidate, and fallback responses.
-- [ ] 10.2 Check that existing mobile store routes, product search routes, recipe routes, and admin auth boundaries still work.
+- [x] 10.1 Check changed backend routes with representative HTTP requests for normal, no-candidate, and fallback responses.
+- [x] 10.2 Check that existing mobile store routes, product search routes, recipe routes, and admin auth boundaries still work.
 - [x] 10.3 Review prompt text, suggestion reasons, and UX frequency on a realistic shopping-list flow.
 - [ ] 10.4 Record final changed files, test commands, build results, skipped checks, and remaining risks before archive/verification.
 
