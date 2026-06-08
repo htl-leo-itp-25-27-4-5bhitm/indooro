@@ -19,6 +19,15 @@ final class UpsellSuggestionStore: ObservableObject {
         let expiresAt: Date
     }
 
+    private struct PendingOpportunity {
+        let opportunityId: String
+        let checkedItems: [ShoppingListItem]
+        let list: ShoppingList
+        let store: MobileStoreSummary?
+        let source: String
+        let requestedAt: Date
+    }
+
     private struct OpportunitySignature: Hashable {
         let opportunityId: String
         let triggerProductIds: [Int]
@@ -39,6 +48,7 @@ final class UpsellSuggestionStore: ObservableObject {
     private let maxPromptsPerSession = 4
     private let maxSuggestionsShown = 3
     private let minConfidence = 0.45
+    private let maxPendingOpportunityAge: TimeInterval = 8
     private let debugEnabled = true
     private let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
@@ -53,6 +63,7 @@ final class UpsellSuggestionStore: ObservableObject {
     private var planTask: URLSessionDataTask?
     private var latestPlanRequestID = UUID()
     private var cachedOpportunities: [PlanKey: CachedOpportunity] = [:]
+    private var pendingOpportunities: [PlanKey: PendingOpportunity] = [:]
     private var authorizedStoreId: UUID?
     private var activePlanSignature: PlanRequestSignature?
     private var lastCompletedPlanSignature: PlanRequestSignature?
@@ -62,6 +73,7 @@ final class UpsellSuggestionStore: ObservableObject {
         planTask?.cancel()
         planTask = nil
         cachedOpportunities.removeAll()
+        pendingOpportunities.removeAll()
         activePrompt = nil
         isLoading = false
         latestPlanRequestID = UUID()
@@ -94,6 +106,7 @@ final class UpsellSuggestionStore: ObservableObject {
             latestPlanRequestID = UUID()
             isLoading = false
             cachedOpportunities.removeAll()
+            pendingOpportunities.removeAll()
             activePlanSignature = nil
             lastCompletedPlanSignature = nil
         } else {
@@ -238,6 +251,7 @@ final class UpsellSuggestionStore: ObservableObject {
                         expiresAt: expiresAt
                     )
                     self.debugLog("preloadPlan cached key=\(self.keyDebug(key)) suggestions=\(opportunity.suggestions.map { "\($0.product.id):\($0.product.name)" }) expiresAt=\(expiresAt)")
+                    self.showPendingOpportunityIfPossible(for: key)
                 }
             }
         }
@@ -273,6 +287,14 @@ final class UpsellSuggestionStore: ObservableObject {
             source: source
         )
         guard let cached = cachedOpportunity(for: key) else {
+            rememberPendingOpportunity(
+                key: key,
+                opportunityId: opportunityId,
+                checkedItems: checkedItems,
+                list: list,
+                store: store,
+                source: source
+            )
             debugLog("showOpportunity skipped opportunity=\(opportunityId) reason=cache_miss key=\(keyDebug(key)) cachedKeys=\(cachedOpportunities.keys.map(keyDebug))")
             return
         }
@@ -318,6 +340,46 @@ final class UpsellSuggestionStore: ObservableObject {
                 "responseSource": cached.responseSource,
                 "preloaded": "true"
             ])
+        )
+    }
+
+    private func rememberPendingOpportunity(
+        key: PlanKey,
+        opportunityId: String,
+        checkedItems: [ShoppingListItem],
+        list: ShoppingList,
+        store: MobileStoreSummary?,
+        source: String
+    ) {
+        guard planTask != nil else {
+            return
+        }
+        pendingOpportunities[key] = PendingOpportunity(
+            opportunityId: opportunityId,
+            checkedItems: checkedItems,
+            list: list,
+            store: store,
+            source: source,
+            requestedAt: Date()
+        )
+        debugLog("pendingOpportunity stored key=\(keyDebug(key))")
+    }
+
+    private func showPendingOpportunityIfPossible(for key: PlanKey) {
+        guard let pending = pendingOpportunities.removeValue(forKey: key) else {
+            return
+        }
+        guard Date().timeIntervalSince(pending.requestedAt) <= maxPendingOpportunityAge else {
+            debugLog("pendingOpportunity expired key=\(keyDebug(key))")
+            return
+        }
+        debugLog("pendingOpportunity retry key=\(keyDebug(key))")
+        showOpportunity(
+            opportunityId: pending.opportunityId,
+            checkedItems: pending.checkedItems,
+            list: pending.list,
+            store: pending.store,
+            source: pending.source
         )
     }
 
