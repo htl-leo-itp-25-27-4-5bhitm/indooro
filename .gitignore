@@ -8,6 +8,7 @@ yarn-error.log
 dist/
 build/
 .env
+.env.example/
 .vscode/
 .cache/
 

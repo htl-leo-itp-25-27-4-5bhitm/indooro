@@ -1,0 +1,102 @@
+/*
+# Indooro Mobile Upsell API Smoke Tests
+
+Upsell routes are anonymous mobile APIs. They must never require an OpenAI key
+from the client and must not expose OpenAI/API-key details in responses.
+*/
+
+@baseUrl={{BASE_URL}}
+
+###
+# Mobile upsell suggestions for a valid checked product
+POST {{baseUrl}}/api/mobile/upsell/suggestions
+Content-Type: application/json
+Accept: application/json
+
+{
+  "storeId": "{{ACTIVE_STORE_ID}}",
+  "checkedProductId": {{UPSELL_CHECKED_PRODUCT_ID}},
+  "shoppingListId": "httpyac-smoke-list",
+  "currentListProductIds": [{{UPSELL_CHECKED_PRODUCT_ID}}],
+  "completedProductIds": [],
+  "source": "shopping_session"
+}
+
+?? status == 200
+?? header content-type includes json
+?? body suggestions exists
+
+###
+# Mobile upsell suggestions reject an unknown checked product
+POST {{baseUrl}}/api/mobile/upsell/suggestions
+Content-Type: application/json
+Accept: application/json
+
+{
+  "storeId": "{{ACTIVE_STORE_ID}}",
+  "checkedProductId": {{UPSELL_UNKNOWN_PRODUCT_ID}},
+  "shoppingListId": "httpyac-smoke-list",
+  "currentListProductIds": [],
+  "completedProductIds": [],
+  "source": "shopping_session"
+}
+
+?? status matches ^(404|503)$
+?? header content-type includes json
+
+###
+# Mobile upsell plan supports station opportunities
+POST {{baseUrl}}/api/mobile/upsell/plan
+Content-Type: application/json
+Accept: application/json
+
+{
+  "storeId": "{{ACTIVE_STORE_ID}}",
+  "shoppingListId": "httpyac-smoke-list",
+  "currentListProductIds": [{{UPSELL_CHECKED_PRODUCT_ID}}],
+  "completedProductIds": [],
+  "source": "shopping_session",
+  "opportunities": [
+    {
+      "opportunityId": "station:httpyac-smoke",
+      "triggerProductIds": [{{UPSELL_CHECKED_PRODUCT_ID}}],
+      "triggerProductNames": ["{{TEST_PRODUCT_NAME}}"]
+    }
+  ]
+}
+
+?? status == 200
+?? header content-type includes json
+?? body opportunities exists
+
+###
+# Mobile upsell events are accepted without leaking details
+POST {{baseUrl}}/api/mobile/upsell/events
+Content-Type: application/json
+Accept: application/json
+
+{
+  "eventType": "shown",
+  "checkedProductId": {{UPSELL_CHECKED_PRODUCT_ID}},
+  "suggestedProductId": {{UPSELL_CHECKED_PRODUCT_ID}},
+  "storeId": "{{ACTIVE_STORE_ID}}",
+  "sessionId": "httpyac-session",
+  "source": "shopping_session"
+}
+
+?? status == 202
+
+###
+# Mobile upsell dismissals are accepted without leaking details
+POST {{baseUrl}}/api/mobile/upsell/dismiss
+Content-Type: application/json
+Accept: application/json
+
+{
+  "checkedProductId": {{UPSELL_CHECKED_PRODUCT_ID}},
+  "suggestedProductId": {{UPSELL_CHECKED_PRODUCT_ID}},
+  "storeId": "{{ACTIVE_STORE_ID}}",
+  "sessionId": "httpyac-session"
+}
+
+?? status == 202

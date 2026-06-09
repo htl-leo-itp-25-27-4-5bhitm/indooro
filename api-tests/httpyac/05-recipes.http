@@ -1,0 +1,74 @@
+/*
+# Indooro Recipe API Smoke Tests
+
+Public mobile recipe routes are anonymous. Admin recipe/tag routes require the
+admin bearer token from 00-auth.http.
+*/
+
+@baseUrl={{BASE_URL}}
+
+###
+# Mobile recipes list stays anonymous
+GET {{baseUrl}}/api/mobile/recipes?page=0&size=5
+Accept: application/json
+
+?? status == 200
+?? header content-type includes json
+?? body content exists
+
+###
+# Mobile recipe search rejects missing q
+GET {{baseUrl}}/api/mobile/recipes/search
+Accept: application/json
+
+?? status == 400
+
+###
+# Mobile recipe search accepts a real query
+GET {{baseUrl}}/api/mobile/recipes/search?q={{RECIPE_SEARCH_QUERY}}&size=5
+Accept: application/json
+
+?? status == 200
+?? header content-type includes json
+
+###
+# Mobile recipe detail is public when fixture is published; unknown fixtures are 404
+GET {{baseUrl}}/api/mobile/recipes/{{ACTIVE_RECIPE_ID}}
+Accept: application/json
+
+?? status matches ^(200|404)$
+?? header content-type includes json
+
+###
+# Mobile recipe product mapping is public when fixture exists; unknown fixtures are 404
+GET {{baseUrl}}/api/mobile/recipes/{{ACTIVE_RECIPE_ID}}/product-mapping?storeId={{ACTIVE_STORE_ID}}
+Accept: application/json
+
+?? status matches ^(200|404)$
+?? header content-type includes json
+
+###
+# Anonymous admin recipes request is rejected or redirected to Keycloak
+GET {{baseUrl}}/api/admin/recipes
+Accept: application/json
+
+?? status matches ^(200|302|401)$
+?? header content-type matches ^(text/html|application/json)
+
+###
+# Admin can list recipes
+GET {{baseUrl}}/api/admin/recipes?size=10
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+?? header content-type includes json
+
+###
+# Admin can list recipe tags
+GET {{baseUrl}}/api/admin/recipe-tags
+Accept: application/json
+Authorization: Bearer {{$global.adminToken}}
+
+?? status == 200
+?? header content-type includes json

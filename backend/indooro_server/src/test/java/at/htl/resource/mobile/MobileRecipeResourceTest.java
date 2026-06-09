@@ -18,6 +18,7 @@ import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.hasItems;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @QuarkusTest
@@ -45,6 +46,45 @@ class MobileRecipeResourceTest {
     }
 
     @Test
+    void normalizesPaginationDefaultsCapsAndInvalidValues() {
+        when(recipeService.listMobileRecipes(eq(null), eq(null), eq(0), eq(20), eq(null)))
+                .thenReturn(new CommonDtos.PageResponse<>(List.of(), 0, 20, 0));
+        when(recipeService.listMobileRecipes(eq(null), eq(null), eq(0), eq(50), eq(null)))
+                .thenReturn(new CommonDtos.PageResponse<>(List.of(), 0, 50, 0));
+        when(recipeService.listMobileRecipes(eq(null), eq(null), eq(2), eq(1), eq(null)))
+                .thenReturn(new CommonDtos.PageResponse<>(List.of(), 2, 1, 0));
+
+        given()
+                .when().get("/api/mobile/recipes")
+                .then()
+                .statusCode(200)
+                .body("page", equalTo(0))
+                .body("size", equalTo(20));
+
+        given()
+                .queryParam("page", -5)
+                .queryParam("size", 999)
+                .when().get("/api/mobile/recipes")
+                .then()
+                .statusCode(200)
+                .body("page", equalTo(0))
+                .body("size", equalTo(50));
+
+        given()
+                .queryParam("page", 2)
+                .queryParam("size", 0)
+                .when().get("/api/mobile/recipes")
+                .then()
+                .statusCode(200)
+                .body("page", equalTo(2))
+                .body("size", equalTo(1));
+
+        verify(recipeService).listMobileRecipes(null, null, 0, 20, null);
+        verify(recipeService).listMobileRecipes(null, null, 0, 50, null);
+        verify(recipeService).listMobileRecipes(null, null, 2, 1, null);
+    }
+
+    @Test
     void searchesWithRequiredQuery() {
         when(recipeService.listMobileRecipes(eq("pasta"), eq(null), eq(0), eq(20), eq(null)))
                 .thenReturn(new CommonDtos.PageResponse<>(List.of(summary()), 0, 20, 1));
@@ -55,6 +95,11 @@ class MobileRecipeResourceTest {
                 .then()
                 .statusCode(200)
                 .body("content[0].slug", equalTo("tomaten-pasta"));
+
+        given()
+                .when().get("/api/mobile/recipes/search")
+                .then()
+                .statusCode(400);
 
         given()
                 .queryParam("q", "x")
@@ -105,6 +150,37 @@ class MobileRecipeResourceTest {
                         "UNAVAILABLE_IN_STORE",
                         "PRODUCT_WITHOUT_LAYOUT"
                 ));
+    }
+
+    @Test
+    void productMappingAcceptsStoreIdOnlyAndStoreCodeOnly() {
+        when(recipeService.mappingStatus(RECIPE_ID, STORE_ID, null, true))
+                .thenReturn(new RecipeDtos.RecipeProductMappingResponse(RECIPE_ID, STORE_ID, null, List.of()));
+        when(recipeService.mappingStatus(RECIPE_ID, null, "demo-store", true))
+                .thenReturn(new RecipeDtos.RecipeProductMappingResponse(RECIPE_ID, null, "demo-store", List.of()));
+
+        given()
+                .queryParam("storeId", STORE_ID)
+                .when().get("/api/mobile/recipes/{recipeId}/product-mapping", RECIPE_ID)
+                .then()
+                .statusCode(200)
+                .body("storeId", equalTo(STORE_ID.toString()));
+
+        given()
+                .queryParam("storeCode", "demo-store")
+                .when().get("/api/mobile/recipes/{recipeId}/product-mapping", RECIPE_ID)
+                .then()
+                .statusCode(200)
+                .body("storeCode", equalTo("demo-store"));
+    }
+
+    @Test
+    void productMappingRejectsInvalidStoreId() {
+        given()
+                .queryParam("storeId", "not-a-uuid")
+                .when().get("/api/mobile/recipes/{recipeId}/product-mapping", RECIPE_ID)
+                .then()
+                .statusCode(404);
     }
 
     private RecipeDtos.RecipeSummaryResponse summary() {

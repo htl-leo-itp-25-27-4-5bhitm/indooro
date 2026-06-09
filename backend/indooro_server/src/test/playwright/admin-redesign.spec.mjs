@@ -30,3 +30,18 @@ test("renders layout editor canvas and professional tool panels", async ({ page 
   await page.getByRole("button", { name: "Validate" }).click();
   await expect(page.locator("#validationPanel")).toContainText(/Layout|Warnung|Fehler|bereit/i);
 });
+
+test("renders recipe list controls and edit entry points", async ({ page }) => {
+  await page.goto("/admin/recipes/");
+  await expect(page.getByRole("heading", { name: "Rezepte" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Rezept anlegen" })).toBeVisible();
+  await expect(page.getByText("Rezepte suchen")).toBeVisible();
+  await expect(page.locator('[data-filter="query"]')).toBeVisible();
+  await expect(page.locator(".filters label", { hasText: "Status" })).toBeVisible();
+  await expect(page.locator('[data-filter="status"]')).toBeVisible();
+  await expect(page.locator(".filters label", { hasText: "Sortierung" })).toBeVisible();
+  await expect(page.locator('[data-filter="sort"]')).toBeVisible();
+  await expect(page.locator("strong", { hasText: "Apfelkuchen" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bearbeiten" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Mapping" })).toBeVisible();
+});

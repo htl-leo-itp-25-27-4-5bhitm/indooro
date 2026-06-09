@@ -18,6 +18,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class UpsellSuggestionServiceTest {
@@ -65,6 +66,88 @@ class UpsellSuggestionServiceTest {
         assertFalse(ids.contains(4));
         assertTrue(ids.contains(2));
         assertEquals("fallback", response.source());
+    }
+
+    @Test
+    void fallbackSuggestionsExcludeAcceptedUpsellWhenItIsInCurrentListInput() {
+        UpsellDtos.UpsellSuggestionResponse response = service.suggestions(new UpsellDtos.UpsellSuggestionRequest(
+                null,
+                null,
+                1,
+                "local-list",
+                List.of(2),
+                List.of(),
+                "shopping_session",
+                null
+        ));
+
+        List<Integer> ids = response.suggestions().stream()
+                .map(suggestion -> suggestion.product().id())
+                .toList();
+
+        assertFalse(ids.contains(1));
+        assertFalse(ids.contains(2));
+        assertTrue(ids.contains(3));
+        assertEquals("fallback", response.source());
+    }
+
+    @Test
+    void invalidCheckedProductReturnsNotFound() {
+        jakarta.ws.rs.NotFoundException exception = assertThrows(
+                jakarta.ws.rs.NotFoundException.class,
+                () -> service.suggestions(new UpsellDtos.UpsellSuggestionRequest(
+                        null,
+                        null,
+                        999,
+                        "local-list",
+                        List.of(),
+                        List.of(),
+                        "shopping_session",
+                        null
+                ))
+        );
+
+        assertEquals(404, exception.getResponse().getStatus());
+    }
+
+    @Test
+    void disabledUpsellReturnsEmptyDisabledResponseWithoutOpenAiKey() {
+        service.upsellEnabled = false;
+        service.openAiEnabled = true;
+        service.openAiApiKey = Optional.empty();
+
+        UpsellDtos.UpsellSuggestionResponse response = service.suggestions(new UpsellDtos.UpsellSuggestionRequest(
+                null,
+                null,
+                1,
+                "local-list",
+                List.of(),
+                List.of(),
+                "shopping_session",
+                null
+        ));
+
+        assertEquals("disabled", response.source());
+        assertTrue(response.suggestions().isEmpty());
+    }
+
+    @Test
+    void emptyCandidatePoolReturnsEmptySuggestions() {
+        openSearchService.emptyCandidates = true;
+
+        UpsellDtos.UpsellSuggestionResponse response = service.suggestions(new UpsellDtos.UpsellSuggestionRequest(
+                null,
+                null,
+                1,
+                "local-list",
+                List.of(),
+                List.of(),
+                "shopping_session",
+                null
+        ));
+
+        assertEquals("none", response.source());
+        assertTrue(response.suggestions().isEmpty());
     }
 
     @Test
@@ -119,6 +202,77 @@ class UpsellSuggestionServiceTest {
         assertFalse(ids.contains(1));
         assertFalse(ids.contains(3));
         assertTrue(ids.contains(2));
+    }
+
+    @Test
+    void planResponsesIncludeMultipleOpportunities() {
+        UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
+                null,
+                "SPAR",
+                "local-list",
+                List.of(),
+                List.of(),
+                "shopping_session",
+                List.of(
+                        new UpsellDtos.UpsellOpportunityRequest(
+                                "station:shelf-430",
+                                List.of(1),
+                                List.of("Spaghetti")
+                        ),
+                        new UpsellDtos.UpsellOpportunityRequest(
+                                "station:shelf-525",
+                                List.of(4),
+                                List.of("Basilikum")
+                        )
+                )
+        ));
+
+        assertEquals("fallback", response.source());
+        assertEquals(2, response.opportunities().size());
+        assertEquals("station:shelf-430", response.opportunities().get(0).opportunityId());
+        assertEquals("station:shelf-525", response.opportunities().get(1).opportunityId());
+    }
+
+    @Test
+    void emptyPlanCandidatePoolReturnsEmptyOpportunitySuggestions() {
+        openSearchService.emptyCandidates = true;
+
+        UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
+                null,
+                "SPAR",
+                "local-list",
+                List.of(),
+                List.of(),
+                "shopping_session",
+                List.of(new UpsellDtos.UpsellOpportunityRequest(
+                        "station:shelf-430",
+                        List.of(1),
+                        List.of("Spaghetti")
+                ))
+        ));
+
+        assertEquals("none", response.source());
+        assertEquals(1, response.opportunities().size());
+        assertTrue(response.opportunities().get(0).suggestions().isEmpty());
+        assertEquals("no_candidates", response.debug().fallbackReason());
+    }
+
+    @Test
+    void invalidEmptyPlanRequestIsRejected() {
+        jakarta.ws.rs.WebApplicationException exception = assertThrows(
+                jakarta.ws.rs.WebApplicationException.class,
+                () -> service.plan(new UpsellDtos.UpsellPlanRequest(
+                        null,
+                        "SPAR",
+                        "local-list",
+                        List.of(),
+                        List.of(),
+                        "shopping_session",
+                        List.of()
+                ))
+        );
+
+        assertEquals(400, exception.getResponse().getStatus());
     }
 
     @Test
@@ -211,6 +365,7 @@ class UpsellSuggestionServiceTest {
 
     private static final class FakeOpenSearchService extends OpenSearchService {
         int productLookups = 0;
+        boolean emptyCandidates = false;
 
         @Override
         public Product getProductById(Integer id) throws IOException {
@@ -223,6 +378,9 @@ class UpsellSuggestionServiceTest {
 
         @Override
         public List<Product> findUpsellCandidates(Integer size, String storeId, String storeCode) throws IOException {
+            if (emptyCandidates) {
+                return List.of();
+            }
             return List.of(
                     new Product(1, "Spaghetti", 1.49, "430/1/1/1"),
                     new Product(2, "Parmesan", 2.99, "525/1/1/1"),

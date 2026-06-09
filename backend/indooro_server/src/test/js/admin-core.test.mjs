@@ -4,10 +4,12 @@ import {
   canAccessRoute,
   parseImportText,
   readinessForProduct,
+  recipeReadiness,
   routeFromPath,
   sortRows,
   validateBeaconForm,
   validateProductForm,
+  validateRecipeForm,
   validateStoreForm
 } from "../../main/resources/META-INF/resources/admin/core.js";
 import {
@@ -23,11 +25,16 @@ import {
 test("routeFromPath resolves split admin pages", () => {
   assert.equal(routeFromPath("/admin/stores/detail/").id, "stores");
   assert.equal(routeFromPath("/admin/server-logs/").id, "server-logs");
+  assert.equal(routeFromPath("/admin/recipes/").id, "recipes");
+  assert.equal(routeFromPath("/admin/recipes/?recipeId=abc").id, "recipes");
 });
 
 test("role-aware navigation blocks admin-only routes for store managers", () => {
   assert.equal(canAccessRoute({ roles: ["store-manager"] }, routeFromPath("/admin/products/")), false);
+  assert.equal(canAccessRoute({ roles: ["store-manager"] }, routeFromPath("/admin/recipes/")), false);
+  assert.equal(canAccessRoute({ roles: ["region-manager"] }, routeFromPath("/admin/recipes/")), false);
   assert.equal(canAccessRoute({ roles: ["admin"] }, routeFromPath("/admin/products/")), true);
+  assert.equal(canAccessRoute({ roles: ["admin"] }, routeFromPath("/admin/recipes/")), true);
 });
 
 test("validators catch required operational fields", () => {
@@ -41,6 +48,34 @@ test("product readiness reports missing route metadata", () => {
   assert.equal(readiness.status, "warning");
   assert.ok(readiness.problems.includes("Layout-Code fehlt"));
   assert.equal(readinessForProduct({ id: 2, name: "Milch", layoutCode: "A-01", storeCode: "LNZ" }).label, "Routbar");
+});
+
+test("recipe form validation catches publish blockers early", () => {
+  const errors = validateRecipeForm({ slug: "", title: "", servings: 0 });
+  assert.equal(errors.slug, "Slug ist erforderlich.");
+  assert.equal(errors.title, "Titel ist erforderlich.");
+  assert.equal(errors.servings, "Portionen muessen mindestens 1 sein.");
+  assert.deepEqual(validateRecipeForm({ slug: "tomaten-pasta", title: "Tomaten Pasta", servings: 2 }), {});
+});
+
+test("recipe readiness reports mapping and step gaps", () => {
+  const readiness = recipeReadiness({
+    totalIngredientCount: 3,
+    mappedIngredientCount: 1,
+    stepCount: 0,
+    steps: []
+  });
+  assert.equal(readiness.status, "warning");
+  assert.ok(readiness.warnings.includes("2 Mapping offen"));
+  assert.ok(readiness.warnings.includes("Keine Schritte"));
+
+  const ready = recipeReadiness({
+    totalIngredientCount: 2,
+    mappedIngredientCount: 2,
+    steps: [{ instruction: "Kochen." }]
+  });
+  assert.equal(ready.status, "ready");
+  assert.equal(ready.label, "Publikationsbereit");
 });
 
 test("imports support JSON arrays and NDJSON", () => {

@@ -14,6 +14,8 @@ import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.not;
+import static org.hamcrest.CoreMatchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
@@ -131,6 +133,51 @@ class MobileUpsellResourceTest {
     }
 
     @Test
+    void returnsMultiplePlannedOpportunities() {
+        when(upsellSuggestionService.plan(any()))
+                .thenReturn(new UpsellDtos.UpsellPlanResponse(
+                        List.of(
+                                new UpsellDtos.UpsellOpportunityResponse("station:shelf-430", List.of(1), List.of()),
+                                new UpsellDtos.UpsellOpportunityResponse("station:shelf-525", List.of(3), List.of())
+                        ),
+                        "fallback",
+                        Instant.parse("2026-06-02T12:00:00Z"),
+                        null
+                ));
+
+        given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "shoppingListId": "local-list",
+                          "source": "shopping_session",
+                          "opportunities": [
+                            { "opportunityId": "station:shelf-430", "triggerProductIds": [1] },
+                            { "opportunityId": "station:shelf-525", "triggerProductIds": [3] }
+                          ]
+                        }
+                        """)
+                .when().post("/api/mobile/upsell/plan")
+                .then()
+                .statusCode(200)
+                .body("opportunities.size()", equalTo(2))
+                .body("opportunities[1].opportunityId", equalTo("station:shelf-525"));
+    }
+
+    @Test
+    void invalidOpportunityRequestReturnsBadRequest() {
+        when(upsellSuggestionService.plan(any()))
+                .thenThrow(new WebApplicationException("Mindestens eine Upsell-Station ist erforderlich.", Response.Status.BAD_REQUEST));
+
+        given()
+                .contentType("application/json")
+                .body("{\"opportunities\":[]}")
+                .when().post("/api/mobile/upsell/plan")
+                .then()
+                .statusCode(400);
+    }
+
+    @Test
     void invalidCheckedProductReturnsNotFound() {
         when(upsellSuggestionService.suggestions(any()))
                 .thenThrow(new WebApplicationException("Produkt nicht gefunden.", Response.Status.NOT_FOUND));
@@ -153,13 +200,17 @@ class MobileUpsellResourceTest {
                 .body("{\"eventType\":\"dismissed\",\"checkedProductId\":1,\"suggestedProductId\":2}")
                 .when().post("/api/mobile/upsell/events")
                 .then()
-                .statusCode(202);
+                .statusCode(202)
+                .body(not(containsString("openai")))
+                .body(not(containsString("api")));
 
         given()
                 .contentType("application/json")
                 .body("{\"checkedProductId\":1,\"suggestedProductId\":2}")
                 .when().post("/api/mobile/upsell/dismiss")
                 .then()
-                .statusCode(202);
+                .statusCode(202)
+                .body(not(containsString("openai")))
+                .body(not(containsString("api")));
     }
 }

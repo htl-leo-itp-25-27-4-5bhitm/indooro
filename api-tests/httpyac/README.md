@@ -99,10 +99,10 @@ npm run api:test -- --output none --output-failed response
 Erwarteter erfolgreicher Endstand:
 
 ```text
-79 requests processed (79 succeeded)
+92 requests processed (92 succeeded)
 ```
 
-## Was sind die 79 Tests?
+## Was sind die 92 Tests?
 
 Der Gesamtlauf `npm run api:test` fuehrt diese Dateien aus:
 
@@ -112,9 +112,11 @@ Der Gesamtlauf `npm run api:test` fuehrt diese Dateien aus:
 02-admin-rbac.http
 03-maintenance-smoke.http
 04-role-route-matrix.http
+05-recipes.http
+06-upsell.http
 ```
 
-Zusammen sind das 79 HTTP-Requests mit Assertions.
+Zusammen sind das 92 HTTP-Requests mit Assertions.
 
 ### 00-auth.http: 3 Auth-Checks
 
@@ -266,6 +268,47 @@ Geprueft wird:
   `403`.
 - Rollenfehler sind echte Authorization-Fehler und keine kaputten Logins.
 
+### 05-recipes.http: 8 Recipe-Smoke-Checks
+
+Diese Datei prueft neue Recipe-Catalog-Routen, ohne Live-Daten hart
+vorauszusetzen. Detail- und Mapping-Routen akzeptieren fuer unbekannte
+Fixture-IDs deshalb `404`; mit einer echten publizierten `ACTIVE_RECIPE_ID`
+liefern sie `200`.
+
+1. `GET /api/mobile/recipes?page=0&size=5` anonym
+2. `GET /api/mobile/recipes/search` anonym ohne `q`
+3. `GET /api/mobile/recipes/search?q={RECIPE_SEARCH_QUERY}&size=5` anonym
+4. `GET /api/mobile/recipes/{ACTIVE_RECIPE_ID}` anonym
+5. `GET /api/mobile/recipes/{ACTIVE_RECIPE_ID}/product-mapping?storeId={ACTIVE_STORE_ID}` anonym
+6. `GET /api/admin/recipes` anonym
+7. `GET /api/admin/recipes?size=10` als Admin
+8. `GET /api/admin/recipe-tags` als Admin
+
+Geprueft wird:
+
+- Mobile Recipe APIs bleiben oeffentlich/anonym.
+- Recipe Search validiert den Pflichtparameter `q`.
+- Admin Recipe APIs sind geschuetzt.
+- Admin kann Recipes und Recipe Tags lesen.
+
+### 06-upsell.http: 5 Upsell-Smoke-Checks
+
+Diese Datei prueft die anonymen Mobile-Upsell-Routen. Sie verwendet keine
+OpenAI-Secrets und setzt keinen OpenAI-Key auf dem Client voraus.
+
+1. `POST /api/mobile/upsell/suggestions` mit `UPSELL_CHECKED_PRODUCT_ID`
+2. `POST /api/mobile/upsell/suggestions` mit `UPSELL_UNKNOWN_PRODUCT_ID`
+3. `POST /api/mobile/upsell/plan` mit station opportunity
+4. `POST /api/mobile/upsell/events`
+5. `POST /api/mobile/upsell/dismiss`
+
+Geprueft wird:
+
+- Suggestions liefern JSON fuer einen gueltigen Produktkontext.
+- Unbekannte Produkt-IDs liefern einen sauberen Fehler.
+- Station-based Upsell-Plans bleiben oeffentlich nutzbar.
+- Events und Dismissals liefern `202` und geben keine sensitiven Details aus.
+
 ## Einzelne Testbereiche
 
 Public Routes, ohne Login:
@@ -292,6 +335,18 @@ Maintenance-Smoke-Tests:
 npm run api:test:maintenance -- --output none --output-failed response
 ```
 
+Recipe-Smoke-Tests:
+
+```bash
+npm run api:test:recipes -- --output none --output-failed response
+```
+
+Upsell-Smoke-Tests:
+
+```bash
+npm run api:test:upsell -- --output none --output-failed response
+```
+
 ## Token-Fallback
 
 Nur verwenden, wenn du Access Tokens manuell in `.env` eingetragen hast:
@@ -309,7 +364,10 @@ Fuer den normalen Stand brauchst du diese Variante nicht.
 - Public Product APIs bleiben anonym erreichbar.
 - Public Category APIs bleiben anonym erreichbar.
 - Public Mobile Store APIs bleiben anonym erreichbar.
+- Public Mobile Recipe APIs bleiben anonym erreichbar.
+- Public Mobile Upsell APIs bleiben anonym erreichbar.
 - Admin APIs sind ohne Login nicht direkt als JSON-API nutzbar.
+- Admin Recipe APIs brauchen Admin-Auth.
 - `indooro-admin` darf globale Admin-Routen verwenden.
 - `indooro-region` ist auf seine Region eingeschraenkt.
 - `indooro-store` ist auf seine Filiale eingeschraenkt.
@@ -338,7 +396,16 @@ REGION_ALLOWED_STORE_ID=ad61389a-7486-48fa-afa2-9b5e4132f6a8
 REGION_FORBIDDEN_STORE_ID=00000000-0000-0000-0000-000000000000
 STORE_ALLOWED_STORE_ID=ad61389a-7486-48fa-afa2-9b5e4132f6a8
 STORE_FORBIDDEN_STORE_ID=8c45864d-5041-4b07-aca0-2405db5a2ca7
+ACTIVE_RECIPE_ID=00000000-0000-0000-0000-000000000000
+RECIPE_SEARCH_QUERY=pasta
+UPSELL_CHECKED_PRODUCT_ID=990001
+UPSELL_UNKNOWN_PRODUCT_ID=999999999
 ```
+
+`ACTIVE_RECIPE_ID` darf fuer Smoke-Zwecke auf einer unbekannten UUID stehen;
+dann werden Detail und Mapping als dokumentiertes `404` akzeptiert. Fuer eine
+staerkere Live-Demo sollte hier eine publizierte Rezept-ID aus der Demo-DB
+eingetragen werden.
 
 Aktueller Live-Stand:
 
