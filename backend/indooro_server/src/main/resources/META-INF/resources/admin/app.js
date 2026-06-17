@@ -2,6 +2,7 @@ import {
   API,
   ROUTES,
   beaconState,
+  buildRecipeProductMappingPayload,
   buildProductPayload,
   buildStorePayload,
   canAccessRoute,
@@ -11,6 +12,8 @@ import {
   normalizeList,
   paginateRows,
   parseImportText,
+  recipeMappingProductMeta,
+  recipeMappingProductReadiness,
   readinessForProduct,
   recipeReadiness,
   routeFromPath,
@@ -690,6 +693,19 @@ function openImportDrawer(kind) {
 }
 
 function openRecipeDrawer(recipe = {}) {
+  const initialIngredients = normalizeList(recipe.ingredients).length
+    ? normalizeList(recipe.ingredients).map((item, index) => ({
+      id: item.id || null,
+      position: item.position || index + 1,
+      quantityText: item.quantityText || "",
+      selectedProduct: item.product || null,
+      displayName: item.displayName || ""
+    }))
+    : [{ id: null, position: 1, quantityText: "", selectedProduct: null, displayName: "" }];
+  const initialSteps = normalizeList(recipe.steps).length
+    ? normalizeList(recipe.steps).map((item, index) => ({ id: item.id || null, position: item.position || index + 1, instruction: item.instruction || "" }))
+    : [{ id: null, position: 1, instruction: "" }];
+
   openDrawer(recipe.id ? "Rezept bearbeiten" : "Rezept anlegen", `
     <div class="stepper"><div class="step active">1 Metadata</div><div class="step active">2 Zutaten</div><div class="step active">3 Schritte</div><div class="step">4 Publish</div></div>
     <form class="stack">
@@ -702,17 +718,66 @@ function openRecipeDrawer(recipe = {}) {
         ${field("totalTimeMinutes", "Gesamt min", recipe.totalTimeMinutes ?? "", "number", "", "37")}
         <div class="span-2">${textarea("summary", "Summary", recipe.summary || "", "Warmer Crumble mit Apfel, Hafer und Butter.")}</div>
         <div class="span-2">${textarea("description", "Beschreibung", recipe.description || "", "Ein einfaches Ofenrezept fuer 4 Portionen.")}</div>
-        <div class="span-2">${textarea("ingredientsText", "Zutaten", (recipe.ingredients || []).map((item, index) => `${index + 1};${item.displayName};${item.quantityText || ""}`).join("\n"), "1;Apfel;4 Stk\n2;Haferflocken;120 g\n3;Butter;80 g")}</div>
-        <div class="span-2">${textarea("stepsText", "Schritte", (recipe.steps || []).map((item, index) => `${index + 1};${item.instruction}`).join("\n"), "1;Aepfel schneiden und in die Form geben\n2;Haferflocken und Butter verkneten\n3;25 Minuten backen")}</div>
+        <div class="span-2 recipe-builder">
+          <div class="split">
+            <div>
+              <label>Zutaten</label>
+              <p class="muted">Produkt aus dem Katalog suchen und auswaehlen. Freitext wird hier nicht als Produkt-Mapping gespeichert.</p>
+            </div>
+            <button type="button" class="small" data-add-ingredient>+ Zutat</button>
+          </div>
+          <div class="recipe-ingredient-list" data-recipe-ingredients></div>
+        </div>
+        <div class="span-2 recipe-builder">
+          <div class="split">
+            <label>Schritte</label>
+            <button type="button" class="small" data-add-step>+ Schritt</button>
+          </div>
+          <div class="recipe-step-list" data-recipe-steps></div>
+        </div>
       </div>
       <div data-error-summary></div>
       <div class="toolbar"><button class="primary">Speichern</button></div>
     </form>
   `, (drawer) => {
+    const ingredientState = initialIngredients.map((item, index) => ({ ...item, position: index + 1, query: item.selectedProduct?.name || item.displayName || "", results: [], loading: false, error: null, timer: null }));
+    const stepState = initialSteps.map((item, index) => ({ ...item, position: index + 1 }));
+    let productOptions = [];
+
+    const renderRecipeBuilder = () => {
+      drawer.querySelector("[data-recipe-ingredients]").innerHTML = ingredientState.map((item, index) => renderRecipeIngredientRow(item, index)).join("");
+      drawer.querySelector("[data-recipe-steps]").innerHTML = stepState.map((item, index) => renderRecipeStepRow(item, index)).join("");
+      hydrateRecipeBuilder(drawer, ingredientState, stepState, () => {
+        renderRecipeBuilder();
+      }, () => productOptions);
+    };
+
+    loadRecipeProductOptions().then((products) => {
+      productOptions = products;
+      renderRecipeBuilder();
+    }).catch((error) => {
+      productOptions = [];
+      toast(`Produkte konnten nicht geladen werden: ${error.message}`, "danger");
+      renderRecipeBuilder();
+    });
+    renderRecipeBuilder();
+
     drawer.querySelector("form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const values = formValues(event.currentTarget);
       const errors = validateRecipeForm(values);
+      const ingredients = ingredientState
+        .map((item, index) => ({ ...item, position: index + 1, quantityText: String(item.quantityText || "").trim() }))
+        .filter((item) => item.selectedProduct);
+      const steps = stepState
+        .map((item, index) => ({ position: index + 1, instruction: String(item.instruction || "").trim() }))
+        .filter((item) => item.instruction);
+      if (!ingredients.length) {
+        errors.ingredients = "Mindestens eine Zutat mit Produkt auswaehlen.";
+      }
+      if (!steps.length) {
+        errors.steps = "Mindestens einen Zubereitungsschritt eintragen.";
+      }
       if (showErrors(event.currentTarget, errors)) return;
       const recipePayload = {
         slug: values.slug,
@@ -726,12 +791,21 @@ function openRecipeDrawer(recipe = {}) {
         status: recipe.status || "DRAFT",
         tagIds: []
       };
-      const ingredients = rowsFromText(values.ingredientsText).map(([position, displayName, quantityText]) => ({ position: Number(position), displayName, quantityText, optional: false }));
-      const steps = rowsFromText(values.stepsText).map(([position, instruction]) => ({ position: Number(position), instruction }));
       if (recipe.id) {
         await apiPut(`${API.recipes}/${recipe.id}`, recipePayload);
       } else {
-        await apiPost(API.recipes, { recipe: recipePayload, ingredients, steps });
+        const savedRecipe = await apiPost(API.recipes, {
+          recipe: recipePayload,
+          ingredients: ingredients.map((item) => ({
+            position: item.position,
+            displayName: item.selectedProduct.name,
+            canonicalName: item.selectedProduct.name,
+            quantityText: item.quantityText || null,
+            optional: false
+          })),
+          steps
+        });
+        await saveRecipeIngredientProductMappings(savedRecipe, ingredients);
       }
       closeDrawer();
       toast("Rezept gespeichert.");
@@ -740,41 +814,435 @@ function openRecipeDrawer(recipe = {}) {
   });
 }
 
-async function openMappingDrawer(recipe) {
-  openDrawer("Zutaten-Mapping", `<div class="loading">Mapping wird geladen...</div>`);
-  const mapping = await safeGet(`${API.recipes}/${recipe.id}/mapping-status`, { ingredients: [] });
-  const drawer = document.querySelector(".drawer");
-  drawer.innerHTML = `
-    <div class="split"><h2>Zutaten-Mapping</h2><button class="ghost" data-close-drawer>Schliessen</button></div>
-    <div class="stack">
-      ${normalizeList(mapping.ingredients).map((item) => `
-        <div class="panel">
-          <div class="split"><strong>${escapeHtml(item.ingredientName)}</strong>${badge(item.status, item.status === "RESOLVED" ? "success" : "warning")}</div>
-          <p class="muted">${escapeHtml(item.reason || "Vorschlaege pruefen oder manuell bestaetigen.")}</p>
-          ${(item.candidates || []).map((candidate) => `<div class="split"><span>${escapeHtml(candidate.name)} <span class="mono">${escapeHtml(candidate.layoutCode || "-")}</span></span><button class="small" data-map="${item.ingredientId}" data-product="${candidate.id}">Zuordnen</button></div>`).join("") || empty("Keine Vorschlaege.", "Produktsuche im Backend lieferte keinen sicheren Treffer.")}
-        </div>
-      `).join("") || empty("Keine Mapping-Daten.", "Dieses Rezept hat noch keine Zutaten.")}
+function renderRecipeIngredientRow(item, index) {
+  const results = item.query.trim().length > 1 ? item.results : [];
+  return `
+    <div class="recipe-ingredient-row" data-recipe-ingredient-row="${index}">
+      <div class="recipe-row-number">${index + 1}</div>
+      <div class="field">
+        <label for="ingredient-quantity-${index}">Menge</label>
+        <input id="ingredient-quantity-${index}" data-ingredient-quantity="${index}" value="${escapeHtml(item.quantityText)}" placeholder="z.B. 4 Stk oder 250 g">
+      </div>
+      <div class="field recipe-product-picker">
+        <label for="ingredient-product-${index}">Produkt aus Katalog</label>
+        <input
+          id="ingredient-product-${index}"
+          data-ingredient-product-search="${index}"
+          role="combobox"
+          aria-expanded="${results.length ? "true" : "false"}"
+          autocomplete="off"
+          value="${escapeHtml(item.query)}"
+          placeholder="Produkt suchen, z.B. Apfel">
+        ${item.selectedProduct ? `<div class="mapping-selected compact">${renderMappingProduct(item.selectedProduct)}</div>` : ""}
+        ${renderRecipeProductPickerState(item, index)}
+      </div>
+      <button type="button" class="small ghost" data-remove-ingredient="${index}" ${index === 0 ? "disabled" : ""}>Entfernen</button>
     </div>
   `;
-  drawer.querySelector("[data-close-drawer]")?.addEventListener("click", closeDrawer);
-  drawer.querySelectorAll("[data-map]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const candidate = normalizeList(mapping.ingredients).flatMap((item) => item.candidates || []).find((product) => String(product.id) === button.dataset.product);
-      await apiPut(`${API.recipes}/${recipe.id}/ingredients/${button.dataset.map}/product-mapping`, {
-        productId: candidate.id,
-        productName: candidate.name,
-        layoutCode: candidate.layoutCode,
-        storeId: candidate.storeId || null,
-        storeCode: candidate.storeCode || null,
-        mappingType: "MANUAL",
-        confidence: 1,
-        manuallyConfirmed: true
-      });
-      toast("Mapping bestaetigt.");
-      closeDrawer();
-      renderRecipes();
+}
+
+function renderRecipeProductPickerState(item, index) {
+  if (item.loading) {
+    return `<div class="mapping-results"><div class="loading">Produkte werden gesucht...</div></div>`;
+  }
+  if (item.error) {
+    return `<div class="mapping-results"><div class="notice danger">${escapeHtml(item.error)}</div></div>`;
+  }
+  if (item.query.trim().length > 1 && !item.results.length && !item.selectedProduct) {
+    return `<div class="mapping-results">${empty("Keine Produkte gefunden.", "Bitte ein vorhandenes Produkt aus dem Katalog suchen.")}</div>`;
+  }
+  if (item.query.trim().length < 2 || item.selectedProduct) {
+    return "";
+  }
+  return `
+    <div class="mapping-results" role="listbox" aria-label="Produktvorschlaege">
+      ${item.results.map((product) => `
+        <button type="button" class="mapping-result" data-recipe-select-product="${index}" data-product-id="${escapeHtml(product.id)}" role="option">
+          ${renderMappingProduct(product)}
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderRecipeStepRow(item, index) {
+  return `
+    <div class="recipe-step-row" data-recipe-step-row="${index}">
+      <div class="recipe-row-number">${index + 1}</div>
+      <div class="field">
+        <label for="recipe-step-${index}">Schritt</label>
+        <textarea id="recipe-step-${index}" data-step-instruction="${index}" placeholder="Was passiert in diesem Schritt?">${escapeHtml(item.instruction)}</textarea>
+      </div>
+      <button type="button" class="small ghost" data-remove-step="${index}" ${index === 0 ? "disabled" : ""}>Entfernen</button>
+    </div>
+  `;
+}
+
+function hydrateRecipeBuilder(drawer, ingredientState, stepState, render, productsProvider) {
+  drawer.querySelector("[data-add-ingredient]")?.addEventListener("click", () => {
+    ingredientState.push({ id: null, position: ingredientState.length + 1, quantityText: "", selectedProduct: null, displayName: "", query: "", results: [], loading: false, error: null, timer: null });
+    render();
+  });
+  drawer.querySelector("[data-add-step]")?.addEventListener("click", () => {
+    stepState.push({ id: null, position: stepState.length + 1, instruction: "" });
+    render();
+  });
+  drawer.querySelectorAll("[data-ingredient-quantity]").forEach((input) => {
+    input.addEventListener("input", () => {
+      ingredientState[Number(input.dataset.ingredientQuantity)].quantityText = input.value;
     });
   });
+  drawer.querySelectorAll("[data-step-instruction]").forEach((input) => {
+    input.addEventListener("input", () => {
+      stepState[Number(input.dataset.stepInstruction)].instruction = input.value;
+    });
+  });
+  drawer.querySelectorAll("[data-remove-ingredient]").forEach((button) => {
+    button.addEventListener("click", () => {
+      ingredientState.splice(Number(button.dataset.removeIngredient), 1);
+      render();
+    });
+  });
+  drawer.querySelectorAll("[data-remove-step]").forEach((button) => {
+    button.addEventListener("click", () => {
+      stepState.splice(Number(button.dataset.removeStep), 1);
+      render();
+    });
+  });
+  drawer.querySelectorAll("[data-ingredient-product-search]").forEach((input) => {
+    input.addEventListener("input", () => {
+      const index = Number(input.dataset.ingredientProductSearch);
+      const row = ingredientState[index];
+      row.query = input.value;
+      row.selectedProduct = null;
+      clearTimeout(row.timer);
+      const query = row.query.trim();
+      if (query.length < 2) {
+        row.results = [];
+        row.loading = false;
+        row.error = null;
+        render();
+        return;
+      }
+      row.loading = true;
+      row.error = null;
+      render();
+      row.timer = setTimeout(() => {
+        row.results = filterRecipeProducts(productsProvider(), query).slice(0, 8);
+        row.loading = false;
+        render();
+      }, 250);
+    });
+  });
+  drawer.querySelectorAll("[data-recipe-select-product]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number(button.dataset.recipeSelectProduct);
+      const product = ingredientState[index].results.find((candidate) => String(candidate.id) === button.dataset.productId);
+      ingredientState[index].selectedProduct = product || null;
+      ingredientState[index].query = product?.name || "";
+      ingredientState[index].results = [];
+      render();
+    });
+  });
+}
+
+async function loadRecipeProductOptions() {
+  const products = normalizeList(await apiGet(API.products));
+  return products.filter((product) => product?.id && product?.name);
+}
+
+function filterRecipeProducts(products, query) {
+  const needle = query.trim().toLowerCase();
+  return products.filter((product) => [
+    product.name,
+    product.id,
+    product.layoutCode,
+    product.storeCode
+  ].some((value) => String(value ?? "").toLowerCase().includes(needle)));
+}
+
+async function saveRecipeIngredientProductMappings(savedRecipe, selectedIngredients) {
+  const savedIngredients = normalizeList(savedRecipe.ingredients);
+  for (const selected of selectedIngredients) {
+    const savedIngredient = savedIngredients.find((ingredient) => ingredient.position === selected.position);
+    if (!savedIngredient?.id || !selected.selectedProduct?.id) {
+      continue;
+    }
+    await apiPut(`${API.recipes}/${savedRecipe.id}/ingredients/${savedIngredient.id}/product-mapping`, buildRecipeProductMappingPayload(selected.selectedProduct));
+  }
+}
+
+async function openMappingDrawer(recipe) {
+  openDrawer("Zutaten-Mapping", `<div class="loading">Mapping wird geladen...</div>`);
+  let mapping = await safeGet(`${API.recipes}/${recipe.id}/mapping-status`, { ingredients: [] });
+  const drawer = document.querySelector(".drawer");
+  const ingredientState = new Map();
+
+  const stateFor = (item) => {
+    if (!ingredientState.has(item.ingredientId)) {
+      ingredientState.set(item.ingredientId, {
+        query: "",
+        results: normalizeList(item.candidates),
+        selected: null,
+        loading: false,
+        error: null,
+        highlightedIndex: -1,
+        timer: null
+      });
+    }
+    return ingredientState.get(item.ingredientId);
+  };
+
+  const render = (focusIngredientId = null) => {
+    const ingredients = normalizeList(mapping.ingredients);
+    drawer.innerHTML = `
+      <div class="split"><h2>Zutaten-Mapping</h2><button class="ghost" data-close-drawer>Schliessen</button></div>
+      <p class="muted">Suche ein Produkt aus dem Katalog und speichere die Zuordnung ueber die echte Produkt-ID.</p>
+      <div class="stack">
+        ${ingredients.map((item) => renderMappingIngredientPanel(item, stateFor(item))).join("") || empty("Keine Mapping-Daten.", "Dieses Rezept hat noch keine Zutaten.")}
+      </div>
+    `;
+    hydrateMappingDrawer(recipe, drawer, ingredients, ingredientState, render, async () => {
+      mapping = await apiGet(`${API.recipes}/${recipe.id}/mapping-status`);
+      ingredientState.clear();
+      render();
+      renderRecipes();
+    });
+    if (focusIngredientId) {
+      const input = drawer.querySelector(`[data-product-search="${focusIngredientId}"]`);
+      input?.focus();
+      input?.setSelectionRange(input.value.length, input.value.length);
+    }
+  };
+
+  render();
+}
+
+function renderMappingIngredientPanel(item, controlState) {
+  const currentProduct = item.product;
+  const selectedProduct = controlState.selected;
+  return `
+    <div class="panel mapping-panel" data-ingredient-panel="${escapeHtml(item.ingredientId)}">
+      <div class="split">
+        <div>
+          <strong>${escapeHtml(item.ingredientName)}</strong>
+          <p class="muted">${escapeHtml(item.reason || "Produkt im Katalog suchen und bestaetigen.")}</p>
+        </div>
+        ${badge(mappingStatusLabel(item.status), mappingStatusTone(item.status))}
+      </div>
+      ${currentProduct ? `
+        <div class="mapping-current">
+          <div>
+            <span class="muted">Aktuell zugeordnet</span>
+            ${renderMappingProduct(currentProduct)}
+          </div>
+        </div>
+      ` : ""}
+      <div class="mapping-combobox">
+        <label class="muted" for="mapping-search-${escapeHtml(item.ingredientId)}">Produkt suchen</label>
+        <div class="mapping-search-row">
+          <input
+            id="mapping-search-${escapeHtml(item.ingredientId)}"
+            data-product-search="${escapeHtml(item.ingredientId)}"
+            role="combobox"
+            aria-expanded="${controlState.results.length ? "true" : "false"}"
+            autocomplete="off"
+            placeholder="Mindestens 2 Zeichen eingeben"
+            value="${escapeHtml(controlState.query)}">
+          <button class="small" data-clear-selection="${escapeHtml(item.ingredientId)}" ${selectedProduct || controlState.query ? "" : "disabled"}>Leeren</button>
+        </div>
+        ${selectedProduct ? `
+          <div class="mapping-selected">
+            <span class="muted">Ausgewaehlt</span>
+            ${renderMappingProduct(selectedProduct)}
+            <button class="primary small" data-save-mapping="${escapeHtml(item.ingredientId)}">Mapping speichern</button>
+          </div>
+        ` : ""}
+        ${renderMappingSearchState(item, controlState)}
+      </div>
+    </div>
+  `;
+}
+
+function renderMappingSearchState(item, controlState) {
+  if (controlState.loading) {
+    return `<div class="mapping-results"><div class="loading">Produkte werden gesucht...</div></div>`;
+  }
+  if (controlState.error) {
+    return `<div class="mapping-results"><div class="notice danger">${escapeHtml(controlState.error)}</div></div>`;
+  }
+  if (controlState.query.trim().length > 1 && !controlState.results.length) {
+    return `<div class="mapping-results">${empty("Keine Produkte gefunden.", "Passe den Suchbegriff an. Freitext wird nicht als Mapping gespeichert.")}</div>`;
+  }
+  if (!controlState.query.trim() && !controlState.results.length) {
+    return `<div class="mapping-results"><div class="notice">Tippe mindestens 2 Zeichen, um Katalogprodukte zu suchen.</div></div>`;
+  }
+
+  return `
+    <div class="mapping-results" role="listbox" aria-label="Produktvorschlaege fuer ${escapeHtml(item.ingredientName)}">
+      ${controlState.results.map((product, index) => `
+        <button class="mapping-result ${index === controlState.highlightedIndex ? "active" : ""}" data-select-product="${escapeHtml(item.ingredientId)}" data-product-id="${escapeHtml(product.id)}" role="option">
+          ${renderMappingProduct(product)}
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderMappingProduct(product) {
+  const readiness = recipeMappingProductReadiness(product);
+  return `
+    <span class="mapping-product">
+      <span><strong>${escapeHtml(product.name || "Unbenanntes Produkt")}</strong> <span class="mono">#${escapeHtml(product.id ?? "-")}</span></span>
+      <span class="muted">${escapeHtml(recipeMappingProductMeta(product))}</span>
+      ${badge(readiness.label, readiness.tone)}
+    </span>
+  `;
+}
+
+function hydrateMappingDrawer(recipe, drawer, ingredients, ingredientState, render, afterSaved) {
+  drawer.querySelector("[data-close-drawer]")?.addEventListener("click", closeDrawer);
+
+  drawer.querySelectorAll("[data-product-search]").forEach((input) => {
+    input.addEventListener("input", () => {
+      const ingredientId = input.dataset.productSearch;
+      const controlState = ingredientState.get(ingredientId);
+      controlState.query = input.value;
+      controlState.selected = null;
+      controlState.highlightedIndex = -1;
+      clearTimeout(controlState.timer);
+      const query = controlState.query.trim();
+      if (query.length < 2) {
+        const item = ingredients.find((ingredient) => ingredient.ingredientId === ingredientId);
+        controlState.results = normalizeList(item?.candidates);
+        controlState.loading = false;
+        controlState.error = null;
+        render(ingredientId);
+        return;
+      }
+      controlState.loading = true;
+      controlState.error = null;
+      render(ingredientId);
+      controlState.timer = setTimeout(async () => {
+        const item = ingredients.find((ingredient) => ingredient.ingredientId === ingredientId);
+        await searchMappingProducts(recipe.id, ingredientId, controlState, query, item);
+        render(ingredientId);
+      }, 320);
+    });
+
+    input.addEventListener("keydown", (event) => {
+      const ingredientId = input.dataset.productSearch;
+      const controlState = ingredientState.get(ingredientId);
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        controlState.highlightedIndex = Math.min(controlState.results.length - 1, controlState.highlightedIndex + 1);
+        render(ingredientId);
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        controlState.highlightedIndex = Math.max(0, controlState.highlightedIndex - 1);
+        render(ingredientId);
+      } else if (event.key === "Enter" && controlState.highlightedIndex >= 0) {
+        event.preventDefault();
+        controlState.selected = controlState.results[controlState.highlightedIndex];
+        controlState.query = controlState.selected?.name || controlState.query;
+        render(ingredientId);
+      } else if (event.key === "Escape") {
+        controlState.selected = null;
+        controlState.query = "";
+        controlState.results = [];
+        render(ingredientId);
+      }
+    });
+  });
+
+  drawer.querySelectorAll("[data-select-product]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const ingredientId = button.dataset.selectProduct;
+      const controlState = ingredientState.get(ingredientId);
+      const selected = controlState.results.find((product) => String(product.id) === button.dataset.productId);
+      controlState.selected = selected || null;
+      controlState.query = selected?.name || controlState.query;
+      render(ingredientId);
+    });
+  });
+
+  drawer.querySelectorAll("[data-clear-selection]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const ingredientId = button.dataset.clearSelection;
+      const controlState = ingredientState.get(ingredientId);
+      clearTimeout(controlState.timer);
+      controlState.query = "";
+      controlState.selected = null;
+      controlState.results = [];
+      controlState.error = null;
+      controlState.loading = false;
+      controlState.highlightedIndex = -1;
+      render(ingredientId);
+    });
+  });
+
+  drawer.querySelectorAll("[data-save-mapping]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const ingredientId = button.dataset.saveMapping;
+      const controlState = ingredientState.get(ingredientId);
+      const payload = buildRecipeProductMappingPayload(controlState.selected, {
+        storeId: controlState.selected?.storeId || null,
+        storeCode: controlState.selected?.storeCode || null
+      });
+      if (!payload) {
+        toast("Bitte zuerst ein Produkt auswaehlen.", "danger");
+        return;
+      }
+      await apiPut(`${API.recipes}/${recipe.id}/ingredients/${ingredientId}/product-mapping`, payload);
+      toast("Mapping bestaetigt.");
+      await afterSaved();
+    });
+  });
+}
+
+async function searchMappingProducts(recipeId, ingredientId, controlState, query, item = {}) {
+  try {
+    const params = new URLSearchParams({ q: query, size: "8" });
+    if (item.product?.storeId) {
+      params.set("storeId", item.product.storeId);
+    }
+    controlState.results = normalizeList(await apiGet(`${API.recipes}/${recipeId}/ingredients/${ingredientId}/mapping-suggestions?${params}`));
+    controlState.error = null;
+  } catch (error) {
+    controlState.results = [];
+    controlState.error = error.message || "Produktsuche fehlgeschlagen.";
+  } finally {
+    controlState.loading = false;
+  }
+}
+
+function mappingStatusLabel(status) {
+  switch (status) {
+    case "MAPPED":
+      return "Im Markt";
+    case "PRODUCT_WITHOUT_LAYOUT":
+      return "Nicht routbar";
+    case "MULTIPLE_CANDIDATES":
+      return "Auswahl noetig";
+    case "UNAVAILABLE_IN_STORE":
+      return "Nicht im Store";
+    default:
+      return "Nicht zugeordnet";
+  }
+}
+
+function mappingStatusTone(status) {
+  switch (status) {
+    case "MAPPED":
+      return "success";
+    case "PRODUCT_WITHOUT_LAYOUT":
+    case "MULTIPLE_CANDIDATES":
+      return "warning";
+    case "UNAVAILABLE_IN_STORE":
+      return "danger";
+    default:
+      return "muted";
+  }
 }
 
 function table({ columns, rows, emptyMessage }) {

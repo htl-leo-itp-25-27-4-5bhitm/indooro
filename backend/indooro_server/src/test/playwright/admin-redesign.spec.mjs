@@ -44,4 +44,18 @@ test("renders recipe list controls and edit entry points", async ({ page }) => {
   await expect(page.locator("strong", { hasText: "Apfelkuchen" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Bearbeiten" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Mapping" })).toBeVisible();
+  await page.getByRole("button", { name: "Mapping" }).click();
+  await expect(page.getByRole("heading", { name: "Zutaten-Mapping" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Produkt suchen" })).toBeVisible();
+  await expect(page.getByRole("option", { name: /Apfel/ })).toBeVisible();
+});
+
+test("recipe create form offers product dropdown for ingredients", async ({ page }) => {
+  await page.goto("/admin/recipes/");
+  await page.getByRole("button", { name: "Rezept anlegen" }).click();
+  await expect(page.getByRole("heading", { name: "Rezept anlegen" })).toBeVisible();
+  const productSearch = page.getByRole("combobox", { name: "Produkt aus Katalog" });
+  await expect(productSearch).toBeVisible();
+  await productSearch.fill("Ap");
+  await expect(page.getByRole("option", { name: /Apfel/ })).toBeVisible();
 });

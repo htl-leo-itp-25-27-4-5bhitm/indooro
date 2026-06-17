@@ -2,6 +2,7 @@ package at.htl.resource.admin;
 
 import at.htl.admin.dto.CommonDtos;
 import at.htl.admin.dto.RecipeDtos;
+import at.htl.admin.service.ErrorLogService;
 import at.htl.admin.service.RecipeService;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
@@ -29,6 +30,9 @@ class AdminRecipeResourceTest {
 
     @InjectMock
     RecipeService recipeService;
+
+    @InjectMock
+    ErrorLogService errorLogService;
 
     @Test
     void rejectsAnonymousRecipeAdminAccess() {
@@ -300,8 +304,6 @@ class AdminRecipeResourceTest {
                 .body("""
                         {
                           "productId": 42,
-                          "productName": "Tomaten",
-                          "layoutCode": "310/1",
                           "mappingType": "MANUAL",
                           "confidence": 1,
                           "manuallyConfirmed": true
@@ -314,16 +316,34 @@ class AdminRecipeResourceTest {
 
     @Test
     @TestSecurity(user = "admin", roles = "admin")
+    void returnsNotFoundForUnknownMappingProduct() {
+        when(recipeService.confirmMapping(eq(RECIPE_ID), eq(INGREDIENT_ID), any()))
+                .thenThrow(new WebApplicationException("Produkt nicht gefunden.", Response.Status.NOT_FOUND));
+
+        given()
+                .contentType("application/json")
+                .body("{\"productId\":999,\"mappingType\":\"MANUAL\",\"confidence\":1,\"manuallyConfirmed\":true}")
+                .when().put("/api/admin/recipes/{recipeId}/ingredients/{ingredientId}/product-mapping", RECIPE_ID, INGREDIENT_ID)
+                .then()
+                .statusCode(404);
+    }
+
+    @Test
+    @TestSecurity(user = "admin", roles = "admin")
     void returnsMappingSuggestions() {
         when(recipeService.mappingSuggestions(eq(RECIPE_ID), eq(INGREDIENT_ID), eq(null), eq("tomaten"), eq(10)))
-                .thenReturn(List.of(new RecipeDtos.MappedRecipeProduct(42, "Tomaten", 1.99, "310/1", null, null)));
+                .thenReturn(List.of(new RecipeDtos.MappedRecipeProduct(42, "Tomaten", 1.99, "310/1", null, "demo-store")));
 
         given()
                 .queryParam("q", "tomaten")
                 .when().get("/api/admin/recipes/{recipeId}/ingredients/{ingredientId}/mapping-suggestions", RECIPE_ID, INGREDIENT_ID)
                 .then()
                 .statusCode(200)
-                .body("[0].id", equalTo(42));
+                .body("[0].id", equalTo(42))
+                .body("[0].name", equalTo("Tomaten"))
+                .body("[0].price", equalTo(1.99f))
+                .body("[0].layoutCode", equalTo("310/1"))
+                .body("[0].storeCode", equalTo("demo-store"));
     }
 
     private RecipeDtos.RecipeIngredientResponse ingredient(String displayName) {

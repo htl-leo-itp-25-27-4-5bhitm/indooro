@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildRecipeProductMappingPayload,
   canAccessRoute,
   parseImportText,
   readinessForProduct,
+  recipeMappingProductReadiness,
+  recipeMappingProductMeta,
   recipeReadiness,
   routeFromPath,
   sortRows,
@@ -76,6 +79,30 @@ test("recipe readiness reports mapping and step gaps", () => {
   });
   assert.equal(ready.status, "ready");
   assert.equal(ready.label, "Publikationsbereit");
+});
+
+test("recipe mapping product helpers keep product id as mapping source", () => {
+  const product = {
+    id: 42,
+    name: "Tomaten",
+    price: 1.99,
+    layoutCode: "310/1",
+    storeCode: "demo-store"
+  };
+
+  assert.deepEqual(buildRecipeProductMappingPayload(product), {
+    productId: 42,
+    storeId: null,
+    storeCode: "demo-store",
+    mappingType: "MANUAL",
+    confidence: 1,
+    manuallyConfirmed: true
+  });
+  assert.equal(buildRecipeProductMappingPayload({ name: "Freitext" }), null);
+  assert.equal(recipeMappingProductReadiness(product).label, "Routbar");
+  assert.equal(recipeMappingProductReadiness({ ...product, layoutCode: "" }).label, "Nicht routbar");
+  assert.ok(recipeMappingProductMeta(product).includes("#42"));
+  assert.ok(recipeMappingProductMeta(product).includes("310/1"));
 });
 
 test("imports support JSON arrays and NDJSON", () => {

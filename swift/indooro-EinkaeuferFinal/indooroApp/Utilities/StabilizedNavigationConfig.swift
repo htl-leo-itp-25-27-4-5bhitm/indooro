@@ -3,6 +3,7 @@ import Foundation
 struct StabilizedNavigationConfig {
     var beacon = BeaconPositioningConfig()
     var poseFusion = PoseFusionConfig()
+    var displayPosition = DisplayPositionConfig()
     var mapMatcher = MapMatcherConfig()
     var route = RouteStabilityConfig()
     var confidence = ConfidenceConfig()
@@ -40,6 +41,15 @@ struct PoseFusionConfig {
     var confidenceDecayPerPredictionSecond: Float = 0.38
 }
 
+struct DisplayPositionConfig {
+    var displayPositionUpdateIntervalSeconds: TimeInterval = 1.0
+    var minDisplayPositionChangeMeters: Float = 0.85
+    var maxDisplayPositionStalenessSeconds: TimeInterval = 3.0
+    var maxReasonableMovementMetersPerSecond: Float = 2.5
+    var requiredJumpConfirmations: Int = 3
+    var smoothingAlpha: Float = 0.35
+}
+
 struct MapMatcherConfig {
     var candidateSearchRadius: Float = 2.4
     var maxProjectionDistance: Float = 3.8
@@ -53,13 +63,15 @@ struct MapMatcherConfig {
 }
 
 struct RouteStabilityConfig {
-    var offRouteDistanceMeters: Float = 4.0
-    var offRouteHoldSeconds: TimeInterval = 2.5
-    var rerouteCooldownSeconds: TimeInterval = 8.0
-    var activeSegmentLockDistanceMeters: Float = 1.35
-    var decisionUnlockDistanceMeters: Float = 1.6
-    var progressBacktrackToleranceMeters: Float = 1.2
-    var rerouteRequiresAlternativeEdgeScoreGain: Float = 0.55
+    var offRouteDistanceMeters: Float = 8.0
+    var offRouteHoldSeconds: TimeInterval = 6.0
+    var rerouteCooldownSeconds: TimeInterval = 20.0
+    var minReroutePositionChangeMeters: Float = 5.0
+    var minRouteDifferenceToReplace: Float = 6.0
+    var activeSegmentLockDistanceMeters: Float = 2.4
+    var decisionUnlockDistanceMeters: Float = 2.6
+    var progressBacktrackToleranceMeters: Float = 3.0
+    var rerouteRequiresAlternativeEdgeScoreGain: Float = 2.0
     var manualCalibrationTriggersReroute: Bool = true
 }
 

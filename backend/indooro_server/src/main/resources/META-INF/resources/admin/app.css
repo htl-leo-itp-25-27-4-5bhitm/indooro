@@ -421,6 +421,113 @@ tbody tr:hover { background: #fbfcfd; }
 .split { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
 .hide { display: none !important; }
 
+.mapping-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.mapping-current,
+.mapping-selected {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+}
+
+.mapping-combobox {
+  display: grid;
+  gap: 8px;
+}
+
+.mapping-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.mapping-results {
+  display: grid;
+  gap: 8px;
+}
+
+.mapping-result {
+  width: 100%;
+  min-height: 0;
+  padding: 10px;
+  justify-content: stretch;
+  text-align: left;
+  white-space: normal;
+  background: #fff;
+}
+
+.mapping-result:hover,
+.mapping-result.active {
+  border-color: var(--primary);
+  background: #edf7fa;
+}
+
+.mapping-product {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+}
+
+.mapping-selected.compact {
+  margin-top: 8px;
+  padding: 10px;
+}
+
+.recipe-builder {
+  display: grid;
+  gap: 12px;
+}
+
+.recipe-builder > .split label {
+  margin-bottom: 2px;
+}
+
+.recipe-ingredient-list,
+.recipe-step-list {
+  display: grid;
+  gap: 10px;
+}
+
+.recipe-ingredient-row,
+.recipe-step-row {
+  display: grid;
+  grid-template-columns: 32px minmax(120px, .35fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+}
+
+.recipe-step-row {
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+}
+
+.recipe-row-number {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-top: 24px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.recipe-product-picker {
+  position: relative;
+}
+
 @media (max-width: 1040px) {
   .admin-app { grid-template-columns: 1fr; }
   .sidebar { position: relative; height: auto; }
@@ -435,4 +542,11 @@ tbody tr:hover { background: #fbfcfd; }
   .filters, .form-grid, .stepper { grid-template-columns: 1fr; }
   .form-grid .span-2 { grid-column: auto; }
   .nav { grid-template-columns: 1fr 1fr; }
+  .recipe-ingredient-row,
+  .recipe-step-row {
+    grid-template-columns: 1fr;
+  }
+  .recipe-row-number {
+    margin-top: 0;
+  }
 }

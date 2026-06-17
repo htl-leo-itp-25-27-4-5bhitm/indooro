@@ -202,6 +202,36 @@ export function recipeReadiness(recipe = {}) {
   };
 }
 
+export function recipeMappingProductReadiness(product = {}) {
+  const layoutCode = String(product.layoutCode ?? "").trim();
+  return {
+    routable: Boolean(layoutCode),
+    label: layoutCode ? "Routbar" : "Nicht routbar",
+    tone: layoutCode ? "success" : "warning"
+  };
+}
+
+export function recipeMappingProductMeta(product = {}) {
+  const price = product.price == null ? "-" : `${Number(product.price).toFixed(2)} EUR`;
+  const layout = product.layoutCode || "kein Layout-Code";
+  const store = product.storeCode || product.storeId || "global";
+  return `#${product.id ?? "-"} · ${price} · ${layout} · ${store}`;
+}
+
+export function buildRecipeProductMappingPayload(product = {}, options = {}) {
+  if (!product.id) {
+    return null;
+  }
+  return {
+    productId: Number(product.id),
+    storeId: product.storeId || options.storeId || null,
+    storeCode: product.storeCode || options.storeCode || null,
+    mappingType: options.mappingType || "MANUAL",
+    confidence: options.confidence ?? 1,
+    manuallyConfirmed: options.manuallyConfirmed ?? true
+  };
+}
+
 export function buildProductPayload(values = {}) {
   return {
     id: Number(values.id),

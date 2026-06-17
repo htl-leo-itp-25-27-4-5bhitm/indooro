@@ -26,6 +26,23 @@ const mock = {
   products: [{ id: 1, name: "Apfel", price: 1.99, layoutCode: "A-01", storeCode: "LINZ-01" }],
   categories: [{ categoryCode: 310, categoryName: "Obst und Gemuese", name: "Obst und Gemuese" }],
   recipes: [{ id: "recipe-1", slug: "apfelkuchen", title: "Apfelkuchen", status: "DRAFT", mappedIngredientCount: 1, totalIngredientCount: 2, tags: [] }],
+  recipeMapping: {
+    recipeId: "recipe-1",
+    storeId: null,
+    storeCode: null,
+    ingredients: [
+      {
+        ingredientId: "ingredient-1",
+        ingredientName: "Aepfel",
+        status: "UNMAPPED",
+        product: null,
+        candidates: [{ id: 1, name: "Apfel", price: 1.99, layoutCode: "A-01", storeCode: "LINZ-01" }],
+        confidence: null,
+        manuallyConfirmed: false,
+        reason: "Keine Produktzuordnung vorhanden."
+      }
+    ]
+  },
   logs: [{ id: "log-1", action: "SMOKE", summary: "Smoke event", createdAt: new Date().toISOString() }]
 };
 
@@ -38,6 +55,20 @@ createServer(async (request, response) => {
   if (url.pathname === "/api/admin/products") return json(response, mock.products);
   if (url.pathname === "/api/categories") return json(response, mock.categories);
   if (url.pathname === "/api/admin/recipes") return json(response, mock.recipes);
+  if (url.pathname === "/api/admin/recipes/recipe-1/mapping-status") return json(response, mock.recipeMapping);
+  if (url.pathname === "/api/admin/recipes/recipe-1/ingredients/ingredient-1/mapping-suggestions") return json(response, mock.products);
+  if (url.pathname === "/api/admin/recipes/recipe-1/ingredients/ingredient-1/product-mapping" && request.method === "PUT") {
+    mock.recipeMapping.ingredients[0] = {
+      ...mock.recipeMapping.ingredients[0],
+      status: "MAPPED",
+      product: mock.products[0],
+      candidates: [],
+      confidence: 1,
+      manuallyConfirmed: true,
+      reason: null
+    };
+    return json(response, mock.recipeMapping.ingredients[0]);
+  }
   if (url.pathname === "/api/admin/logs" || url.pathname === "/api/admin/error-logs") return json(response, mock.logs);
   if (url.pathname === "/api/stores/store-1") return json(response, { ...mock.stores.items[0], street: "Hauptstrasse 1", zipCode: "4020", country: "Austria", activeLayout: { versionNo: 1, createdAt: new Date().toISOString() } });
   if (url.pathname === "/api/stores/store-1/beacons") return json(response, mock.beacons);

@@ -340,9 +340,11 @@ public class RecipeService {
                                                                      RecipeDtos.ProductMappingRequest request) {
         adminAccessService.requireAdmin();
         RecipeIngredientEntity ingredient = requireIngredient(recipeId, ingredientId);
+        Product product = requireProduct(request.productId());
         StoreEntity store = request.storeId() == null
                 ? null
                 : storeRepository.findByIdOptional(request.storeId()).orElseThrow(() -> new NotFoundException("Filiale nicht gefunden."));
+        validateProductStoreContext(product, request.storeId(), request.storeCode());
         mappingRepository.findActiveByIngredientAndProduct(ingredientId, request.productId(), request.storeId()).ifPresent(existing -> {
             throw conflict("Dieses Produkt ist fuer die Zutat bereits aktiv gemappt.");
         });
@@ -351,22 +353,14 @@ public class RecipeService {
         mapping.recipeIngredient = ingredient;
         mapping.canonicalName = normalizeIngredientName(ingredient);
         mapping.store = store;
-        mapping.storeCode = normalizeOptional(request.storeCode()) != null
-                ? normalizeOptional(request.storeCode())
-                : store == null ? null : store.storeCode;
-        mapping.productId = request.productId();
-        mapping.productNameSnapshot = normalizeOptional(request.productName());
-        mapping.layoutCodeSnapshot = normalizeOptional(request.layoutCode());
+        mapping.storeCode = firstNonBlank(product.getStoreCode(), request.storeCode(), store == null ? null : store.storeCode);
+        mapping.productId = product.getId();
+        mapping.productNameSnapshot = normalizeOptional(product.getName());
+        mapping.layoutCodeSnapshot = normalizeOptional(product.getLayoutCode());
         mapping.mappingType = parseMappingType(request.mappingType());
         mapping.confidence = request.confidence() == null ? BigDecimal.ONE : request.confidence();
         mapping.manuallyConfirmed = request.manuallyConfirmed() == null || request.manuallyConfirmed();
         mapping.status = RecordStatus.ACTIVE;
-
-        Product product = resolveProduct(request.productId());
-        if (product != null) {
-            mapping.productNameSnapshot = product.getName();
-            mapping.layoutCodeSnapshot = product.getLayoutCode();
-        }
 
         mappingRepository.persist(mapping);
         auditLogService.log("RECIPE", recipeId, "CONFIRM_MAPPING", "Zutat einem Produkt zugeordnet", null, mapping.productNameSnapshot);
@@ -619,6 +613,33 @@ public class RecipeService {
         }
     }
 
+    private Product requireProduct(Integer productId) {
+        Product product;
+        try {
+            product = openSearchService.getProductById(productId);
+        } catch (IOException exception) {
+            LOG.warn("Could not verify recipe mapping product " + productId, exception);
+            throw new WebApplicationException("Produktkatalog nicht erreichbar.", Response.Status.INTERNAL_SERVER_ERROR);
+        }
+        if (product == null) {
+            throw new NotFoundException("Produkt nicht gefunden.");
+        }
+        return product;
+    }
+
+    private void validateProductStoreContext(Product product, UUID requestedStoreId, String requestedStoreCode) {
+        String productStoreId = normalizeOptional(product.getStoreId());
+        if (requestedStoreId != null && productStoreId != null && !productStoreId.equalsIgnoreCase(requestedStoreId.toString())) {
+            throw badRequest("Produkt gehoert nicht zur angefragten Filiale.");
+        }
+
+        String productStoreCode = normalizeOptional(product.getStoreCode());
+        String normalizedRequestedStoreCode = normalizeOptional(requestedStoreCode);
+        if (normalizedRequestedStoreCode != null && productStoreCode != null && !productStoreCode.equalsIgnoreCase(normalizedRequestedStoreCode)) {
+            throw badRequest("Produkt gehoert nicht zum angefragten Store-Code.");
+        }
+    }
+
     private RecipeDtos.MappedRecipeProduct toMappedProduct(Product product) {
         return new RecipeDtos.MappedRecipeProduct(
                 product.getId(),
@@ -811,6 +832,16 @@ public class RecipeService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            String normalized = normalizeOptional(value);
+            if (normalized != null) {
+                return normalized;
+            }
+        }
+        return null;
     }
 
     private WebApplicationException badRequest(String message) {

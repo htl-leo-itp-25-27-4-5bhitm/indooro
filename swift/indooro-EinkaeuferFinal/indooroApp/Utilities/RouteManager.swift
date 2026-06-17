@@ -21,6 +21,7 @@ final class RouteManager {
     private var routeFrozen = false
     private var offRouteSince: TimeInterval?
     private var lastRerouteAt: TimeInterval?
+    private var currentRouteStartPoint: SIMD2<Float>?
 
     private var lockedRouteEdgeIndex: Int?
     private var maxProgressAlongRoute: Float = 0
@@ -46,6 +47,8 @@ final class RouteManager {
         currentRoute = nil
         destinationMapPoint = nil
         offRouteSince = nil
+        lastRerouteAt = nil
+        currentRouteStartPoint = nil
         lockedRouteEdgeIndex = nil
         maxProgressAlongRoute = 0
         edgePrefixDistances = []
@@ -128,8 +131,9 @@ final class RouteManager {
         if isStableOffRoute,
            !routeFrozen,
            canReroute(at: timestamp),
+           hasMovedEnoughForReroute(from: matchedPose.snappedPosition),
            let destinationMapPoint,
-           buildRoute(from: matchedPose.snappedPosition, to: destinationMapPoint) {
+           buildRoute(from: matchedPose.snappedPosition, to: destinationMapPoint, replacingOnlyIfRelevant: true) {
             routeChanged = true
             triggeredReroute = true
             offRouteSince = nil
@@ -143,6 +147,8 @@ final class RouteManager {
                 progressAlongRoute: nearestOnRoute.progress
             )
             activeEdgeID = currentRoute?.edgeIDs[safe: lockedIndex]
+        } else if isStableOffRoute, !routeFrozen, canReroute(at: timestamp), hasMovedEnoughForReroute(from: matchedPose.snappedPosition) {
+            lastRerouteAt = timestamp
         }
 
         let polyline = currentRoute?.polyline ?? []
@@ -166,13 +172,31 @@ final class RouteManager {
         return timestamp - lastRerouteAt >= config.rerouteCooldownSeconds
     }
 
+    private func hasMovedEnoughForReroute(from mapPoint: SIMD2<Float>) -> Bool {
+        guard let currentRouteStartPoint else {
+            return true
+        }
+        return simd_length(mapPoint - currentRouteStartPoint) >= config.minReroutePositionChangeMeters
+    }
+
     @discardableResult
-    private func buildRoute(from startPoint: SIMD2<Float>, to endPoint: SIMD2<Float>) -> Bool {
+    private func buildRoute(
+        from startPoint: SIMD2<Float>,
+        to endPoint: SIMD2<Float>,
+        replacingOnlyIfRelevant: Bool = false
+    ) -> Bool {
         guard let newRoute = graph.plannedRoute(from: startPoint, to: endPoint, floor: 0), !newRoute.edgeIDs.isEmpty else {
             return false
         }
 
+        if replacingOnlyIfRelevant,
+           let currentRoute,
+           !isRouteReplacementRelevant(currentRoute: currentRoute, newRoute: newRoute) {
+            return false
+        }
+
         currentRoute = newRoute
+        currentRouteStartPoint = startPoint
         offRouteSince = nil
         lockedRouteEdgeIndex = 0
         maxProgressAlongRoute = 0
@@ -322,6 +346,50 @@ final class RouteManager {
         }
 
         return activeProjection.distanceToPoint - matchedPose.distanceToRaw
+    }
+
+    private func isRouteReplacementRelevant(currentRoute: IndoorRoute, newRoute: IndoorRoute) -> Bool {
+        let routeCostDifference = abs(currentRoute.totalCost - newRoute.totalCost)
+        let polylineLengthDifference = abs(polylineLength(currentRoute.polyline) - polylineLength(newRoute.polyline))
+
+        if routeCostDifference >= config.minRouteDifferenceToReplace
+            || polylineLengthDifference >= config.minRouteDifferenceToReplace {
+            return true
+        }
+
+        guard currentRoute.edgeIDs == newRoute.edgeIDs else {
+            return false
+        }
+
+        return maxPolylinePointDistance(currentRoute.polyline, newRoute.polyline) >= config.minRouteDifferenceToReplace
+    }
+
+    private func polylineLength(_ polyline: [SIMD2<Float>]) -> Float {
+        guard polyline.count > 1 else {
+            return 0
+        }
+
+        var length: Float = 0
+        for index in 1..<polyline.count {
+            length += simd_length(polyline[index] - polyline[index - 1])
+        }
+        return length
+    }
+
+    private func maxPolylinePointDistance(_ lhs: [SIMD2<Float>], _ rhs: [SIMD2<Float>]) -> Float {
+        guard lhs.isEmpty == false || rhs.isEmpty == false else {
+            return 0
+        }
+
+        if lhs.count != rhs.count {
+            return .greatestFiniteMagnitude
+        }
+
+        var maxDistance: Float = 0
+        for index in lhs.indices {
+            maxDistance = max(maxDistance, simd_length(lhs[index] - rhs[index]))
+        }
+        return maxDistance
     }
 }
 

@@ -232,6 +232,11 @@ final class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate,
     private let headingReliabilityTimeout: TimeInterval = 1.4
 
     private var lastMatchedPose: MapMatchedPose?
+    private var smoothedDisplayPositionPoint: SIMD2<Float>?
+    private var lastPublishedDisplayPositionPoint: SIMD2<Float>?
+    private var lastPublishedDisplayPositionTimestamp: TimeInterval?
+    private var pendingJumpPoint: SIMD2<Float>?
+    private var pendingJumpConfirmations = 0
     private var manualCalibrationRevision: Int = 0
     private var isUpdatingHeading = false
     private var latestHeadingAccuracyDegrees: CLLocationDirection = -1
@@ -692,10 +697,104 @@ final class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate,
             applyStateActions(navigationStateMachine?.handle(.rerouteFinished(timestamp: timestamp)) ?? [])
         }
 
+        let displayPoint = filteredDisplayPosition(for: matched.snappedPosition, timestamp: timestamp)
+
         DispatchQueue.main.async {
-            self.userPosition = CGPoint(matched.snappedPosition)
+            if let displayPoint {
+                self.userPosition = CGPoint(displayPoint)
+            }
             self.setNavigationRouteIfNeeded(NavigationRoute(points: routeUpdate.routePolyline))
         }
+    }
+
+    private func filteredDisplayPosition(for candidatePoint: SIMD2<Float>, timestamp: TimeInterval) -> SIMD2<Float>? {
+        guard candidatePoint.x.isFinite, candidatePoint.y.isFinite else {
+            return nil
+        }
+
+        let config = navigationConfig.displayPosition
+
+        if shouldHoldForJumpConfirmation(candidatePoint: candidatePoint, timestamp: timestamp, config: config) {
+            return nil
+        }
+
+        let smoothedPoint: SIMD2<Float>
+        if let previous = smoothedDisplayPositionPoint {
+            smoothedPoint = previous + (candidatePoint - previous) * config.smoothingAlpha
+        } else {
+            smoothedPoint = candidatePoint
+        }
+        smoothedDisplayPositionPoint = smoothedPoint
+
+        guard let lastPublishedPoint = lastPublishedDisplayPositionPoint,
+              let lastPublishedTimestamp = lastPublishedDisplayPositionTimestamp else {
+            lastPublishedDisplayPositionPoint = smoothedPoint
+            lastPublishedDisplayPositionTimestamp = timestamp
+            return smoothedPoint
+        }
+
+        let elapsed = timestamp - lastPublishedTimestamp
+        guard elapsed >= config.displayPositionUpdateIntervalSeconds else {
+            return nil
+        }
+
+        let movedEnough = simd_length(smoothedPoint - lastPublishedPoint) >= config.minDisplayPositionChangeMeters
+        let staleEnough = elapsed >= config.maxDisplayPositionStalenessSeconds
+        guard movedEnough || staleEnough else {
+            return nil
+        }
+
+        lastPublishedDisplayPositionPoint = smoothedPoint
+        lastPublishedDisplayPositionTimestamp = timestamp
+        return smoothedPoint
+    }
+
+    private func shouldHoldForJumpConfirmation(
+        candidatePoint: SIMD2<Float>,
+        timestamp: TimeInterval,
+        config: DisplayPositionConfig
+    ) -> Bool {
+        guard let stablePoint = smoothedDisplayPositionPoint ?? lastPublishedDisplayPositionPoint else {
+            pendingJumpPoint = nil
+            pendingJumpConfirmations = 0
+            return false
+        }
+
+        let referenceTimestamp = lastPublishedDisplayPositionTimestamp ?? timestamp
+        let elapsed = max(0.05, timestamp - referenceTimestamp)
+        let allowedMovement = config.maxReasonableMovementMetersPerSecond * Float(elapsed)
+            + config.minDisplayPositionChangeMeters
+        let distance = simd_length(candidatePoint - stablePoint)
+
+        guard distance > allowedMovement else {
+            pendingJumpPoint = nil
+            pendingJumpConfirmations = 0
+            return false
+        }
+
+        if let pendingJumpPoint,
+           simd_length(candidatePoint - pendingJumpPoint) <= max(0.5, config.minDisplayPositionChangeMeters * 1.5) {
+            pendingJumpConfirmations += 1
+        } else {
+            pendingJumpPoint = candidatePoint
+            pendingJumpConfirmations = 1
+        }
+
+        if pendingJumpConfirmations >= max(1, config.requiredJumpConfirmations) {
+            pendingJumpPoint = nil
+            pendingJumpConfirmations = 0
+            return false
+        }
+
+        return true
+    }
+
+    private func resetDisplayPositionFilter(to mapPoint: SIMD2<Float>? = nil, timestamp: TimeInterval? = nil) {
+        smoothedDisplayPositionPoint = mapPoint
+        lastPublishedDisplayPositionPoint = mapPoint
+        lastPublishedDisplayPositionTimestamp = timestamp
+        pendingJumpPoint = nil
+        pendingJumpConfirmations = 0
     }
 
     // MARK: - Manual calibration
@@ -741,6 +840,7 @@ final class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate,
             mapPoint: CGPoint(effectivePoint),
             timestamp: timestamp
         )
+        resetDisplayPositionFilter(to: effectivePoint, timestamp: timestamp)
 
         DispatchQueue.main.async {
             self.userPosition = CGPoint(effectivePoint)
@@ -1064,9 +1164,12 @@ final class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate,
         if let matched {
             lastMatchedPose = matched
         }
+        let filteredDisplayPoint = filteredDisplayPosition(for: displayPoint, timestamp: timestamp)
 
         DispatchQueue.main.async {
-            self.userPosition = CGPoint(displayPoint)
+            if let filteredDisplayPoint {
+                self.userPosition = CGPoint(filteredDisplayPoint)
+            }
             if self.rawUserPosition == nil {
                 self.rawUserPosition = CGPoint(predictedPose.mapPoint)
             }
@@ -1756,6 +1859,7 @@ final class BeaconManager: NSObject, ObservableObject, CBCentralManagerDelegate,
         syncKalmanFiltersWithBeacons()
         clearBeaconMeasurements()
         rssiBuffer.removeAll()
+        resetDisplayPositionFilter()
         targetPosition = nil
         rebuildNavigationPipeline()
         setNavigationRouteIfNeeded(.empty)

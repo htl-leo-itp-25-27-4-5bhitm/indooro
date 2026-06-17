@@ -9,11 +9,13 @@
 
     <properties>
         <compiler-plugin.version>3.11.0</compiler-plugin.version>
+        <jacoco-plugin.version>0.8.15</jacoco-plugin.version>
         <surefire-plugin.version>3.2.5</surefire-plugin.version>
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <quarkus.platform.version>3.6.0</quarkus.platform.version>
         <opensearch.version>2.9.0</opensearch.version>
+        <jacocoArgLine></jacocoArgLine>
     </properties>
 
     <dependencyManagement>
@@ -118,6 +120,11 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jacoco</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
             <scope>test</scope>
@@ -152,10 +159,44 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire-plugin.version}</version>
                 <configuration>
+                    <argLine>@{jacocoArgLine}</argLine>
                     <systemPropertyVariables>
                         <net.bytebuddy.experimental>true</net.bytebuddy.experimental>
                     </systemPropertyVariables>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco-plugin.version}</version>
+                <configuration>
+                    <exclClassLoaders>*QuarkusClassLoader</exclClassLoaders>
+                    <destFile>${project.build.directory}/jacoco-quarkus.exec</destFile>
+                    <append>true</append>
+                    <excludes>
+                        <exclude>at/htl/DTO/**</exclude>
+                        <exclude>at/htl/admin/dto/**</exclude>
+                        <exclude>at/htl/admin/entity/**</exclude>
+                        <exclude>at/htl/config/**</exclude>
+                        <exclude>at/htl/model/**</exclude>
+                        <exclude>at/htl/ExampleResource*</exclude>
+                    </excludes>
+                    <formats>
+                        <format>HTML</format>
+                        <format>XML</format>
+                    </formats>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                        <configuration>
+                            <propertyName>jacocoArgLine</propertyName>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
