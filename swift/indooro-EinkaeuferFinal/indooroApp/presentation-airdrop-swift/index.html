@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AirDrop in Swift</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section class="hero" data-background-gradient="linear-gradient(135deg, #180f1f 0%, #3b1219 46%, #f04f23 130%)">
+          <div class="hero-grid">
+            <div>
+              <p class="eyebrow">Swift / iOS / Share Sheet</p>
+              <h1>AirDrop in Swift</h1>
+              <p class="subtitle">Wie iOS Daten peer-to-peer teilt und wie unser Swift-Projekt das nutzt</p>
+              <p class="meta">Projekt: <strong>mc-indooro / indooroApp</strong> · Erik Bergmair, David Berghahn</p>
+            </div>
+            <div class="device-card" aria-label="AirDrop Konzeptgrafik">
+              <div class="iphone">
+                <div class="speaker"></div>
+                <div class="screen">
+                  <div class="app-icon">in</div>
+                  <div class="share-panel">
+                    <span></span><span></span><span></span>
+                  </div>
+                </div>
+              </div>
+              <div class="signal">
+                <span></span><span></span><span></span>
+              </div>
+              <div class="iphone small">
+                <div class="speaker"></div>
+                <div class="screen">
+                  <div class="file-icon">.indoorolist</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <aside class="notes">
+            Einstieg: In dieser Präsentation geht es um AirDrop aus der Sicht eines Swift/iOS-Projekts. Wir erklären nicht das interne Apple-Protokoll im Detail und versuchen auch nicht, AirDrop selbst nachzubauen. Stattdessen zeigen wir, was für uns als App-Entwickler relevant ist: Wir müssen Daten sauber vorbereiten, sie in ein teilbares Format bringen und sie an iOS übergeben. In unserem Projekt ist das Beispiel eine Einkaufsliste oder eine Auswahl von Artikeln. Die wichtige Grundidee lautet: AirDrop ist die Systemfunktion, unser Swift-Code baut den Export und den Import darum herum.
+          </aside>
+        </section>
+
+        <section>
+          <h2>Worum geht's?</h2>
+          <div class="cards three compact">
+            <div class="card">
+              <span class="badge">1</span>
+              <h3>AirDrop allgemein</h3>
+              <p>Was passiert konzeptionell, wenn Apple-Geräte in der Nähe Daten austauschen?</p>
+            </div>
+            <div class="card">
+              <span class="badge">2</span>
+              <h3>iOS Share Sheet</h3>
+              <p>Welche Rolle spielt das System-UI, und warum sieht man AirDrop oft nicht direkt im Code?</p>
+            </div>
+            <div class="card">
+              <span class="badge">3</span>
+              <h3>Unser Projekt</h3>
+              <p>Wie wird aus einer Einkaufsliste eine Datei, die geteilt und wieder importiert werden kann?</p>
+            </div>
+          </div>
+          <div class="claim">
+            Kernidee: Unsere App baut Export und Import. iOS übernimmt das eigentliche Teilen, inklusive AirDrop.
+          </div>
+          <aside class="notes">
+            Auf dieser Folie geben wir die Struktur vor. Zuerst betrachten wir AirDrop allgemein: Was macht iOS, was macht der User, und welche Rolle spielt die Nähe zwischen Geräten? Danach erklären wir das Share Sheet, weil das in iOS der zentrale Einstiegspunkt fürs Teilen ist. Erst danach gehen wir in unser Projekt. Diese Reihenfolge ist wichtig, weil man sonst leicht denkt, wir hätten irgendwo eine AirDrop-Methode implementiert. In Wirklichkeit implementieren wir aber nicht AirDrop selbst. Wir bauen ein Datenpaket, geben es dem System, und iOS bietet AirDrop als eine mögliche Zielaktion an.
+          </aside>
+        </section>
+
+        <section>
+          <h2>AirDrop allgemein</h2>
+          <div class="timeline">
+            <div><span>1</span><strong>Geräte finden</strong><p>Apple-Geräte in der Nähe werden über Systemdienste sichtbar.</p></div>
+            <div><span>2</span><strong>Kontakt wählen</strong><p>Der User wählt im System-UI aus, an wen gesendet wird.</p></div>
+            <div><span>3</span><strong>Transfer</strong><p>iOS kümmert sich um Verbindung, Sicherheit und Übertragung.</p></div>
+            <div><span>4</span><strong>Öffnen</strong><p>Beim Empfänger entscheidet iOS, welche App die Datei öffnen kann.</p></div>
+          </div>
+          <p class="footnote">Nicht zu tief intern: Für uns als App-Entwickler ist entscheidend, welche Daten wir an iOS übergeben.</p>
+          <aside class="notes">
+            AirDrop kann man sich als Systemfunktion vorstellen, die das schnelle Teilen zwischen Apple-Geräten ermöglicht. Der User muss keinen Account in unserer App haben, keine Telefonnummer eingeben und keinen Server verwenden. iOS zeigt Geräte oder Kontakte in der Nähe an, der User wählt ein Ziel aus, und das System übernimmt die Verbindung und Übertragung. Für uns ist wichtig: Unsere App muss nicht selbst nach anderen Geräten suchen und keine Bluetooth- oder Wi-Fi-Verbindung programmieren. Wir stellen nur etwas Teilbares bereit, zum Beispiel eine Datei. Danach übernimmt iOS den AirDrop-Teil.
+          </aside>
+        </section>
+
+        <section>
+          <h2>Was AirDrop im System macht</h2>
+          <div class="cards three compact">
+            <div class="card">
+              <span class="badge">Discovery</span>
+              <h3>Geräte in der Nähe</h3>
+              <p>iOS findet mögliche Empfänger in der Umgebung und zeigt sie im Teilen-Dialog an.</p>
+            </div>
+            <div class="card">
+              <span class="badge">Transport</span>
+              <h3>Direkte Übertragung</h3>
+              <p>Der Transfer läuft lokal zwischen Apple-Geräten. Unsere App sieht diesen Netzwerkaufbau nicht.</p>
+            </div>
+            <div class="card">
+              <span class="badge">Sicherheit</span>
+              <h3>User entscheidet</h3>
+              <p>Der User wählt Empfänger und bestätigt Annahme. iOS kontrolliert UI und Berechtigungen.</p>
+            </div>
+          </div>
+          <div class="claim">Für Swift-Code heißt das: AirDrop ist kein eigener Netzwerkservice in unserer App, sondern eine Systemoption beim Teilen.</div>
+          <aside class="notes">
+            Diese Folie fokussiert wirklich auf AirDrop selbst. Wichtig ist, dass AirDrop nicht einfach „Datei kopieren“ bedeutet. iOS muss zuerst erkennen, welche Apple-Geräte in der Nähe verfügbar sind. Dann wird im Share Sheet ein Empfänger angezeigt, und der User entscheidet aktiv, wohin gesendet wird. Der eigentliche Transport passiert systemseitig. Das ist für uns angenehm, weil wir keine Low-Level-Kommunikation bauen müssen. Gleichzeitig bedeutet es aber auch: Wir haben nicht volle Kontrolle über jeden Schritt. Unsere Verantwortung liegt davor und danach: Daten vorbereiten, Datei übergeben, Import sauber verarbeiten.
+          </aside>
+        </section>
+
+        <section>
+          <h2>Was AirDrop nicht ist</h2>
+          <div class="cards two">
+            <div class="card">
+              <span class="badge">Nicht unser Code</span>
+              <h3>Kein eigenes Protokoll</h3>
+              <p>Wir implementieren keine AirDrop-Verbindung, keine Geräteliste und keine Funkübertragung.</p>
+            </div>
+            <div class="card">
+              <span class="badge">Nicht Backend</span>
+              <h3>Keine Synchronisation</h3>
+              <p>AirDrop sendet eine Datei. Es ersetzt keine Datenbank, keinen Account und keinen Cloud-Sync.</p>
+            </div>
+          </div>
+          <div class="mini-flow">
+            <span>Unsere Daten</span><span>Datei</span><span>Share Sheet</span><span>AirDrop</span><span>Import</span>
+          </div>
+          <aside class="notes">
+            Diese Abgrenzung ist wichtig, damit die Erklärung sauber bleibt. AirDrop ist nicht etwas, das wir als Framework direkt nachprogrammieren. Wir bauen keinen Scanner für andere Geräte, wir öffnen keine eigene Peer-to-Peer-Verbindung und wir schicken keine Pakete selbst durch die Luft. Außerdem ist AirDrop keine dauerhafte Synchronisation. Wenn wir eine Liste per AirDrop senden, bekommt die andere Person einen Stand dieser Liste als Datei. Änderungen danach werden nicht automatisch zurück synchronisiert. Für unser Feature ist das aber genau passend, weil wir bewusst eine Liste oder Artikelauswahl lokal weitergeben wollen.
+          </aside>
+        </section>
+
+        <section>
+          <h2>Share Sheet: die Zentrale</h2>
+          <div class="split">
+            <div class="panel accent">
+              <p class="kicker">Aus Sicht unserer App</p>
+              <p>Wir übergeben eine Datei oder Daten an das iOS Share Sheet. Danach entscheidet der User, wohin das geht: AirDrop, Nachrichten, Mail, Dateien-App und mehr.</p>
+            </div>
+            <div class="panel">
+              <p class="kicker">Warum das wichtig ist</p>
+              <p>AirDrop muss deshalb nicht als eigener Button im Code auftauchen. Es ist eine mögliche Aktion innerhalb von <code>UIActivityViewController</code>.</p>
+            </div>
+          </div>
+          <div class="mini-flow">
+            <span>App</span><span>Datei</span><span>Share Sheet</span><span>AirDrop</span><span>Empfänger</span>
+          </div>
+          <aside class="notes">
+            Das Share Sheet ist die zentrale Schnittstelle zwischen unserer App und den Teilen-Funktionen von iOS. Unsere App sagt sinngemäß: Hier ist ein Item, das geteilt werden kann. Das kann Text sein, ein Bild, eine URL oder in unserem Fall eine Datei. iOS zeigt danach die möglichen Ziele an. Dazu gehören AirDrop, Nachrichten, Mail, die Dateien-App und andere installierte Apps. Deshalb taucht AirDrop in unserem Code nicht als große eigene Funktion auf. Der relevante technische Schritt ist: Wir übergeben die Datei an den UIActivityViewController. Alles, was danach im Teilen-Menü passiert, kommt vom System.
+          </aside>
+        </section>
+
+        <section>
+          <h2>Welche Swift/iOS-Wege gibt es?</h2>
+          <div class="api-grid">
+            <div class="api-card inactive">
+              <h3>ShareLink</h3>
+              <p>Sehr SwiftUI-freundlich für einfache Inhalte.</p>
+              <span>Alternative</span>
+            </div>
+            <div class="api-card active">
+              <h3>UIActivityViewController</h3>
+              <p>Das klassische Share Sheet mit viel Kontrolle.</p>
+              <span>In unserem Projekt</span>
+            </div>
+            <div class="api-card inactive">
+              <h3>Transferable</h3>
+              <p>Modernes SwiftUI-Sharing mit typisierten Transfers.</p>
+              <span>Alternative</span>
+            </div>
+            <div class="api-card active">
+              <h3>UTType</h3>
+              <p>Beschreibt, welchen Dateityp unsere App exportiert und importiert.</p>
+              <span>In unserem Projekt</span>
+            </div>
+            <div class="api-card active">
+              <h3>Codable + JSON</h3>
+              <p>Macht aus Swift-Structs eine speicherbare Datei.</p>
+              <span>In unserem Projekt</span>
+            </div>
+            <div class="api-card active">
+              <h3>fileImporter / onOpenURL</h3>
+              <p>Eingangspunkte, wenn eine Datei wieder in die App kommt.</p>
+              <span>In unserem Projekt</span>
+            </div>
+          </div>
+          <aside class="notes">
+            Hier ordnen wir die wichtigsten iOS-APIs ein. ShareLink wäre der sehr SwiftUI-nahe Weg, vor allem wenn man einfache Inhalte teilen möchte. Transferable ist ebenfalls modern und stark typisiert. Unser Projekt nutzt aber den klassischen Weg über UIActivityViewController, weil wir konkret eine Datei an das System-Share-Sheet geben. Damit SwiftUI trotzdem damit arbeiten kann, gibt es eine kleine Bridge über UIViewControllerRepresentable. Für den Import sind dann UTType, fileImporter und onOpenURL entscheidend. UTType sagt dem System, was für eine Datei das ist. fileImporter und onOpenURL sind Wege, wie die Datei wieder in die App gelangt.
+          </aside>
+        </section>
+
+        <section>
+          <h2>Unser Share-Feature im Überblick</h2>
+          <div class="cards three compact">
+            <div class="card">
+              <span class="badge">Modell</span>
+              <h3><code>ShoppingTransferPackage</code></h3>
+              <p>Enthält Version, Quellliste, Datum und alle übertragenen Artikel.</p>
+            </div>
+            <div class="card">
+              <span class="badge">Datei</span>
+              <h3><code>.indoorolist</code></h3>
+              <p>Eigener Dateityp, technisch JSON, aber für iOS als Indooro-Einkaufsliste erkennbar.</p>
+            </div>
+            <div class="card">
+              <span class="badge">Import</span>
+              <h3>Neue Liste oder Merge</h3>
+              <p>Nach dem Öffnen entscheidet der User, wie die importierten Items übernommen werden.</p>
+            </div>
+          </div>
+          <table class="file-table small-table">
+            <tbody>
+              <tr><td><code>ShoppingTransferService.swift</code></td><td>JSON schreiben/lesen, UTType, Fehler</td></tr>
+              <tr><td><code>ShareSheet.swift</code></td><td>SwiftUI-Bridge zum Share Sheet</td></tr>
+              <tr><td><code>ShoppingFeatureViews.swift</code></td><td>Buttons, Export, Import, Sheets</td></tr>
+              <tr><td><code>Info.plist</code></td><td>Dateityp <code>.indoorolist</code> registrieren</td></tr>
+            </tbody>
+          </table>
+          <aside class="notes">
+            Diese Folie ist die Brücke in unser konkretes Projekt. Das zentrale Datenobjekt heißt ShoppingTransferPackage. Es beschreibt nicht die ganze App, sondern nur das, was für den Transfer gebraucht wird: Welche Liste ist die Quelle, wann wurde exportiert, welche Art von Transfer ist es und welche Artikel sind enthalten. Daraus erzeugen wir eine Datei mit der Endung indoorolist. Technisch ist sie JSON, aber für iOS registrieren wir sie als eigenen Dateityp. Dadurch kann das System beim Empfangen erkennen, dass unsere App diese Datei öffnen kann. Der Import endet dann nicht blind, sondern führt in eine Preview mit Entscheidung.
+          </aside>
+        </section>
+
+        <section>
+          <h2>Das Dateiformat</h2>
+          <div class="split">
+            <pre class="json-card"><code class="language-json" data-trim>
+{
+  "version": 1,
+  "kind": "fullList",
+  "sourceListName": "Wocheneinkauf",
+  "exportedAt": "2026-06-16T...",
+  "items": [
+    { "name": "Milch", "quantity": 2, "layoutCode": "A3" }
+  ]
+}
+            </code></pre>
+            <div class="panel">
+              <p class="kicker">Warum eine Datei?</p>
+              <p>Eine Datei ist perfekt für AirDrop, weil iOS sie transportieren und danach einer App zuordnen kann.</p>
+              <p><code>version</code> macht spätere Änderungen am Format kontrollierbar.</p>
+            </div>
+          </div>
+          <aside class="notes">
+            Diese Folie zeigt nur eine vereinfachte Form unseres Dateiinhalts, damit man die Idee schnell versteht. In der echten Datei sind noch mehr Felder enthalten, zum Beispiel Product-ID, Preis, Status und Notizen. Wichtig ist aber das Prinzip: Wir nehmen Swift-Structs und machen daraus mit Codable eine JSON-Datei. JSON ist gut lesbar, gut testbar und für so ein Transferformat ausreichend. Die Dateiendung indoorolist sorgt dafür, dass die Datei für den User nicht wie irgendeine zufällige JSON-Datei wirkt. Das Versionsfeld ist wichtig, weil wir später das Format erweitern können, ohne alte Dateien sofort kaputt zu machen.
+          </aside>
+        </section>
+
+        <section>
+          <h2>Ablauf im Projekt</h2>
+          <div class="flow-diagram">
+            <div><span>1</span>User tippt<br /><strong>Teilen</strong></div>
+            <div><span>2</span>App erstellt<br /><strong>Package</strong></div>
+            <div><span>3</span><code>Codable</code><br /><strong>JSON</strong></div>
+            <div><span>4</span>Datei<br /><strong>.indoorolist</strong></div>
+            <div><span>5</span>iOS<br /><strong>Share Sheet</strong></div>
+            <div><span>6</span>User wählt<br /><strong>AirDrop</strong></div>
+            <div><span>7</span>Empfänger<br /><strong>erhält Datei</strong></div>
+            <div><span>8</span>iOS erkennt<br /><strong>UTType</strong></div>
+            <div><span>9</span>App lädt<br /><strong>Datei</strong></div>
+            <div><span>10</span>Import als<br /><strong>Liste/Merge</strong></div>
+          </div>
+          <aside class="notes">
+            Dieses Diagramm ist der gesamte Ablauf in einem Bild. Wir können beim Präsentieren langsam von links oben nach rechts gehen und dann unten zurück. Zuerst passiert unser eigener App-Teil: User tippt auf Teilen, wir bauen ein ShoppingTransferPackage, encodieren es als JSON und schreiben eine indoorolist-Datei. Dann kommt der Systemteil: iOS zeigt das Share Sheet, der User wählt AirDrop, und der Empfänger bekommt die Datei. Danach beginnt wieder unser App-Teil: iOS erkennt den Dateityp, öffnet unsere App oder den Import-Flow, und wir decodieren die Datei wieder. Genau diese Trennung ist die wichtigste Architekturidee.
+          </aside>
+        </section>
+
+        <section class="code-slide">
+          <h2>Essentieller Code: Modell</h2>
+          <p class="source">Quelle: <code>Models/ShoppingTransferModels.swift</code></p>
+          <pre><code class="language-swift" data-trim>
+struct ShoppingTransferPackage: Codable, Identifiable {
+    static let currentVersion = 1
+
+    let id: UUID
+    let version: Int
+    let kind: ShoppingTransferKind
+    let sourceListName: String
+    let exportedAt: Date
+    let items: [ShoppingTransferItem]
+}
+          </code></pre>
+          <div class="caption">Das Paket ist bewusst klein erklärbar: Metadaten plus Artikel, codierbar als JSON.</div>
+          <aside class="notes">
+            Diesen Code müssen wir nicht Zeile für Zeile erklären. Entscheidend ist, dass unser Transferformat als Swift-Typ modelliert ist. ShoppingTransferPackage ist Codable, also kann Swift daraus automatisch JSON erzeugen und später wieder ein Swift-Objekt daraus bauen. Identifiable und UUID passen gut zu SwiftUI, weil wir damit zum Beispiel Sheets an ein konkretes Package binden können. Das Versionsfeld ist besonders wichtig, weil es unser Dateiformat zukunftssicherer macht. Wenn wir später mehr Informationen übertragen, können wir prüfen, ob die App die Version der Datei überhaupt versteht.
+          </aside>
+        </section>
+
+        <section class="code-slide">
+          <h2>Essentieller Code: Export</h2>
+          <p class="source">Quelle: <code>Utilities/ShoppingTransferService.swift</code></p>
+          <pre><code class="language-swift" data-trim>
+let encoder = JSONEncoder()
+encoder.dateEncodingStrategy = .iso8601
+
+let data = try encoder.encode(package)
+let fileURL = tempDirectory
+    .appendingPathComponent("\(name).indoorolist")
+
+try data.write(to: fileURL, options: .atomic)
+return fileURL
+          </code></pre>
+          <div class="caption">Aus Swift-Daten wird eine echte Datei. Diese URL geht danach ins Share Sheet.</div>
+          <aside class="notes">
+            Diese Folie zeigt den Kern des Exports. Wir starten mit einem Package, also mit normalen Swift-Daten. JSONEncoder wandelt dieses Package in Data um. Danach schreiben wir diese Data in eine Datei im temporären Verzeichnis. Die Datei bekommt die Endung indoorolist. Das ist für den User und für iOS wichtig, weil daraus klarer wird, dass es sich um eine Indooro-Einkaufsliste handelt. Danach haben wir eine URL zu einer echten Datei. Genau diese Datei-URL geben wir an das Share Sheet weiter. AirDrop kann dann diese Datei transportieren, ohne dass unser Code wissen muss, wie der Transfer technisch abläuft.
+          </aside>
+        </section>
+
+        <section class="code-slide">
+          <h2>Essentieller Code: Share + Import</h2>
+          <p class="source">Quellen: <code>ShareSheet.swift</code>, <code>ShoppingFeatureViews.swift</code>, <code>ContentView.swift</code></p>
+          <pre><code class="language-swift" data-trim>
+ShareSheet(activityItems: [presentation.fileURL]) { completed in
+    completeShare(presentation, completed: completed)
+}
+
+.fileImporter(
+    isPresented: $showFileImporter,
+    allowedContentTypes: [.indooroShoppingList]
+) { result in
+    handleFileImport(result)
+}
+
+.onOpenURL { url in
+    handleIncomingShoppingTransfer(url)
+}
+          </code></pre>
+          <div class="caption">Drei SwiftUI-Anschlüsse: Share Sheet öffnen, Datei auswählen, Datei direkt von iOS bekommen.</div>
+          <aside class="notes">
+            Hier sehen wir die drei wichtigsten Anschlüsse an iOS. Erstens öffnen wir mit ShareSheet das Teilen-Menü und übergeben unsere Datei-URL. Das ist der Punkt, an dem AirDrop als Ziel im System-UI erscheinen kann. Zweitens gibt es fileImporter. Damit kann der User bewusst eine indoorolist-Datei auswählen und importieren. Drittens gibt es onOpenURL. Das ist wichtig, wenn iOS unsere App direkt mit einer Datei öffnet, zum Beispiel nachdem eine Datei per AirDrop empfangen wurde. In allen Fällen bleibt die Idee gleich: iOS liefert uns eine URL, und unser Code lädt und decodiert daraus wieder ein ShoppingTransferPackage.
+          </aside>
+        </section>
+
+        <section>
+          <h2>Import: Was passiert danach?</h2>
+          <div class="cards two">
+            <div class="card">
+              <span class="badge">Neue Liste</span>
+              <h3><code>importPackageAsNewList</code></h3>
+              <p>Die importierten Artikel werden als eigene Einkaufsliste angelegt.</p>
+            </div>
+            <div class="card">
+              <span class="badge">Zusammenführen</span>
+              <h3><code>mergePackage</code></h3>
+              <p>Artikel werden in eine bestehende Liste eingefügt. Gleiche offene Produkte werden über die Menge zusammengeführt.</p>
+            </div>
+          </div>
+          <div class="claim small">Das ist UX-relevant: Der Import endet nicht blind, sondern der User entscheidet bewusst.</div>
+          <aside class="notes">
+            Nach dem Decoding ist der Import nicht einfach automatisch fertig. Das ist eine bewusste UX-Entscheidung in unserem Projekt. Die App zeigt eine Vorschau der importierten Liste und lässt den User auswählen, was passieren soll. Entweder wird daraus eine neue Einkaufsliste, oder die Artikel werden in eine bestehende Liste eingefügt. Beim Merge schaut der Code, ob ein gleiches offenes Produkt mit gleichem Layout-Code bereits existiert. Dann wird nicht doppelt angelegt, sondern die Menge erhöht und die Notiz sinnvoll zusammengeführt. Dadurch fühlt sich der Import kontrollierter und weniger riskant an.
+          </aside>
+        </section>
+
+        <section>
+          <h2>Fehlerfälle</h2>
+          <div class="error-grid">
+            <div><strong>Ungültige Datei</strong><span><code>.invalidFile</code></span></div>
+            <div><strong>Unlesbare Datei</strong><span><code>.noReadableData</code></span></div>
+            <div><strong>Leere Auswahl</strong><span><code>.emptySelection</code></span></div>
+            <div><strong>Falsche Version</strong><span><code>.unsupportedVersion</code></span></div>
+            <div><strong>Share abgebrochen</strong><span><code>completed == false</code></span></div>
+            <div><strong>Doppelte Produkte</strong><span>Merge-Logik entscheidet</span></div>
+          </div>
+          <aside class="notes">
+            Teilen und Import sind nie nur Happy Path. Eine Datei kann beschädigt sein, sie kann von einer anderen App stammen, oder sie kann eine Version verwenden, die unsere aktuelle App noch nicht versteht. Deshalb gibt es eigene Fehlerfälle. invalidFile bedeutet: Die Datei sieht nicht aus wie unser erwartetes Transferformat. noReadableData bedeutet: Die Datei konnte nicht gelesen werden. unsupportedVersion schützt uns vor zukünftigen Formatänderungen. Außerdem ist wichtig: Wenn der User das Share Sheet abbricht, darf unser Code nicht so tun, als wäre erfolgreich geteilt worden. Das ist besonders relevant beim Modus „Aus Liste senden“, weil dort erst nach erfolgreichem Teilen entfernt werden sollte.
+          </aside>
+        </section>
+
+        <section>
+          <h2>Warum ist das Swift-relevant?</h2>
+          <div class="swift-cloud">
+            <span>Codable</span>
+            <span>JSONEncoder</span>
+            <span>JSONDecoder</span>
+            <span>UTType</span>
+            <span>FileManager</span>
+            <span>URL</span>
+            <span>Data</span>
+            <span>UIViewControllerRepresentable</span>
+            <span>@State</span>
+            <span>@Binding</span>
+            <span>.sheet(item:)</span>
+            <span>.fileImporter</span>
+            <span>.onOpenURL</span>
+            <span>LocalizedError</span>
+          </div>
+          <aside class="notes">
+            Diese Folie verbindet das Feature mit dem Fach Swift. Von außen sieht das Ganze aus wie ein einfacher Teilen-Button. Technisch stecken aber viele zentrale Swift- und iOS-Konzepte darin. Codable sorgt für die Serialisierung. JSONEncoder und JSONDecoder machen aus Objekten Dateien und wieder Objekte. FileManager, URL und Data sind klassisches Datei-Handling. UTType verbindet unser Dateiformat mit iOS. SwiftUI-State und Bindings steuern, wann Sheets geöffnet werden. UIViewControllerRepresentable zeigt, wie SwiftUI und UIKit zusammenarbeiten. Und LocalizedError sorgt dafür, dass Fehler nicht nur technisch auftreten, sondern verständlich angezeigt werden können.
+          </aside>
+        </section>
+
+        <section>
+          <h2>Limitierungen</h2>
+          <ul class="warn-list large-list">
+            <li>AirDrop funktioniert nur im Apple-Ökosystem.</li>
+            <li>Für echte Tests braucht man echte Geräte, nicht nur den Simulator.</li>
+            <li>Der Empfänger braucht eine App, die den Dateityp versteht.</li>
+            <li>Das ist kein Backend-Sync: Es wird eine lokale Datei geteilt.</li>
+            <li>Bei späteren Änderungen muss die Dateiversion sauber behandelt werden.</li>
+          </ul>
+          <aside class="notes">
+            Diese Folie ist wichtig, damit wir das Feature realistisch einordnen. AirDrop ist praktisch, aber es funktioniert nur zwischen Apple-Geräten. Für Android oder Web bräuchte man einen anderen Weg, zum Beispiel Backend-Synchronisation oder Export über eine normale Datei. Außerdem ist AirDrop im Simulator nicht wirklich testbar, deshalb braucht man für echte Tests echte Geräte. Der Empfänger muss außerdem eine App haben, die den Dateityp öffnen kann. Und ganz wichtig: AirDrop ist keine Synchronisation. Es wird ein Stand der Liste geteilt. Wenn danach jemand etwas ändert, wird das nicht automatisch zurück übertragen.
+          </aside>
+        </section>
+
+        <section>
+          <h2>Fazit</h2>
+          <div class="final-grid">
+            <div class="big-number">1</div>
+            <p><strong>AirDrop ist iOS.</strong><br />Unsere App implementiert nicht das Protokoll, sondern liefert teilbare Daten.</p>
+            <div class="big-number">2</div>
+            <p><strong>Das Share Sheet ist die Brücke.</strong><br />Die <code>.indoorolist</code>-Datei wird dort an AirDrop oder andere Ziele weitergegeben.</p>
+            <div class="big-number">3</div>
+            <p><strong>Swift macht den Flow sauber.</strong><br /><code>Codable</code>, <code>UTType</code>, Datei-Handling und State bilden Export und Import.</p>
+          </div>
+          <aside class="notes">
+            Als Abschluss fassen wir die drei wichtigsten Punkte zusammen. Erstens: AirDrop selbst kommt vom System. Wir implementieren nicht die Funkverbindung und nicht das AirDrop-Protokoll. Zweitens: Das Share Sheet ist die Brücke zwischen unserer Swift-App und den iOS-Teilen-Funktionen. Dort kann der User AirDrop auswählen. Drittens: Der eigentliche Swift-Teil ist trotzdem spannend, weil wir Daten modellieren, sie mit Codable exportieren, einen eigenen Dateityp registrieren und beim Import sauber validieren. Dadurch wird aus einer einfachen Idee, nämlich „Liste teilen“, ein vollständiger und nachvollziehbarer iOS-Workflow.
+          </aside>
+        </section>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+    <script src="main.js"></script>
+  </body>
+</html>
