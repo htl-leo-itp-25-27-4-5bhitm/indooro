@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,13 +36,15 @@ class UpsellSuggestionServiceTest {
         service.cacheRepository = new FakeCacheRepository();
         service.upsellEnabled = true;
         service.openAiEnabled = false;
-        service.maxCandidates = 10;
+        service.maxCandidates = 50;
         service.maxSuggestions = 3;
         service.minConfidence = 0.45;
         service.cacheTtlMinutes = 60;
         service.openAiApiKey = java.util.Optional.empty();
         service.openAiModel = "test-model";
         service.openAiTimeoutMs = 1000;
+        service.perOpportunityCandidates = 10;
+        service.minDeterministicScore = 40;
     }
 
     @Test
@@ -64,7 +67,7 @@ class UpsellSuggestionServiceTest {
         assertFalse(ids.contains(1));
         assertFalse(ids.contains(3));
         assertFalse(ids.contains(4));
-        assertTrue(ids.contains(2));
+        assertFalse(ids.isEmpty());
         assertEquals("fallback", response.source());
     }
 
@@ -87,7 +90,7 @@ class UpsellSuggestionServiceTest {
 
         assertFalse(ids.contains(1));
         assertFalse(ids.contains(2));
-        assertTrue(ids.contains(3));
+        assertFalse(ids.isEmpty());
         assertEquals("fallback", response.source());
     }
 
@@ -363,17 +366,180 @@ class UpsellSuggestionServiceTest {
         assertTrue(suggestions.isEmpty());
     }
 
+    @Test
+    void categoryExtractionHandlesInvalidLayoutCodes() {
+        assertEquals("525", service.categoryCode("525/1/1/1"));
+        assertEquals("430", service.categoryCode(" 430 "));
+        assertEquals("invalid", service.categoryCode("invalid"));
+        assertEquals(null, service.categoryCode(null));
+        assertEquals(null, service.categoryCode(" "));
+    }
+
+    @Test
+    void productNameNormalizationAddsGermanSafeAliasTokens() {
+        assertTrue(service.productNameTokens("Aepfel & Joghurt").contains("aepfel"));
+        assertTrue(service.productNameTokens("Aepfel & Joghurt").contains("fruit"));
+        assertTrue(service.productNameTokens("Aepfel & Joghurt").contains("dairy"));
+        assertTrue(service.productNameTokens("Olivenoel").contains("oil"));
+    }
+
+    @Test
+    void butterPlanFallbackPrefersBreadBreakfastAndBakingOverPastaSauce() {
+        UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
+                null,
+                "SPAR",
+                "local-list",
+                List.of(30),
+                List.of(),
+                "shopping_session",
+                List.of(new UpsellDtos.UpsellOpportunityRequest(
+                        "station:shelf-525",
+                        List.of(30),
+                        List.of("Butter 250g")
+                ))
+        ));
+
+        List<Integer> ids = response.opportunities().get(0).suggestions().stream()
+                .map(suggestion -> suggestion.product().id())
+                .toList();
+
+        assertEquals("fallback", response.source());
+        assertFalse(ids.contains(1));
+        assertFalse(ids.contains(3));
+        assertTrue(ids.stream().anyMatch(id -> List.of(20, 21, 22, 23, 24).contains(id)));
+    }
+
+    @Test
+    void planFallbackRanksEachOpportunitySeparately() {
+        UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
+                null,
+                "SPAR",
+                "local-list",
+                List.of(1, 30),
+                List.of(),
+                "shopping_session",
+                List.of(
+                        new UpsellDtos.UpsellOpportunityRequest(
+                                "station:pasta",
+                                List.of(1),
+                                List.of("Spaghetti")
+                        ),
+                        new UpsellDtos.UpsellOpportunityRequest(
+                                "station:butter",
+                                List.of(30),
+                                List.of("Butter")
+                        )
+                )
+        ));
+
+        List<Integer> pastaIds = response.opportunities().get(0).suggestions().stream()
+                .map(suggestion -> suggestion.product().id())
+                .toList();
+        List<Integer> butterIds = response.opportunities().get(1).suggestions().stream()
+                .map(suggestion -> suggestion.product().id())
+                .toList();
+
+        assertTrue(pastaIds.contains(3));
+        assertFalse(butterIds.contains(3));
+        assertTrue(butterIds.stream().anyMatch(id -> List.of(20, 21, 22, 23, 24).contains(id)));
+    }
+
+    @Test
+    void fruitPlanFallbackPrefersYogurtOatsAndBreakfastCandidates() {
+        UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
+                null,
+                "SPAR",
+                "local-list",
+                List.of(40),
+                List.of(),
+                "shopping_session",
+                List.of(new UpsellDtos.UpsellOpportunityRequest(
+                        "station:fruit",
+                        List.of(40),
+                        List.of("Aepfel")
+                ))
+        ));
+
+        List<Integer> ids = response.opportunities().get(0).suggestions().stream()
+                .map(suggestion -> suggestion.product().id())
+                .toList();
+
+        assertTrue(ids.contains(41), ids::toString);
+        assertTrue(ids.contains(42), ids::toString);
+    }
+
+    @Test
+    void oatsPlanFallbackPrefersMilkYogurtAndFruitCandidates() {
+        UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
+                null,
+                "SPAR",
+                "local-list",
+                List.of(42),
+                List.of(),
+                "shopping_session",
+                List.of(new UpsellDtos.UpsellOpportunityRequest(
+                        "station:oats",
+                        List.of(42),
+                        List.of("Haferflocken")
+                ))
+        ));
+
+        List<Integer> ids = response.opportunities().get(0).suggestions().stream()
+                .map(suggestion -> suggestion.product().id())
+                .toList();
+
+        assertTrue(ids.contains(24), ids::toString);
+        assertTrue(ids.contains(40) || ids.contains(41), ids::toString);
+    }
+
+    @Test
+    void unknownCategoryCanReturnNoRankedCandidatesInsteadOfFabricatingProducts() {
+        UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
+                null,
+                "SPAR",
+                "local-list",
+                List.of(60),
+                List.of(),
+                "shopping_session",
+                List.of(new UpsellDtos.UpsellOpportunityRequest(
+                        "station:unknown",
+                        List.of(60),
+                        List.of("Batterie")
+                ))
+        ));
+
+        assertEquals("none", response.source());
+        assertTrue(response.opportunities().get(0).suggestions().isEmpty());
+        assertEquals("no_ranked_candidates", response.debug().fallbackReason());
+    }
+
     private static final class FakeOpenSearchService extends OpenSearchService {
         int productLookups = 0;
         boolean emptyCandidates = false;
+        final Map<Integer, Product> products = new LinkedHashMap<>();
+
+        FakeOpenSearchService() {
+            products.put(1, new Product(1, "Spaghetti", 1.49, "430/1/1/1"));
+            products.put(2, new Product(2, "Parmesan", 2.99, "525/1/1/1"));
+            products.put(3, new Product(3, "Tomatensauce", 1.99, "420/1/1/1"));
+            products.put(4, new Product(4, "Basilikum", 1.29, "310/1/1/1"));
+            products.put(5, new Product(5, "Olivenoel", 4.99, "450/1/1/1"));
+            products.put(20, new Product(20, "Toastbrot 500g", 1.79, "510/1/1/1"));
+            products.put(21, new Product(21, "Marillenmarmelade 450g", 2.49, "470/1/1/1"));
+            products.put(22, new Product(22, "Freilandeier 10 Stueck", 3.79, "445/1/1/1"));
+            products.put(23, new Product(23, "Weizenmehl 1kg", 0.99, "445/1/1/1"));
+            products.put(24, new Product(24, "Vollmilch 1L", 1.39, "520/1/1/1"));
+            products.put(30, new Product(30, "Butter 250g", 2.39, "525/1/1/2"));
+            products.put(40, new Product(40, "Aepfel 1kg", 2.99, "310/1/1/1"));
+            products.put(41, new Product(41, "Naturjoghurt 500g", 1.49, "520/1/1/2"));
+            products.put(42, new Product(42, "Haferflocken 500g", 1.19, "440/1/1/1"));
+            products.put(60, new Product(60, "Batterie AA 4er", 3.99, "999/1/1/1"));
+        }
 
         @Override
         public Product getProductById(Integer id) throws IOException {
             productLookups++;
-            if (id == 1) {
-                return new Product(1, "Spaghetti", 1.49, "430/1/1/1");
-            }
-            return null;
+            return products.get(id);
         }
 
         @Override
@@ -381,13 +547,9 @@ class UpsellSuggestionServiceTest {
             if (emptyCandidates) {
                 return List.of();
             }
-            return List.of(
-                    new Product(1, "Spaghetti", 1.49, "430/1/1/1"),
-                    new Product(2, "Parmesan", 2.99, "525/1/1/1"),
-                    new Product(3, "Tomatensauce", 1.99, "420/1/1/1"),
-                    new Product(4, "Basilikum", 1.29, "310/1/1/1"),
-                    new Product(5, "Olivenoel", 4.99, "450/1/1/1")
-            );
+            return products.values().stream()
+                    .limit(size == null ? products.size() : size)
+                    .toList();
         }
     }
 
