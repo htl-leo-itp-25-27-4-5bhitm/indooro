@@ -56,11 +56,11 @@
 
 ## 7. Commit, Build, Deploy, Rollback
 
-- [ ] 7.1 Commit the implementation and OpenSpec updates.
-- [ ] 7.2 Push `main` so GitHub Actions builds and pushes `ghcr.io/.../indooro-backend-v2:latest`.
-- [ ] 7.3 Wait for the GitHub Actions backend image build to complete successfully.
-- [ ] 7.4 Apply LeoCloud backend manifest with `kubectl -n student-it220209 apply -f k8s/backend.yaml`.
-- [ ] 7.5 Restart LeoCloud backend with `kubectl -n student-it220209 rollout restart deployment/indooro-backend`.
-- [ ] 7.6 Wait for rollout with `kubectl -n student-it220209 rollout status deployment/indooro-backend`.
-- [ ] 7.7 Verify LeoCloud deployment readiness with `kubectl -n student-it220209 get deployment indooro-backend`.
-- [ ] 7.8 Record rollback command/state in the final response.
+- [x] 7.1 Commit the implementation and OpenSpec updates.
+- [x] 7.2 Push `main` so GitHub Actions builds and pushes `ghcr.io/.../indooro-backend-v2:latest`.
+- [x] 7.3 Wait for the GitHub Actions backend image build to complete successfully.
+- [x] 7.4 Apply LeoCloud backend manifest with `kubectl -n student-it220209 apply -f k8s/backend.yaml`.
+- [x] 7.5 Restart LeoCloud backend with `kubectl -n student-it220209 rollout restart deployment/indooro-backend`.
+- [x] 7.6 Wait for rollout with `kubectl -n student-it220209 rollout status deployment/indooro-backend`.
+- [x] 7.7 Verify LeoCloud deployment readiness with `kubectl -n student-it220209 get deployment indooro-backend`.
+- [x] 7.8 Record rollback command/state in the final response.
