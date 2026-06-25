@@ -15,11 +15,13 @@ sequenceDiagram
     App->>API: POST /api/mobile/upsell/plan
     API->>Catalog: Kandidaten fuer Store laden
     API->>API: Liste, erledigte Produkte und Trigger ausschliessen
-    API->>AI: Strukturierter Ranking-Prompt
+    API->>API: Produkt-Domain, Familie und Klasse ableiten
+    API->>API: Harte Quality-Gates und Plan-Dedupe anwenden
+    API->>AI: Strukturierter Ranking-Prompt mit nur vorgefilterten Kandidaten
     AI-->>API: JSON mit opportunityId + productId-Rankings
-    API->>API: IDs gegen Kandidaten validieren
+    API->>API: IDs gegen Kandidaten und Gates validieren
     API-->>App: Plan-JSON mit Vorschlaegen pro Station
-    App->>App: Plan lokal nach opportunityId cachen
+    App->>App: Plan lokal nach opportunityId cachen, auch leere Ergebnisse
     User->>App: Station abhaken oder ueberspringen
     App->>App: station:<shelf-id> lokal nachschlagen
     App-->>User: Sofort vorbereitete Vorschlaege anzeigen
@@ -73,13 +75,21 @@ User-Payload:
       "triggerProductNames": ["Spaghetti", "Tomatensauce"]
     }
   ],
-  "candidateProducts": [
+  "opportunities": [
     {
-      "id": 2,
-      "name": "Basilikum",
-      "categoryCode": "310",
-      "layoutCode": "310/1/1/1",
-      "hasLayoutPosition": true
+      "opportunityId": "station:shelf-430",
+      "triggerProductIds": [1, 3],
+      "triggerProductNames": ["Spaghetti", "Tomatensauce"],
+      "candidateProducts": [
+        {
+          "id": 2,
+          "name": "Parmesan",
+          "categoryCode": "525",
+          "family": "cheese",
+          "classKey": "cheese",
+          "score": 124
+        }
+      ]
     }
   ],
   "maxSuggestionsPerOpportunity": 3
@@ -160,8 +170,12 @@ Das Backend ersetzt die AI-IDs durch echte Katalogprodukte, filtert ungueltige I
 ## Wichtige Schutzregeln
 
 - OpenAI-Key liegt nur im Backend als Secret/Env, nie in Swift.
-- AI darf keine Produkte erfinden; unbekannte `productId` werden verworfen.
-- Bereits offene, erledigte und Trigger-Produkte werden ausgeschlossen.
+- AI bekommt nur Backend-vorgefilterte Kandidaten, nie den ganzen Katalog.
+- AI darf keine Produkte erfinden; unbekannte oder inkompatible `productId` werden verworfen.
+- Bereits offene, erledigte, akzeptierte Upsell-Produkte und Trigger-Produkte werden per ID und Produktklasse ausgeschlossen.
+- Inkompatible Domains werden hart geblockt, zum Beispiel Reiniger zu Lebensmitteln oder Cola zu Mehl.
+- Wenn nur schwache Kandidaten existieren, liefert das Backend lieber eine leere Opportunity als ein schlechtes Popup.
 - Stationen werden ueber `opportunityId` gebunden, dadurch kann keine alte Antwort fuer eine andere Station erscheinen.
+- iOS cached leere Opportunities als `loaded_empty`; spaeteres Abhaken fuehrt dann zu `no_suggestions` statt `cache_miss`.
 - Produkte, die aus Vorschlaegen hinzugefuegt wurden, bekommen `addedFromUpsell=true` und triggern keine neue Upsell-Suche.
 - Debug-Ausgaben verwenden in iOS den Prefix `[UpsellDebug]`; Backend-Logs enthalten Request-ID, Source, Dauer und Token-Usage, aber keinen API-Key.

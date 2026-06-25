@@ -31,20 +31,24 @@ class UpsellSuggestionServiceTest {
     void setUp() {
         service = new UpsellSuggestionService();
         openSearchService = new FakeOpenSearchService();
-        service.openSearchService = openSearchService;
-        service.objectMapper = new ObjectMapper().findAndRegisterModules();
-        service.cacheRepository = new FakeCacheRepository();
-        service.upsellEnabled = true;
-        service.openAiEnabled = false;
-        service.maxCandidates = 50;
-        service.maxSuggestions = 3;
-        service.minConfidence = 0.45;
-        service.cacheTtlMinutes = 60;
-        service.openAiApiKey = java.util.Optional.empty();
-        service.openAiModel = "test-model";
-        service.openAiTimeoutMs = 1000;
-        service.perOpportunityCandidates = 10;
-        service.minDeterministicScore = 40;
+        configureService(service);
+    }
+
+    private void configureService(UpsellSuggestionService target) {
+        target.openSearchService = openSearchService;
+        target.objectMapper = new ObjectMapper().findAndRegisterModules();
+        target.cacheRepository = new FakeCacheRepository();
+        target.upsellEnabled = true;
+        target.openAiEnabled = false;
+        target.maxCandidates = 50;
+        target.maxSuggestions = 3;
+        target.minConfidence = 0.45;
+        target.cacheTtlMinutes = 60;
+        target.openAiApiKey = java.util.Optional.empty();
+        target.openAiModel = "test-model";
+        target.openAiTimeoutMs = 1000;
+        target.perOpportunityCandidates = 10;
+        target.minDeterministicScore = 40;
     }
 
     @Test
@@ -513,6 +517,253 @@ class UpsellSuggestionServiceTest {
         assertEquals("no_ranked_candidates", response.debug().fallbackReason());
     }
 
+    @Test
+    void productClassificationCoversSafetyDomainsAndClassesInternally() {
+        assertEquals(UpsellSuggestionService.ProductFamily.BUTTER,
+                service.classifyProduct(new Product(30, "Butter 250g", 2.39, "525/1/1/2")).family());
+        assertEquals("apple",
+                service.classifyProduct(new Product(40, "Bio Aepfel 1kg", 2.99, "310/1/1/1")).classKey());
+        assertEquals("flour",
+                service.classifyProduct(new Product(23, "Weizenmehl 1kg", 0.99, "445/1/1/1")).classKey());
+        assertEquals(UpsellSuggestionService.ProductDomain.DRINK,
+                service.classifyProduct(new Product(70, "Coca-Cola 1.5L", 1.79, "700/1/1/1")).domain());
+        assertEquals(UpsellSuggestionService.ProductDomain.CLEANING,
+                service.classifyProduct(new Product(90, "Frosch Citrus Dusche & Bad-Reiniger", 2.99, "800/1/1/1")).domain());
+        assertEquals(UpsellSuggestionService.ProductDomain.LAUNDRY,
+                service.classifyProduct(new Product(100, "Weichspueler Sommerfrische", 2.49, "810/1/1/1")).domain());
+        assertEquals(UpsellSuggestionService.ProductDomain.UNKNOWN,
+                service.classifyProduct(new Product(60, "Batterie AA 4er", 3.99, "999/1/1/1")).domain());
+    }
+
+    @Test
+    void colaDoesNotFallbackToFlourPastaButterOrEggs() {
+        UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
+                null,
+                "SPAR",
+                "local-list",
+                List.of(70),
+                List.of(),
+                "shopping_session",
+                List.of(new UpsellDtos.UpsellOpportunityRequest(
+                        "item:cola",
+                        List.of(70),
+                        List.of("Coca-Cola 1.5L")
+                ))
+        ));
+
+        List<Integer> ids = response.opportunities().get(0).suggestions().stream()
+                .map(suggestion -> suggestion.product().id())
+                .toList();
+
+        assertFalse(ids.contains(1), ids::toString);
+        assertFalse(ids.contains(23), ids::toString);
+        assertFalse(ids.contains(22), ids::toString);
+        assertFalse(ids.contains(30), ids::toString);
+        assertTrue(ids.isEmpty() || ids.contains(71), ids::toString);
+    }
+
+    @Test
+    void risottoDoesNotFallbackToFruitAndPrefersCookingComplements() {
+        UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
+                null,
+                "SPAR",
+                "local-list",
+                List.of(80),
+                List.of(),
+                "shopping_session",
+                List.of(new UpsellDtos.UpsellOpportunityRequest(
+                        "item:risotto",
+                        List.of(80),
+                        List.of("Risotto Reis")
+                ))
+        ));
+
+        List<Integer> ids = response.opportunities().get(0).suggestions().stream()
+                .map(suggestion -> suggestion.product().id())
+                .toList();
+
+        assertFalse(ids.contains(40), ids::toString);
+        assertFalse(ids.contains(43), ids::toString);
+        assertTrue(ids.stream().anyMatch(id -> List.of(2, 5, 81, 82, 83).contains(id)), ids::toString);
+    }
+
+    @Test
+    void cleanerDoesNotReceiveFoodSuggestions() {
+        UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
+                null,
+                "SPAR",
+                "local-list",
+                List.of(90),
+                List.of(),
+                "shopping_session",
+                List.of(new UpsellDtos.UpsellOpportunityRequest(
+                        "item:cleaner",
+                        List.of(90),
+                        List.of("Bad-Reiniger")
+                ))
+        ));
+
+        List<Integer> ids = response.opportunities().get(0).suggestions().stream()
+                .map(suggestion -> suggestion.product().id())
+                .toList();
+
+        assertFalse(ids.stream().anyMatch(id -> List.of(1, 2, 3, 23, 40, 41, 42, 70, 80).contains(id)), ids::toString);
+        assertTrue(ids.isEmpty() || ids.stream().allMatch(id -> List.of(91, 92, 93, 94).contains(id)), ids::toString);
+    }
+
+    @Test
+    void softenerReceivesOnlyLaundrySuggestionsOrEmptyResult() {
+        UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
+                null,
+                "SPAR",
+                "local-list",
+                List.of(100),
+                List.of(),
+                "shopping_session",
+                List.of(new UpsellDtos.UpsellOpportunityRequest(
+                        "item:softener",
+                        List.of(100),
+                        List.of("Weichspueler")
+                ))
+        ));
+
+        List<Integer> ids = response.opportunities().get(0).suggestions().stream()
+                .map(suggestion -> suggestion.product().id())
+                .toList();
+
+        assertFalse(ids.stream().anyMatch(id -> List.of(1, 2, 3, 23, 40, 41, 42, 70, 80, 90, 91).contains(id)), ids::toString);
+        assertTrue(ids.isEmpty() || ids.stream().allMatch(id -> List.of(101, 102).contains(id)), ids::toString);
+    }
+
+    @Test
+    void appleVariantsAreSuppressedByProductClass() {
+        UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
+                null,
+                "SPAR",
+                "local-list",
+                List.of(40),
+                List.of(),
+                "shopping_session",
+                List.of(new UpsellDtos.UpsellOpportunityRequest(
+                        "item:apple",
+                        List.of(40),
+                        List.of("Aepfel")
+                ))
+        ));
+
+        List<Integer> ids = response.opportunities().get(0).suggestions().stream()
+                .map(suggestion -> suggestion.product().id())
+                .toList();
+
+        assertFalse(ids.contains(43), ids::toString);
+        assertTrue(ids.contains(41) || ids.contains(42), ids::toString);
+    }
+
+    @Test
+    void planLevelDedupeKeepsFlourClassOnOnlyOneOpportunity() {
+        UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
+                null,
+                "SPAR",
+                "local-list",
+                List.of(30, 22),
+                List.of(),
+                "shopping_session",
+                List.of(
+                        new UpsellDtos.UpsellOpportunityRequest(
+                                "item:butter",
+                                List.of(30),
+                                List.of("Butter")
+                        ),
+                        new UpsellDtos.UpsellOpportunityRequest(
+                                "item:eggs",
+                                List.of(22),
+                                List.of("Eier")
+                        )
+                )
+        ));
+
+        long flourOccurrences = response.opportunities().stream()
+                .flatMap(opportunity -> opportunity.suggestions().stream())
+                .filter(suggestion -> suggestion.product().id() == 23)
+                .count();
+
+        assertTrue(flourOccurrences <= 1, response.opportunities()::toString);
+    }
+
+    @Test
+    void openAiValidationDiscardsInvalidDuplicateAndIncompatibleProductIds() {
+        FakeOpenAiService fakeService = new FakeOpenAiService();
+        service = fakeService;
+        configureService(service);
+        service.openAiEnabled = true;
+        service.openAiApiKey = Optional.of("test-key");
+        fakeService.openAiSuggestions = List.of(new UpsellDtos.AiOpportunitySuggestion(
+                "item:risotto",
+                List.of(
+                        new UpsellDtos.AiSuggestion(999, "Nicht vorhanden.", 0.99),
+                        new UpsellDtos.AiSuggestion(40, "Obst waere falsch.", 0.99),
+                        new UpsellDtos.AiSuggestion(2, "Passt gut zu Risotto.", 0.91),
+                        new UpsellDtos.AiSuggestion(2, "Duplikat.", 0.90)
+                )
+        ));
+
+        UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
+                null,
+                "SPAR",
+                "local-list",
+                List.of(80),
+                List.of(),
+                "shopping_session",
+                List.of(new UpsellDtos.UpsellOpportunityRequest(
+                        "item:risotto",
+                        List.of(80),
+                        List.of("Risotto Reis")
+                ))
+        ));
+
+        List<Integer> ids = response.opportunities().get(0).suggestions().stream()
+                .map(suggestion -> suggestion.product().id())
+                .toList();
+
+        assertEquals("openai", response.source());
+        assertEquals(List.of(2), ids);
+        assertTrue(fakeService.openAiCalled);
+    }
+
+    @Test
+    void openAiUnavailableFallsBackOnlyToStrictQualityGatedCandidates() {
+        FakeOpenAiService fakeService = new FakeOpenAiService();
+        service = fakeService;
+        configureService(service);
+        service.openAiEnabled = true;
+        service.openAiApiKey = Optional.of("test-key");
+        fakeService.openAiSuggestions = null;
+
+        UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
+                null,
+                "SPAR",
+                "local-list",
+                List.of(70),
+                List.of(),
+                "shopping_session",
+                List.of(new UpsellDtos.UpsellOpportunityRequest(
+                        "item:cola",
+                        List.of(70),
+                        List.of("Coca-Cola 1.5L")
+                ))
+        ));
+
+        List<Integer> ids = response.opportunities().get(0).suggestions().stream()
+                .map(suggestion -> suggestion.product().id())
+                .toList();
+
+        assertEquals("fallback", response.source());
+        assertTrue(fakeService.openAiCalled);
+        assertFalse(ids.contains(23), ids::toString);
+        assertFalse(ids.contains(1), ids::toString);
+        assertTrue(ids.isEmpty() || ids.equals(List.of(71)), ids::toString);
+    }
+
     private static final class FakeOpenSearchService extends OpenSearchService {
         int productLookups = 0;
         boolean emptyCandidates = false;
@@ -533,7 +784,22 @@ class UpsellSuggestionServiceTest {
             products.put(40, new Product(40, "Aepfel 1kg", 2.99, "310/1/1/1"));
             products.put(41, new Product(41, "Naturjoghurt 500g", 1.49, "520/1/1/2"));
             products.put(42, new Product(42, "Haferflocken 500g", 1.19, "440/1/1/1"));
+            products.put(43, new Product(43, "Bio Aepfel lose", 3.49, "310/1/1/2"));
             products.put(60, new Product(60, "Batterie AA 4er", 3.99, "999/1/1/1"));
+            products.put(70, new Product(70, "Coca-Cola 1.5L", 1.79, "700/1/1/1"));
+            products.put(71, new Product(71, "S-BUDGET Chips gesalzen", 1.29, "710/1/1/1"));
+            products.put(80, new Product(80, "Risotto Reis 500g", 2.19, "450/1/1/2"));
+            products.put(81, new Product(81, "Gemuesebruehe Wuerfel", 1.49, "450/1/1/3"));
+            products.put(82, new Product(82, "Champignons 250g", 1.99, "310/1/1/3"));
+            products.put(83, new Product(83, "Zwiebeln 1kg", 1.49, "310/1/1/4"));
+            products.put(90, new Product(90, "Frosch Citrus Dusche & Bad-Reiniger", 2.99, "800/1/1/1"));
+            products.put(91, new Product(91, "Kuechenrolle 4 Rollen", 2.49, "820/1/1/1"));
+            products.put(92, new Product(92, "Putzschwamm 3er", 1.49, "820/1/1/2"));
+            products.put(93, new Product(93, "Muellsack 35L", 1.99, "820/1/1/3"));
+            products.put(94, new Product(94, "Reinigungshandschuhe", 2.49, "820/1/1/4"));
+            products.put(100, new Product(100, "Weichspueler Sommerfrische", 2.49, "810/1/1/1"));
+            products.put(101, new Product(101, "Colorwaschmittel 1L", 4.99, "810/1/1/2"));
+            products.put(102, new Product(102, "Fleckenentferner Spray", 3.49, "810/1/1/3"));
         }
 
         @Override
@@ -570,6 +836,37 @@ class UpsellSuggestionServiceTest {
         @Override
         public void upsert(UpsellSuggestionCacheEntity incoming) {
             entries.put(incoming.contextHash, incoming);
+        }
+    }
+
+    private static final class FakeOpenAiService extends UpsellSuggestionService {
+        List<UpsellDtos.AiOpportunitySuggestion> openAiSuggestions;
+        boolean openAiCalled = false;
+
+        @Override
+        Optional<OpenAiPlanResult> rankPlanWithOpenAi(List<RankedOpportunity> rankedOpportunities, String requestId) {
+            openAiCalled = true;
+            if (openAiSuggestions == null) {
+                return Optional.empty();
+            }
+            return Optional.of(new OpenAiPlanResult(
+                    openAiSuggestions,
+                    new UpsellDtos.UpsellPlanDebug(
+                            requestId,
+                            openAiModel,
+                            "openai",
+                            null,
+                            12L,
+                            30,
+                            12,
+                            42,
+                            0,
+                            0,
+                            null,
+                            rankedOpportunities.size(),
+                            rankedOpportunities.stream().mapToInt(opportunity -> opportunity.candidates().size()).sum()
+                    )
+            ));
         }
     }
 }

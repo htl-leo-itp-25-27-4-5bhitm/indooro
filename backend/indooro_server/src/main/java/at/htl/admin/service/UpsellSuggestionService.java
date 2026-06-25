@@ -50,8 +50,9 @@ public class UpsellSuggestionService {
 
     private static final Logger LOG = Logger.getLogger(UpsellSuggestionService.class);
     private static final String GENERIC_REASON = "Ergaenzt den gerade erledigten Artikel.";
-    private static final String CACHE_CONTEXT_VERSION = "upsell-v2";
-    private static final String PLAN_CACHE_CONTEXT_VERSION = "upsell-plan-v2";
+    private static final String CACHE_CONTEXT_VERSION = "upsell-v3";
+    private static final String PLAN_CACHE_CONTEXT_VERSION = "upsell-plan-v3";
+    private static final int FALLBACK_MIN_SCORE = 90;
 
     @Inject
     OpenSearchService openSearchService;
@@ -127,18 +128,31 @@ public class UpsellSuggestionService {
             return response;
         }
 
-        Map<Integer, Product> candidateMap = candidates.stream()
+        List<ScoredCandidate> rankedCandidates = rankSingleCandidates(request, checkedProduct, candidates);
+        if (rankedCandidates.isEmpty()) {
+            UpsellDtos.UpsellSuggestionResponse response = emptyResponse(request.checkedProductId(), "none");
+            storeCachedResponse(request, contextHash, response);
+            return response;
+        }
+
+        Map<Integer, Product> candidateMap = rankedCandidates.stream()
+                .map(ScoredCandidate::product)
                 .filter(product -> product.getId() != null)
                 .collect(Collectors.toMap(Product::getId, product -> product, (first, ignored) -> first, LinkedHashMap::new));
+        List<Product> aiCandidates = rankedCandidates.stream()
+                .map(ScoredCandidate::product)
+                .toList();
 
-        RankingResult ranking = rankWithOpenAi(checkedProduct, candidates)
+        RankingResult ranking = rankWithOpenAi(checkedProduct, aiCandidates)
                 .map(suggestions -> new RankingResult(suggestions, "openai"))
-                .orElseGet(() -> new RankingResult(fallbackRank(checkedProduct, candidates), "fallback"));
+                .orElseGet(() -> new RankingResult(fallbackRank(rankedCandidates), "fallback"));
 
         List<UpsellDtos.UpsellSuggestion> suggestions = validatedSuggestions(ranking.suggestions(), candidateMap);
         String source = ranking.source();
         if (suggestions.isEmpty() && !ranking.suggestions().isEmpty()) {
             source = "filtered";
+        } else if (suggestions.isEmpty() && "fallback".equals(source)) {
+            source = "none";
         }
 
         UpsellDtos.UpsellSuggestionResponse response = new UpsellDtos.UpsellSuggestionResponse(
@@ -266,6 +280,8 @@ public class UpsellSuggestionService {
         String source = ranking.source();
         if (responses.stream().allMatch(response -> response.suggestions().isEmpty()) && hadRankedSuggestions) {
             source = "filtered";
+        } else if (responses.stream().allMatch(response -> response.suggestions().isEmpty()) && "fallback".equals(source)) {
+            source = "none";
         }
 
         UpsellDtos.UpsellPlanResponse response = new UpsellDtos.UpsellPlanResponse(
@@ -389,28 +405,33 @@ public class UpsellSuggestionService {
             List<Integer> triggerProductIds,
             List<String> triggerNames,
             List<Product> triggerProducts,
+            List<ProductClassification> triggerClassifications,
             Set<String> triggerCategories,
-            Set<String> triggerTokens
+            Set<String> triggerTokens,
+            Set<ProductDomain> triggerDomains,
+            Set<ProductFamily> triggerFamilies,
+            Set<String> triggerClassKeys
     ) {
     }
 
     record ScoredCandidate(
             Product product,
             String categoryCode,
+            ProductClassification classification,
             int score,
             List<String> reasons,
             boolean storeMatched
     ) {
     }
 
-    private record RankedOpportunity(
+    record RankedOpportunity(
             UpsellDtos.UpsellOpportunityRequest opportunity,
             OpportunityRankingInput input,
             List<ScoredCandidate> candidates
     ) {
     }
 
-    private record OpenAiPlanResult(
+    record OpenAiPlanResult(
             List<UpsellDtos.AiOpportunitySuggestion> opportunities,
             UpsellDtos.UpsellPlanDebug debug
     ) {
@@ -423,6 +444,70 @@ public class UpsellSuggestionService {
             Integer cachedInputTokens,
             Integer reasoningTokens
     ) {
+    }
+
+    enum ProductDomain {
+        FOOD,
+        DRINK,
+        CLEANING,
+        LAUNDRY,
+        PAPER_HOUSEHOLD,
+        PERSONAL_CARE,
+        PET,
+        NON_FOOD,
+        UNKNOWN
+    }
+
+    enum ProductFamily {
+        APPLE,
+        BANANA,
+        ORANGE,
+        FRUIT,
+        OATS_CEREAL,
+        BUTTER,
+        MILK,
+        YOGURT,
+        CHEESE,
+        EGGS,
+        FLOUR,
+        SUGAR,
+        BAKING_STAPLE,
+        BREAD,
+        SPREAD,
+        HONEY,
+        PASTA,
+        PASTA_SAUCE,
+        RICE_RISOTTO,
+        BROTH,
+        VEGETABLE,
+        MUSHROOM,
+        ONION,
+        OIL,
+        HERB,
+        SOFT_DRINK,
+        SNACK,
+        CLEANING_SPRAY,
+        LAUNDRY_SOFTENER,
+        LAUNDRY_DETERGENT,
+        LAUNDRY_STAIN_REMOVER,
+        PAPER_TOWEL,
+        CLEANING_ACCESSORY,
+        TRASH_BAG,
+        GLOVES,
+        PERSONAL_CARE,
+        PET,
+        UNKNOWN
+    }
+
+    record ProductClassification(
+            ProductDomain domain,
+            ProductFamily family,
+            String classKey,
+            int confidence
+    ) {
+        boolean known() {
+            return domain != ProductDomain.UNKNOWN && family != ProductFamily.UNKNOWN && classKey != null;
+        }
     }
 
     @Transactional
@@ -599,19 +684,41 @@ public class UpsellSuggestionService {
     ) {
         String storeId = request.storeId() == null ? null : request.storeId().toString();
         String storeCode = normalizeOptional(request.storeCode());
+        Set<String> globallyExcludedClasses = excludedClassKeys(request.currentListProductIds(), request.completedProductIds());
         List<RankedOpportunity> ranked = new ArrayList<>();
         for (UpsellDtos.UpsellOpportunityRequest opportunity : opportunities) {
             OpportunityRankingInput input = rankingInput(opportunity);
             List<ScoredCandidate> scored = candidates.stream()
-                    .map(candidate -> scoreCandidate(input, candidate, storeId, storeCode))
+                    .map(candidate -> scoreCandidate(input, candidate, storeId, storeCode, globallyExcludedClasses))
                     .filter(candidate -> candidate.score() >= Math.max(0, minDeterministicScore))
                     .sorted(scoredCandidateComparator())
-                    .limit(Math.max(1, perOpportunityCandidates))
                     .toList();
             ranked.add(new RankedOpportunity(opportunity, input, scored));
         }
+        ranked = dedupePlanCandidates(ranked, requestId);
         logRankedCandidateCounts(requestId, candidates.size(), ranked);
         return ranked;
+    }
+
+    List<ScoredCandidate> rankSingleCandidates(
+            UpsellDtos.UpsellSuggestionRequest request,
+            Product checkedProduct,
+            List<Product> candidates
+    ) {
+        String storeId = request.storeId() == null ? null : request.storeId().toString();
+        String storeCode = normalizeOptional(request.storeCode());
+        OpportunityRankingInput input = rankingInput(new UpsellDtos.UpsellOpportunityRequest(
+                "checked:" + checkedProduct.getId(),
+                List.of(checkedProduct.getId()),
+                List.of(checkedProduct.getName())
+        ));
+        Set<String> globallyExcludedClasses = excludedClassKeys(request.currentListProductIds(), request.completedProductIds());
+        return candidates.stream()
+                .map(candidate -> scoreCandidate(input, candidate, storeId, storeCode, globallyExcludedClasses))
+                .filter(candidate -> candidate.score() >= Math.max(0, minDeterministicScore))
+                .sorted(scoredCandidateComparator())
+                .limit(Math.max(1, maxCandidates))
+                .toList();
     }
 
     OpportunityRankingInput rankingInput(UpsellDtos.UpsellOpportunityRequest opportunity) {
@@ -642,14 +749,35 @@ public class UpsellSuggestionService {
         Set<String> triggerTokens = triggerNames.stream()
                 .flatMap(name -> productNameTokens(name).stream())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+        List<ProductClassification> triggerClassifications = new ArrayList<>(triggerProducts.stream()
+                .map(this::classifyProduct)
+                .toList());
+        triggerClassifications.addAll(triggerNames.stream()
+                .map(name -> classifyProduct(new Product(null, name, null, null)))
+                .toList());
+        List<ProductClassification> knownTriggerClassifications = triggerClassifications.stream()
+                .filter(ProductClassification::known)
+                .distinct()
+                .toList();
 
         return new OpportunityRankingInput(
                 opportunity.opportunityId(),
                 triggerProductIds,
                 triggerNames.stream().distinct().limit(20).toList(),
                 triggerProducts,
+                knownTriggerClassifications,
                 triggerCategories,
-                triggerTokens
+                triggerTokens,
+                knownTriggerClassifications.stream()
+                        .map(ProductClassification::domain)
+                        .collect(Collectors.toCollection(LinkedHashSet::new)),
+                knownTriggerClassifications.stream()
+                        .map(ProductClassification::family)
+                        .collect(Collectors.toCollection(LinkedHashSet::new)),
+                knownTriggerClassifications.stream()
+                        .map(ProductClassification::classKey)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toCollection(LinkedHashSet::new))
         );
     }
 
@@ -670,28 +798,42 @@ public class UpsellSuggestionService {
             OpportunityRankingInput input,
             Product candidate,
             String storeId,
-            String storeCode
+            String storeCode,
+            Set<String> globallyExcludedClasses
     ) {
         int score = 0;
         List<String> reasons = new ArrayList<>();
+        ProductClassification classification = classifyProduct(candidate);
+
+        Optional<String> rejection = qualityGateRejection(input, classification, globallyExcludedClasses);
+        if (rejection.isPresent()) {
+            LOG.debugf(
+                    "Upsell candidate suppressed opportunity=%s productId=%s class=%s reason=%s",
+                    input.opportunityId(),
+                    candidate.getId(),
+                    classification.classKey(),
+                    rejection.get()
+            );
+            return new ScoredCandidate(candidate, categoryCode(candidate.getLayoutCode()), classification, Integer.MIN_VALUE, List.of(rejection.get()), false);
+        }
 
         int storeScore = storeScore(candidate, storeId, storeCode);
         boolean storeMatched = storeScore > 0;
         if (storeMatched) {
-            score += 25 + (storeScore * 3);
+            score += 12 + (storeScore * 3);
             reasons.add("store");
         }
 
         if (hasLayoutPosition(candidate)) {
-            score += 12;
+            score += 8;
             reasons.add("layout");
         }
 
         String category = categoryCode(candidate.getLayoutCode());
-        if (category != null && input.triggerCategories().stream()
-                .anyMatch(triggerCategory -> complementaryCategories(triggerCategory).contains(category))) {
-            score += 55;
-            reasons.add("category");
+        int relationScore = complementScore(input.triggerFamilies(), classification.family());
+        if (relationScore > 0) {
+            score += relationScore;
+            reasons.add(relationScore >= 100 ? "family_strong" : relationScore >= 75 ? "family_medium" : "family_weak");
         }
 
         Set<String> candidateTokens = productNameTokens(candidate.getName());
@@ -711,7 +853,436 @@ public class UpsellSuggestionService {
             reasons.add("weak_butter_penalty");
         }
 
-        return new ScoredCandidate(candidate, category, score, List.copyOf(reasons), storeMatched);
+        if (score < Math.max(0, minDeterministicScore)) {
+            reasons.add("below_threshold");
+        }
+
+        return new ScoredCandidate(candidate, category, classification, score, List.copyOf(reasons), storeMatched);
+    }
+
+    ProductClassification classifyProduct(Product product) {
+        String normalizedName = normalizeProductName(product == null ? null : product.getName());
+        String category = categoryCode(product == null ? null : product.getLayoutCode());
+        if (normalizedName == null && category == null) {
+            return unknownClassification();
+        }
+        String text = normalizedName == null ? "" : normalizedName;
+
+        if (containsAnyText(text, "weichspuel", "weichspuler", "softener")) {
+            return classification(ProductDomain.LAUNDRY, ProductFamily.LAUNDRY_SOFTENER, "laundry_softener", 95);
+        }
+        if (containsAnyText(text, "waschmittel", "detergent", "vollwaschmittel", "colorwaschmittel")) {
+            return classification(ProductDomain.LAUNDRY, ProductFamily.LAUNDRY_DETERGENT, "laundry_detergent", 95);
+        }
+        if (containsAnyText(text, "flecken", "stain")) {
+            return classification(ProductDomain.LAUNDRY, ProductFamily.LAUNDRY_STAIN_REMOVER, "laundry_stain_remover", 90);
+        }
+        if (containsAnyText(text, "reiniger", "badreiniger", "bad reiniger", "duschreiniger", "allzweck", "glasreiniger", "wc reiniger")) {
+            return classification(ProductDomain.CLEANING, ProductFamily.CLEANING_SPRAY, "cleaning_spray", 95);
+        }
+        if (containsAnyText(text, "kuechenrolle", "küchenrolle", "papierhandtuch", "haushaltsrolle", "zewa")) {
+            return classification(ProductDomain.PAPER_HOUSEHOLD, ProductFamily.PAPER_TOWEL, "paper_towel", 95);
+        }
+        if (containsAnyText(text, "schwamm", "sponge", "putztuch", "microfaser", "mikrofaser", "reinigungstuch")) {
+            return classification(ProductDomain.CLEANING, ProductFamily.CLEANING_ACCESSORY, "cleaning_accessory", 90);
+        }
+        if (containsAnyText(text, "muellsack", "müllsack", "mullbeutel", "müllbeutel")) {
+            return classification(ProductDomain.PAPER_HOUSEHOLD, ProductFamily.TRASH_BAG, "trash_bag", 90);
+        }
+        if (containsAnyText(text, "handschuh", "gloves")) {
+            return classification(ProductDomain.CLEANING, ProductFamily.GLOVES, "cleaning_gloves", 90);
+        }
+        if (containsAnyText(text, "shampoo", "duschgel", "seife", "zahnpasta", "deo")) {
+            return classification(ProductDomain.PERSONAL_CARE, ProductFamily.PERSONAL_CARE, "personal_care", 90);
+        }
+        if (containsAnyText(text, "katze", "hund", "tierfutter")) {
+            return classification(ProductDomain.PET, ProductFamily.PET, "pet", 90);
+        }
+
+        if (containsAnyText(text, "coca", "cola", "fanta", "sprite", "limonade", "softdrink", "soft drink")) {
+            return classification(ProductDomain.DRINK, ProductFamily.SOFT_DRINK, "soft_drink", 95);
+        }
+        if (containsAnyText(text, "chips", "salzstangen", "snack", "nachos", "erdnuss", "popcorn")) {
+            return classification(ProductDomain.FOOD, ProductFamily.SNACK, "salty_snack", 90);
+        }
+        if (containsAnyText(text, "risotto", "reis")) {
+            return classification(ProductDomain.FOOD, ProductFamily.RICE_RISOTTO, "rice_risotto", 95);
+        }
+        if (containsAnyText(text, "spaghetti", "nudel", "pasta", "penne", "fusilli", "farfalle")) {
+            return classification(ProductDomain.FOOD, ProductFamily.PASTA, "pasta", 95);
+        }
+        if (containsAnyText(text, "tomatensauce", "tomatensosse", "tomatensosse", "nudelsauce", "sugo", "bolognese", "pesto")) {
+            return classification(ProductDomain.FOOD, ProductFamily.PASTA_SAUCE, "pasta_sauce", 95);
+        }
+        if (containsAnyText(text, "parmesan", "kaese", "käse", "gouda", "emmentaler")) {
+            return classification(ProductDomain.FOOD, ProductFamily.CHEESE, "cheese", 95);
+        }
+        if (containsAnyText(text, "bruehe", "brühe", "bouillon", "fond")) {
+            return classification(ProductDomain.FOOD, ProductFamily.BROTH, "broth", 90);
+        }
+        if (containsAnyText(text, "champignon", "pilz", "mushroom")) {
+            return classification(ProductDomain.FOOD, ProductFamily.MUSHROOM, "mushroom", 90);
+        }
+        if (containsAnyText(text, "zwiebel", "onion")) {
+            return classification(ProductDomain.FOOD, ProductFamily.ONION, "onion", 90);
+        }
+        if (containsAnyText(text, "karotte", "moehre", "möhre", "gemuese", "gemüse", "tomate", "paprika", "zucchini")) {
+            return classification(ProductDomain.FOOD, ProductFamily.VEGETABLE, "vegetable", 85);
+        }
+        if (containsAnyText(text, "olivenoel", "olivenöl", "pflanzenoel", "pflanzenöl", "oel", "öl")) {
+            return classification(ProductDomain.FOOD, ProductFamily.OIL, "oil", 95);
+        }
+        if (containsAnyText(text, "basilikum", "kraeuter", "kräuter", "petersilie")) {
+            return classification(ProductDomain.FOOD, ProductFamily.HERB, "herb", 85);
+        }
+        if (containsAnyText(text, "apfel", "aepfel", "äpfel")) {
+            return classification(ProductDomain.FOOD, ProductFamily.APPLE, "apple", 95);
+        }
+        if (containsAnyText(text, "banane")) {
+            return classification(ProductDomain.FOOD, ProductFamily.BANANA, "banana", 95);
+        }
+        if (containsAnyText(text, "orange", "orangen")) {
+            return classification(ProductDomain.FOOD, ProductFamily.ORANGE, "orange", 95);
+        }
+        if (containsAnyText(text, "obst", "beere", "erdbeer", "himbeer")) {
+            return classification(ProductDomain.FOOD, ProductFamily.FRUIT, "fruit", 85);
+        }
+        if (containsAnyText(text, "hafer", "muesli", "müsli", "cereal", "cornflakes", "flocken")) {
+            return classification(ProductDomain.FOOD, ProductFamily.OATS_CEREAL, "oats_cereal", 95);
+        }
+        if (containsAnyText(text, "butter")) {
+            return classification(ProductDomain.FOOD, ProductFamily.BUTTER, "butter", 95);
+        }
+        if (containsAnyText(text, "milch")) {
+            return classification(ProductDomain.FOOD, ProductFamily.MILK, "milk", 95);
+        }
+        if (containsAnyText(text, "joghurt", "yoghurt", "topfen")) {
+            return classification(ProductDomain.FOOD, ProductFamily.YOGURT, "yogurt", 95);
+        }
+        if (containsAnyText(text, "eier", "freilandeier", "huehnerei", "hühnerei")) {
+            return classification(ProductDomain.FOOD, ProductFamily.EGGS, "eggs", 95);
+        }
+        if (containsAnyText(text, "mehl")) {
+            return classification(ProductDomain.FOOD, ProductFamily.FLOUR, "flour", 95);
+        }
+        if (containsAnyText(text, "zucker")) {
+            return classification(ProductDomain.FOOD, ProductFamily.SUGAR, "sugar", 95);
+        }
+        if (containsAnyText(text, "backpulver", "vanillezucker", "hefe")) {
+            return classification(ProductDomain.FOOD, ProductFamily.BAKING_STAPLE, "baking_staple", 90);
+        }
+        if (containsAnyText(text, "brot", "toast", "semmel", "weckerl", "baguette", "croissant", "gebaeck", "gebäck")) {
+            return classification(ProductDomain.FOOD, ProductFamily.BREAD, "bread", 95);
+        }
+        if (containsAnyText(text, "marmelade", "aufstrich")) {
+            return classification(ProductDomain.FOOD, ProductFamily.SPREAD, "spread", 90);
+        }
+        if (containsAnyText(text, "honig")) {
+            return classification(ProductDomain.FOOD, ProductFamily.HONEY, "honey", 90);
+        }
+
+        if ("430".equals(category)) {
+            return classification(ProductDomain.FOOD, ProductFamily.PASTA, "pasta", 70);
+        }
+        if ("420".equals(category)) {
+            return classification(ProductDomain.FOOD, ProductFamily.PASTA_SAUCE, "pasta_sauce", 70);
+        }
+        if ("310".equals(category)) {
+            return classification(ProductDomain.FOOD, ProductFamily.FRUIT, "fruit", 70);
+        }
+        if ("440".equals(category)) {
+            return classification(ProductDomain.FOOD, ProductFamily.OATS_CEREAL, "oats_cereal", 70);
+        }
+        if ("445".equals(category)) {
+            return classification(ProductDomain.FOOD, ProductFamily.BAKING_STAPLE, "baking_staple", 65);
+        }
+        if ("510".equals(category)) {
+            return classification(ProductDomain.FOOD, ProductFamily.BREAD, "bread", 70);
+        }
+        if ("470".equals(category)) {
+            return classification(ProductDomain.FOOD, ProductFamily.SPREAD, "spread", 70);
+        }
+        if ("520".equals(category)) {
+            return classification(ProductDomain.FOOD, ProductFamily.YOGURT, "dairy", 65);
+        }
+        if ("525".equals(category)) {
+            return classification(ProductDomain.FOOD, ProductFamily.CHEESE, "dairy_staple", 60);
+        }
+        if ("450".equals(category)) {
+            return classification(ProductDomain.FOOD, ProductFamily.OIL, "oil", 70);
+        }
+
+        return unknownClassification();
+    }
+
+    private ProductClassification classification(ProductDomain domain, ProductFamily family, String classKey, int confidence) {
+        return new ProductClassification(domain, family, classKey, Math.max(0, Math.min(100, confidence)));
+    }
+
+    private ProductClassification unknownClassification() {
+        return classification(ProductDomain.UNKNOWN, ProductFamily.UNKNOWN, null, 0);
+    }
+
+    private Optional<String> qualityGateRejection(
+            OpportunityRankingInput input,
+            ProductClassification candidate,
+            Set<String> globallyExcludedClasses
+    ) {
+        if (candidate == null || !candidate.known()) {
+            return Optional.of("unknown_candidate");
+        }
+        if (input.triggerClassifications().isEmpty() || input.triggerFamilies().isEmpty()) {
+            return Optional.of("unknown_trigger");
+        }
+        if (candidate.classKey() != null && input.triggerClassKeys().contains(candidate.classKey())) {
+            return Optional.of("same_class");
+        }
+        if (candidate.classKey() != null && globallyExcludedClasses.contains(candidate.classKey())) {
+            return Optional.of("already_in_list_or_completed");
+        }
+        if (!domainsCompatible(input.triggerDomains(), candidate.domain())) {
+            return Optional.of("incompatible_domain");
+        }
+        if (isForbiddenFamilyPair(input.triggerFamilies(), candidate.family())) {
+            return Optional.of("forbidden_family");
+        }
+        if (complementScore(input.triggerFamilies(), candidate.family()) <= 0) {
+            return Optional.of("no_family_rule");
+        }
+        return Optional.empty();
+    }
+
+    private boolean domainsCompatible(Set<ProductDomain> triggerDomains, ProductDomain candidateDomain) {
+        if (triggerDomains == null || triggerDomains.isEmpty() || triggerDomains.contains(ProductDomain.UNKNOWN)) {
+            return false;
+        }
+        if (candidateDomain == ProductDomain.UNKNOWN || candidateDomain == ProductDomain.NON_FOOD) {
+            return false;
+        }
+        if (triggerDomains.contains(ProductDomain.CLEANING)) {
+            return Set.of(ProductDomain.CLEANING, ProductDomain.PAPER_HOUSEHOLD).contains(candidateDomain);
+        }
+        if (triggerDomains.contains(ProductDomain.LAUNDRY)) {
+            return candidateDomain == ProductDomain.LAUNDRY;
+        }
+        if (triggerDomains.contains(ProductDomain.PAPER_HOUSEHOLD)) {
+            return Set.of(ProductDomain.CLEANING, ProductDomain.PAPER_HOUSEHOLD).contains(candidateDomain);
+        }
+        if (triggerDomains.contains(ProductDomain.DRINK)) {
+            return candidateDomain == ProductDomain.FOOD;
+        }
+        if (triggerDomains.contains(ProductDomain.FOOD)) {
+            return candidateDomain == ProductDomain.FOOD || candidateDomain == ProductDomain.DRINK;
+        }
+        return false;
+    }
+
+    private boolean isForbiddenFamilyPair(Set<ProductFamily> triggers, ProductFamily candidate) {
+        if (triggers.contains(ProductFamily.RICE_RISOTTO) && fruitFamilies().contains(candidate)) {
+            return true;
+        }
+        if (triggers.contains(ProductFamily.SOFT_DRINK)
+                && Set.of(ProductFamily.FLOUR, ProductFamily.EGGS, ProductFamily.BUTTER, ProductFamily.PASTA, ProductFamily.PASTA_SAUCE, ProductFamily.BAKING_STAPLE, ProductFamily.SUGAR).contains(candidate)) {
+            return true;
+        }
+        if ((triggers.contains(ProductFamily.CLEANING_SPRAY) || triggers.contains(ProductFamily.LAUNDRY_SOFTENER))
+                && foodFamilies().contains(candidate)) {
+            return true;
+        }
+        return false;
+    }
+
+    private int complementScore(Set<ProductFamily> triggers, ProductFamily candidate) {
+        int best = 0;
+        for (ProductFamily trigger : triggers == null ? Set.<ProductFamily>of() : triggers) {
+            best = Math.max(best, complementScore(trigger, candidate));
+        }
+        return best;
+    }
+
+    private int complementScore(ProductFamily trigger, ProductFamily candidate) {
+        if (trigger == null || candidate == null || trigger == ProductFamily.UNKNOWN || candidate == ProductFamily.UNKNOWN) {
+            return 0;
+        }
+        if (trigger == candidate) {
+            return 0;
+        }
+        return switch (trigger) {
+            case OATS_CEREAL -> scoreFor(candidate,
+                    Set.of(ProductFamily.MILK, ProductFamily.YOGURT, ProductFamily.BANANA, ProductFamily.APPLE, ProductFamily.HONEY),
+                    Set.of(ProductFamily.FRUIT, ProductFamily.ORANGE, ProductFamily.SPREAD),
+                    Set.of(ProductFamily.BREAD));
+            case BUTTER -> scoreFor(candidate,
+                    Set.of(ProductFamily.FLOUR, ProductFamily.EGGS, ProductFamily.BREAD, ProductFamily.SUGAR),
+                    Set.of(ProductFamily.BAKING_STAPLE, ProductFamily.SPREAD, ProductFamily.HONEY, ProductFamily.MILK),
+                    Set.of(ProductFamily.YOGURT));
+            case EGGS -> scoreFor(candidate,
+                    Set.of(ProductFamily.FLOUR, ProductFamily.BUTTER, ProductFamily.BREAD),
+                    Set.of(ProductFamily.BAKING_STAPLE, ProductFamily.MILK, ProductFamily.CHEESE, ProductFamily.VEGETABLE),
+                    Set.of(ProductFamily.SUGAR, ProductFamily.OIL));
+            case RICE_RISOTTO -> scoreFor(candidate,
+                    Set.of(ProductFamily.CHEESE, ProductFamily.BROTH, ProductFamily.MUSHROOM, ProductFamily.ONION, ProductFamily.OIL),
+                    Set.of(ProductFamily.VEGETABLE, ProductFamily.HERB),
+                    Set.of());
+            case PASTA -> scoreFor(candidate,
+                    Set.of(ProductFamily.PASTA_SAUCE, ProductFamily.CHEESE, ProductFamily.OIL),
+                    Set.of(ProductFamily.HERB, ProductFamily.VEGETABLE),
+                    Set.of());
+            case PASTA_SAUCE -> scoreFor(candidate,
+                    Set.of(ProductFamily.PASTA, ProductFamily.CHEESE),
+                    Set.of(ProductFamily.OIL, ProductFamily.HERB),
+                    Set.of(ProductFamily.RICE_RISOTTO));
+            case SOFT_DRINK -> scoreFor(candidate,
+                    Set.of(ProductFamily.SNACK),
+                    Set.of(),
+                    Set.of());
+            case CLEANING_SPRAY -> scoreFor(candidate,
+                    Set.of(ProductFamily.PAPER_TOWEL, ProductFamily.CLEANING_ACCESSORY),
+                    Set.of(ProductFamily.TRASH_BAG, ProductFamily.GLOVES),
+                    Set.of());
+            case LAUNDRY_SOFTENER -> scoreFor(candidate,
+                    Set.of(ProductFamily.LAUNDRY_DETERGENT, ProductFamily.LAUNDRY_STAIN_REMOVER),
+                    Set.of(),
+                    Set.of());
+            case PAPER_TOWEL -> scoreFor(candidate,
+                    Set.of(ProductFamily.CLEANING_SPRAY, ProductFamily.CLEANING_ACCESSORY, ProductFamily.TRASH_BAG),
+                    Set.of(ProductFamily.GLOVES),
+                    Set.of());
+            case APPLE, BANANA, ORANGE, FRUIT -> scoreFor(candidate,
+                    Set.of(ProductFamily.YOGURT, ProductFamily.OATS_CEREAL),
+                    Set.of(ProductFamily.HONEY, ProductFamily.MILK),
+                    Set.of());
+            case MILK, YOGURT -> scoreFor(candidate,
+                    Set.of(ProductFamily.OATS_CEREAL, ProductFamily.BANANA, ProductFamily.APPLE),
+                    Set.of(ProductFamily.FRUIT, ProductFamily.HONEY),
+                    Set.of());
+            case BREAD -> scoreFor(candidate,
+                    Set.of(ProductFamily.BUTTER, ProductFamily.CHEESE, ProductFamily.SPREAD, ProductFamily.HONEY),
+                    Set.of(ProductFamily.EGGS),
+                    Set.of());
+            case FLOUR, SUGAR, BAKING_STAPLE -> scoreFor(candidate,
+                    Set.of(ProductFamily.BUTTER, ProductFamily.EGGS, ProductFamily.MILK),
+                    Set.of(ProductFamily.SUGAR, ProductFamily.FLOUR, ProductFamily.BAKING_STAPLE),
+                    Set.of());
+            default -> 0;
+        };
+    }
+
+    private int scoreFor(ProductFamily candidate, Set<ProductFamily> strong, Set<ProductFamily> medium, Set<ProductFamily> weak) {
+        if (strong.contains(candidate)) {
+            return 112;
+        }
+        if (medium.contains(candidate)) {
+            return 84;
+        }
+        if (weak.contains(candidate)) {
+            return 56;
+        }
+        return 0;
+    }
+
+    private Set<ProductFamily> fruitFamilies() {
+        return Set.of(ProductFamily.APPLE, ProductFamily.BANANA, ProductFamily.ORANGE, ProductFamily.FRUIT);
+    }
+
+    private Set<ProductFamily> foodFamilies() {
+        return Set.of(
+                ProductFamily.APPLE,
+                ProductFamily.BANANA,
+                ProductFamily.ORANGE,
+                ProductFamily.FRUIT,
+                ProductFamily.OATS_CEREAL,
+                ProductFamily.BUTTER,
+                ProductFamily.MILK,
+                ProductFamily.YOGURT,
+                ProductFamily.CHEESE,
+                ProductFamily.EGGS,
+                ProductFamily.FLOUR,
+                ProductFamily.SUGAR,
+                ProductFamily.BAKING_STAPLE,
+                ProductFamily.BREAD,
+                ProductFamily.SPREAD,
+                ProductFamily.HONEY,
+                ProductFamily.PASTA,
+                ProductFamily.PASTA_SAUCE,
+                ProductFamily.RICE_RISOTTO,
+                ProductFamily.BROTH,
+                ProductFamily.VEGETABLE,
+                ProductFamily.MUSHROOM,
+                ProductFamily.ONION,
+                ProductFamily.OIL,
+                ProductFamily.HERB,
+                ProductFamily.SNACK
+        );
+    }
+
+    private Set<String> excludedClassKeys(List<Integer> currentListProductIds, List<Integer> completedProductIds) {
+        Set<String> excluded = new LinkedHashSet<>();
+        List<Integer> ids = new ArrayList<>();
+        ids.addAll(normalizedProductIds(currentListProductIds, null, false));
+        ids.addAll(normalizedProductIds(completedProductIds, null, false));
+        for (Integer id : ids) {
+            resolveTriggerProduct(id)
+                    .map(this::classifyProduct)
+                    .map(ProductClassification::classKey)
+                    .filter(Objects::nonNull)
+                    .ifPresent(excluded::add);
+        }
+        return excluded;
+    }
+
+    private List<RankedOpportunity> dedupePlanCandidates(List<RankedOpportunity> ranked, String requestId) {
+        Map<Integer, String> winningProductOpportunity = new HashMap<>();
+        Map<String, String> winningClassOpportunity = new HashMap<>();
+        Map<Integer, Integer> winningProductScore = new HashMap<>();
+        Map<String, Integer> winningClassScore = new HashMap<>();
+
+        for (RankedOpportunity opportunity : ranked) {
+            for (ScoredCandidate candidate : opportunity.candidates()) {
+                Integer productId = candidate.product().getId();
+                String classKey = candidate.classification().classKey();
+                if (productId != null && candidate.score() > winningProductScore.getOrDefault(productId, Integer.MIN_VALUE)) {
+                    winningProductScore.put(productId, candidate.score());
+                    winningProductOpportunity.put(productId, opportunity.opportunity().opportunityId());
+                }
+                if (classKey != null && candidate.score() > winningClassScore.getOrDefault(classKey, Integer.MIN_VALUE)) {
+                    winningClassScore.put(classKey, candidate.score());
+                    winningClassOpportunity.put(classKey, opportunity.opportunity().opportunityId());
+                }
+            }
+        }
+
+        List<RankedOpportunity> deduped = new ArrayList<>();
+        for (RankedOpportunity opportunity : ranked) {
+            Set<String> localClasses = new HashSet<>();
+            List<ScoredCandidate> kept = new ArrayList<>();
+            for (ScoredCandidate candidate : opportunity.candidates()) {
+                Integer productId = candidate.product().getId();
+                String classKey = candidate.classification().classKey();
+                String opportunityId = opportunity.opportunity().opportunityId();
+                if (productId != null && !Objects.equals(winningProductOpportunity.get(productId), opportunityId)) {
+                    LOG.debugf("Upsell candidate suppressed requestId=%s opportunity=%s productId=%s reason=deduped_plan_product winner=%s",
+                            requestId, opportunityId, productId, winningProductOpportunity.get(productId));
+                    continue;
+                }
+                if (classKey != null && !Objects.equals(winningClassOpportunity.get(classKey), opportunityId)) {
+                    LOG.debugf("Upsell candidate suppressed requestId=%s opportunity=%s productId=%s class=%s reason=deduped_plan_class winner=%s",
+                            requestId, opportunityId, productId, classKey, winningClassOpportunity.get(classKey));
+                    continue;
+                }
+                if (classKey != null && !localClasses.add(classKey)) {
+                    LOG.debugf("Upsell candidate suppressed requestId=%s opportunity=%s productId=%s class=%s reason=deduped_local_class",
+                            requestId, opportunityId, productId, classKey);
+                    continue;
+                }
+                kept.add(candidate);
+                if (kept.size() >= Math.max(1, perOpportunityCandidates)) {
+                    break;
+                }
+            }
+            deduped.add(new RankedOpportunity(opportunity.opportunity(), opportunity.input(), List.copyOf(kept)));
+        }
+        return deduped;
     }
 
     private Comparator<ScoredCandidate> scoredCandidateComparator() {
@@ -863,11 +1434,16 @@ public class UpsellSuggestionService {
         );
     }
 
-    List<UpsellDtos.AiSuggestion> fallbackRank(Product checkedProduct, List<Product> candidates) {
+    List<UpsellDtos.AiSuggestion> fallbackRank(List<ScoredCandidate> candidates) {
         return candidates.stream()
-                .sorted(candidateComparator(checkedProduct, null))
+                .filter(candidate -> candidate.score() >= FALLBACK_MIN_SCORE)
+                .sorted(scoredCandidateComparator())
                 .limit(Math.max(1, maxSuggestions))
-                .map(product -> new UpsellDtos.AiSuggestion(product.getId(), GENERIC_REASON, 0.62))
+                .map(candidate -> new UpsellDtos.AiSuggestion(
+                        candidate.product().getId(),
+                        fallbackReason(candidate),
+                        fallbackConfidence(candidate.score())
+                ))
                 .toList();
     }
 
@@ -876,6 +1452,7 @@ public class UpsellSuggestionService {
                 .map(opportunity -> new UpsellDtos.AiOpportunitySuggestion(
                         opportunity.opportunity().opportunityId(),
                         opportunity.candidates().stream()
+                                .filter(candidate -> candidate.score() >= FALLBACK_MIN_SCORE)
                                 .limit(Math.max(1, maxSuggestions))
                                 .map(candidate -> new UpsellDtos.AiSuggestion(
                                         candidate.product().getId(),
@@ -888,10 +1465,10 @@ public class UpsellSuggestionService {
     }
 
     private String fallbackReason(ScoredCandidate candidate) {
-        if (candidate.reasons().contains("keyword")) {
+        if (candidate.reasons().contains("family_strong")) {
             return "Passt gut zum gerade erledigten Produkt.";
         }
-        if (candidate.reasons().contains("category")) {
+        if (candidate.reasons().contains("family_medium") || candidate.reasons().contains("keyword")) {
             return "Passt als praktische Ergaenzung zum gerade erledigten Produkt.";
         }
         return GENERIC_REASON;
@@ -1259,6 +1836,9 @@ public class UpsellSuggestionService {
         summary.put("id", candidate.product().getId());
         summary.put("name", candidate.product().getName());
         summary.put("categoryCode", candidate.categoryCode());
+        summary.put("family", candidate.classification().family().name().toLowerCase(Locale.ROOT));
+        summary.put("classKey", candidate.classification().classKey());
+        summary.put("score", candidate.score());
         return summary;
     }
 

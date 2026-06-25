@@ -17,6 +17,10 @@ final class UpsellSuggestionStore: ObservableObject {
         let response: UpsellOpportunityResponse
         let responseSource: String
         let expiresAt: Date
+
+        var isLoadedEmpty: Bool {
+            response.suggestions.isEmpty
+        }
     }
 
     private struct PendingOpportunity {
@@ -238,21 +242,33 @@ final class UpsellSuggestionStore: ObservableObject {
                 self.debugLog(
                     "preloadPlan decoded requestId=\(requestID.uuidString) source=\(responseSource) debug=\(self.debugSummary(decoded.debug)) opportunities=\(decoded.opportunities.map { "\($0.opportunityId):\($0.suggestions.map { $0.product.id })" })"
                 )
-                for opportunity in decoded.opportunities where !opportunity.suggestions.isEmpty {
+                var decodedKeys: Set<PlanKey> = []
+                for opportunity in decoded.opportunities {
                     let key = self.makePlanKey(
                         opportunityId: opportunity.opportunityId,
                         listID: list.id,
                         store: store,
                         source: source
                     )
+                    decodedKeys.insert(key)
                     self.cachedOpportunities[key] = CachedOpportunity(
                         response: opportunity,
                         responseSource: responseSource,
                         expiresAt: expiresAt
                     )
-                    self.debugLog("preloadPlan cached key=\(self.keyDebug(key)) suggestions=\(opportunity.suggestions.map { "\($0.product.id):\($0.product.name)" }) expiresAt=\(expiresAt)")
+                    if opportunity.suggestions.isEmpty {
+                        self.debugLog("preloadPlan cached loaded_empty key=\(self.keyDebug(key)) expiresAt=\(expiresAt)")
+                    } else {
+                        self.debugLog("preloadPlan cached loaded_with_suggestions key=\(self.keyDebug(key)) suggestions=\(opportunity.suggestions.map { "\($0.product.id):\($0.product.name)" }) expiresAt=\(expiresAt)")
+                    }
                     self.showPendingOpportunityIfPossible(for: key)
                 }
+                self.dropPendingOpportunitiesResolvedByPlan(
+                    decodedKeys: decodedKeys,
+                    listID: list.id,
+                    store: store,
+                    source: source
+                )
             }
         }
         planTask = task
@@ -296,6 +312,12 @@ final class UpsellSuggestionStore: ObservableObject {
                 source: source
             )
             debugLog("showOpportunity skipped opportunity=\(opportunityId) reason=cache_miss key=\(keyDebug(key)) cachedKeys=\(cachedOpportunities.keys.map(keyDebug))")
+            return
+        }
+        guard !cached.isLoadedEmpty else {
+            cachedOpportunities[key] = nil
+            pendingOpportunities[key] = nil
+            debugLog("showOpportunity skipped opportunity=\(opportunityId) reason=no_suggestions key=\(keyDebug(key))")
             return
         }
 
@@ -367,6 +389,11 @@ final class UpsellSuggestionStore: ObservableObject {
 
     private func showPendingOpportunityIfPossible(for key: PlanKey) {
         guard let pending = pendingOpportunities.removeValue(forKey: key) else {
+            return
+        }
+        if let cached = cachedOpportunity(for: key), cached.isLoadedEmpty {
+            cachedOpportunities[key] = nil
+            debugLog("pendingOpportunity dropped reason=loaded_empty key=\(keyDebug(key))")
             return
         }
         guard Date().timeIntervalSince(pending.requestedAt) <= maxPendingOpportunityAge else {
@@ -548,16 +575,22 @@ final class UpsellSuggestionStore: ObservableObject {
     }
 
     private func cachedOpportunity(for key: PlanKey) -> CachedOpportunity? {
-        guard let cached = cachedOpportunities[key] else {
-            debugLog("cache miss key=\(keyDebug(key))")
+        guard let lookup = freshCachedOpportunity(for: key, logMiss: true) else {
             return nil
         }
+        let cached = lookup.cached
+        if lookup.key != key {
+            cachedOpportunities[key] = cached
+            cachedOpportunities[lookup.key] = nil
+            debugLog("cache source_key_fallback requested=\(keyDebug(key)) found=\(keyDebug(lookup.key))")
+        }
         if cached.expiresAt <= Date() {
-            cachedOpportunities[key] = nil
+            cachedOpportunities[lookup.key] = nil
             debugLog("cache expired key=\(keyDebug(key)) expiresAt=\(cached.expiresAt)")
             return nil
         }
-        debugLog("cache hit key=\(keyDebug(key)) source=\(cached.responseSource) suggestions=\(cached.response.suggestions.map { $0.product.id })")
+        let state = cached.isLoadedEmpty ? "loaded_empty" : "loaded_with_suggestions"
+        debugLog("cache hit key=\(keyDebug(key)) state=\(state) source=\(cached.responseSource) suggestions=\(cached.response.suggestions.map { $0.product.id })")
         return cached
     }
 
@@ -573,15 +606,83 @@ final class UpsellSuggestionStore: ObservableObject {
             store: store,
             source: source
         )
-        guard let cached = cachedOpportunities[key] else {
+        guard let lookup = freshCachedOpportunity(for: key, logMiss: false) else {
             return false
         }
+        let cached = lookup.cached
         if cached.expiresAt <= Date() {
-            cachedOpportunities[key] = nil
+            cachedOpportunities[lookup.key] = nil
             debugLog("preloadPlan cached opportunity expired key=\(keyDebug(key)) expiresAt=\(cached.expiresAt)")
             return false
         }
         return true
+    }
+
+    private struct CachedOpportunityLookup {
+        let key: PlanKey
+        let cached: CachedOpportunity
+    }
+
+    private func freshCachedOpportunity(for key: PlanKey, logMiss: Bool) -> CachedOpportunityLookup? {
+        if let cached = cachedOpportunities[key] {
+            return CachedOpportunityLookup(key: key, cached: cached)
+        }
+        for alternateKey in equivalentSourceKeys(for: key) {
+            if let cached = cachedOpportunities[alternateKey] {
+                return CachedOpportunityLookup(key: alternateKey, cached: cached)
+            }
+        }
+        if logMiss {
+            debugLog("cache miss key=\(keyDebug(key))")
+        }
+        return nil
+    }
+
+    private func equivalentSourceKeys(for key: PlanKey) -> [PlanKey] {
+        let equivalentSources: [String]
+        switch key.source {
+        case "shopping_session":
+            equivalentSources = ["shopping_list"]
+        case "shopping_list":
+            equivalentSources = ["shopping_session"]
+        default:
+            equivalentSources = ["shopping_session", "shopping_list"].filter { $0 != key.source }
+        }
+        return equivalentSources.map { source in
+            PlanKey(
+                opportunityId: key.opportunityId,
+                listID: key.listID,
+                storeId: key.storeId,
+                storeCode: key.storeCode,
+                source: source
+            )
+        }
+    }
+
+    private func dropPendingOpportunitiesResolvedByPlan(
+        decodedKeys: Set<PlanKey>,
+        listID: UUID,
+        store: MobileStoreSummary,
+        source: String
+    ) {
+        let pendingKeys = pendingOpportunities.keys.filter { key in
+            key.listID == listID &&
+            key.storeId == store.id &&
+            key.storeCode == store.storeCode.lowercased() &&
+            (key.source == source || equivalentSourceKeys(for: key).contains { decodedKeys.contains($0) })
+        }
+        for key in pendingKeys {
+            if decodedKeys.contains(key) || equivalentSourceKeys(for: key).contains(where: { decodedKeys.contains($0) }) {
+                if let cached = cachedOpportunity(for: key), cached.isLoadedEmpty {
+                    pendingOpportunities[key] = nil
+                    cachedOpportunities[key] = nil
+                    debugLog("pendingOpportunity dropped reason=loaded_empty key=\(keyDebug(key))")
+                }
+            } else {
+                pendingOpportunities[key] = nil
+                debugLog("pendingOpportunity dropped reason=not_in_plan key=\(keyDebug(key))")
+            }
+        }
     }
 
     private func promptBlockReason(for checkedProductId: Int, source: String) -> String? {
