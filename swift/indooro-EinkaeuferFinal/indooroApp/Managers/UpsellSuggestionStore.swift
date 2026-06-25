@@ -52,7 +52,7 @@ final class UpsellSuggestionStore: ObservableObject {
     private let maxPromptsPerSession = 4
     private let maxSuggestionsShown = 3
     private let minConfidence = 0.45
-    private let maxPendingOpportunityAge: TimeInterval = 8
+    private let maxPendingOpportunityAge: TimeInterval = 30
     private let debugEnabled = true
     private let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
@@ -175,6 +175,10 @@ final class UpsellSuggestionStore: ObservableObject {
             debugLog("preloadPlan skipped reason=duplicate_completed signature=\(signatureDebug(signature))")
             return
         }
+        if planTask != nil {
+            debugLog("preloadPlan skipped reason=in_flight_waiting signature=\(signatureDebug(signature)) activeSignature=\(activePlanSignature.map(signatureDebug) ?? "nil")")
+            return
+        }
         debugLog(
             "preloadPlan begin list=\(list.id.uuidString) source=\(source) store=\(storeDebug(store)) stops=\(stops.count) unresolved=\(unresolvedItems.count) opportunities=\(uncachedOpportunities.map(\.opportunityId)) cachedSkipped=\(opportunities.count - uncachedOpportunities.count)"
         )
@@ -190,10 +194,6 @@ final class UpsellSuggestionStore: ObservableObject {
 
         let requestID = UUID()
         latestPlanRequestID = requestID
-        if planTask != nil {
-            debugLog("preloadPlan cancels previous request newRequestId=\(requestID.uuidString)")
-        }
-        planTask?.cancel()
         activePlanSignature = signature
         isLoading = true
         debugLog("preloadPlan requestId=\(requestID.uuidString) timeout=\(urlRequest.timeoutInterval)s")
@@ -526,7 +526,7 @@ final class UpsellSuggestionStore: ObservableObject {
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.timeoutInterval = 6
+        urlRequest.timeoutInterval = 25
 
         do {
             urlRequest.httpBody = try encoder.encode(request)

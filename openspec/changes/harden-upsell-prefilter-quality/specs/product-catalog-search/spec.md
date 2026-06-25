@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
-### Requirement: Product records support internal derived classification
-The backend SHALL be able to derive internal product-domain and product-class signals from existing product catalog fields for recommendation and filtering workflows.
+### Requirement: Product records support optional internal derived classification
+The backend SHALL support deriving internal product-domain and product-class signals from existing product catalog fields for recommendation support, diagnostics, tests, or future filtering workflows.
 
 #### Scenario: Product has name and layout code
 - **WHEN** the backend evaluates a product with name and layout code
@@ -15,8 +15,8 @@ The backend SHALL be able to derive internal product-domain and product-class si
 - **WHEN** a customer product endpoint returns product data
 - **THEN** internal upsell classification fields are not required to appear in the public response
 
-### Requirement: Product domains are normalized for recommendation safety
-The backend SHALL normalize products into broad internal domains such as food, drink, cleaning, laundry, paper-household, hygiene, cooking, baking, dairy, fruit, grain-breakfast, snack, and unknown where the current catalog permits reliable inference.
+### Requirement: Product domains are normalized for internal support
+The backend SHALL support normalizing products into broad internal domains such as food, drink, cleaning, laundry, paper-household, hygiene, cooking, baking, dairy, fruit, grain-breakfast, snack, and unknown where the current catalog permits reliable inference.
 
 #### Scenario: Cleaning product is classified
 - **WHEN** a product name contains cleaner, bathroom cleaner, shower cleaner, surface cleaner, or similar reliable terms
@@ -34,8 +34,8 @@ The backend SHALL normalize products into broad internal domains such as food, d
 - **WHEN** a product could belong to multiple domains or has insufficient signals
 - **THEN** the backend uses unknown or the safer narrower class rather than a broad guessed domain
 
-### Requirement: Product classes group equivalent variants
-The backend SHALL derive normalized product classes that group equivalent variants across brands, package sizes, and naming differences.
+### Requirement: Product classes can group equivalent variants
+The backend SHALL support deriving normalized product classes that group equivalent variants across brands, package sizes, and naming differences.
 
 #### Scenario: Apple variants exist
 - **WHEN** products include Gala apples, loose apples, organic apples, and budget apples
@@ -53,8 +53,8 @@ The backend SHALL derive normalized product classes that group equivalent varian
 The backend SHALL NOT expose a new public product-class or product-domain API as part of upsell quality gating unless a future OpenSpec change defines that public contract.
 
 #### Scenario: Mobile upsell uses classification
-- **WHEN** the mobile upsell service filters candidates using product domains and classes
-- **THEN** it uses internal derived signals and keeps the existing mobile upsell response shape compatible
+- **WHEN** the mobile upsell service or future recommender helpers use product domains and classes
+- **THEN** they use internal derived signals and keep the existing mobile upsell response shape compatible
 
 #### Scenario: Future client requests classifications
 - **WHEN** a future feature needs classifications in public API responses

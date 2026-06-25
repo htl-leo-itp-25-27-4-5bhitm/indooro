@@ -61,7 +61,9 @@ spec:
             - name: OPENAI_UPSELL_REASONING_EFFORT
               value: "none"
             - name: OPENAI_UPSELL_TIMEOUT_MS
-              value: "4500"
+              value: "12000"
+            - name: UPSELL_MAX_CANDIDATES
+              value: "150"
 
             - name: QUARKUS_OIDC_AUTH_SERVER_URL
               value: "https://it220209.cloud.htl-leonding.ac.at/keycloak/realms/indooro"

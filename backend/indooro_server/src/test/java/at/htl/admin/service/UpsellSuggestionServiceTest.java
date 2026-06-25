@@ -183,7 +183,7 @@ class UpsellSuggestionServiceTest {
     }
 
     @Test
-    void planResponsesGroupStationOpportunitiesAndExcludeListProducts() {
+    void planResponsesGroupStationOpportunitiesAndExcludeListProductsWithoutServerFallback() {
         UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
                 null,
                 "SPAR",
@@ -198,7 +198,7 @@ class UpsellSuggestionServiceTest {
                 ))
         ));
 
-        assertEquals("fallback", response.source());
+        assertEquals("none", response.source());
         assertEquals(1, response.opportunities().size());
         assertEquals("station:shelf-430", response.opportunities().get(0).opportunityId());
 
@@ -208,7 +208,8 @@ class UpsellSuggestionServiceTest {
 
         assertFalse(ids.contains(1));
         assertFalse(ids.contains(3));
-        assertTrue(ids.contains(2));
+        assertTrue(ids.isEmpty());
+        assertEquals("openai_unavailable_timeout_or_invalid", response.debug().fallbackReason());
     }
 
     @Test
@@ -234,7 +235,7 @@ class UpsellSuggestionServiceTest {
                 )
         ));
 
-        assertEquals("fallback", response.source());
+        assertEquals("none", response.source());
         assertEquals(2, response.opportunities().size());
         assertEquals("station:shelf-430", response.opportunities().get(0).opportunityId());
         assertEquals("station:shelf-525", response.opportunities().get(1).opportunityId());
@@ -303,7 +304,7 @@ class UpsellSuggestionServiceTest {
 
         UpsellDtos.UpsellPlanResponse second = service.plan(request);
 
-        assertEquals("fallback", first.source());
+        assertEquals("none", first.source());
         assertEquals("cache", second.source());
         assertEquals(lookupsAfterFirstCall, openSearchService.productLookups);
         assertEquals(
@@ -388,7 +389,7 @@ class UpsellSuggestionServiceTest {
     }
 
     @Test
-    void butterPlanFallbackPrefersBreadBreakfastAndBakingOverPastaSauce() {
+    void unavailableAiReturnsNoButterFallbackInsteadOfServerGuessing() {
         UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
                 null,
                 "SPAR",
@@ -407,14 +408,14 @@ class UpsellSuggestionServiceTest {
                 .map(suggestion -> suggestion.product().id())
                 .toList();
 
-        assertEquals("fallback", response.source());
+        assertEquals("none", response.source());
         assertFalse(ids.contains(1));
         assertFalse(ids.contains(3));
-        assertTrue(ids.stream().anyMatch(id -> List.of(20, 21, 22, 23, 24).contains(id)));
+        assertTrue(ids.isEmpty());
     }
 
     @Test
-    void planFallbackRanksEachOpportunitySeparately() {
+    void unavailableAiReturnsEmptySuggestionsForEachOpportunity() {
         UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
                 null,
                 "SPAR",
@@ -443,13 +444,13 @@ class UpsellSuggestionServiceTest {
                 .map(suggestion -> suggestion.product().id())
                 .toList();
 
-        assertTrue(pastaIds.contains(3));
+        assertTrue(pastaIds.isEmpty());
         assertFalse(butterIds.contains(3));
-        assertTrue(butterIds.stream().anyMatch(id -> List.of(20, 21, 22, 23, 24).contains(id)));
+        assertTrue(butterIds.isEmpty());
     }
 
     @Test
-    void fruitPlanFallbackPrefersYogurtOatsAndBreakfastCandidates() {
+    void unavailableAiReturnsNoFruitFallbackInsteadOfServerGuessing() {
         UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
                 null,
                 "SPAR",
@@ -468,12 +469,12 @@ class UpsellSuggestionServiceTest {
                 .map(suggestion -> suggestion.product().id())
                 .toList();
 
-        assertTrue(ids.contains(41), ids::toString);
-        assertTrue(ids.contains(42), ids::toString);
+        assertEquals("none", response.source());
+        assertTrue(ids.isEmpty(), ids::toString);
     }
 
     @Test
-    void oatsPlanFallbackPrefersMilkYogurtAndFruitCandidates() {
+    void unavailableAiReturnsNoOatsFallbackInsteadOfServerGuessing() {
         UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
                 null,
                 "SPAR",
@@ -492,8 +493,8 @@ class UpsellSuggestionServiceTest {
                 .map(suggestion -> suggestion.product().id())
                 .toList();
 
-        assertTrue(ids.contains(24), ids::toString);
-        assertTrue(ids.contains(40) || ids.contains(41), ids::toString);
+        assertEquals("none", response.source());
+        assertTrue(ids.isEmpty(), ids::toString);
     }
 
     @Test
@@ -514,7 +515,7 @@ class UpsellSuggestionServiceTest {
 
         assertEquals("none", response.source());
         assertTrue(response.opportunities().get(0).suggestions().isEmpty());
-        assertEquals("no_ranked_candidates", response.debug().fallbackReason());
+        assertEquals("openai_unavailable_timeout_or_invalid", response.debug().fallbackReason());
     }
 
     @Test
@@ -563,7 +564,7 @@ class UpsellSuggestionServiceTest {
     }
 
     @Test
-    void risottoDoesNotFallbackToFruitAndPrefersCookingComplements() {
+    void unavailableAiReturnsNoRisottoFallbackInsteadOfServerGuessing() {
         UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
                 null,
                 "SPAR",
@@ -582,9 +583,8 @@ class UpsellSuggestionServiceTest {
                 .map(suggestion -> suggestion.product().id())
                 .toList();
 
-        assertFalse(ids.contains(40), ids::toString);
-        assertFalse(ids.contains(43), ids::toString);
-        assertTrue(ids.stream().anyMatch(id -> List.of(2, 5, 81, 82, 83).contains(id)), ids::toString);
+        assertEquals("none", response.source());
+        assertTrue(ids.isEmpty(), ids::toString);
     }
 
     @Test
@@ -636,7 +636,7 @@ class UpsellSuggestionServiceTest {
     }
 
     @Test
-    void appleVariantsAreSuppressedByProductClass() {
+    void unavailableAiReturnsNoAppleFallbackInsteadOfServerGuessing() {
         UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
                 null,
                 "SPAR",
@@ -655,8 +655,8 @@ class UpsellSuggestionServiceTest {
                 .map(suggestion -> suggestion.product().id())
                 .toList();
 
-        assertFalse(ids.contains(43), ids::toString);
-        assertTrue(ids.contains(41) || ids.contains(42), ids::toString);
+        assertEquals("none", response.source());
+        assertTrue(ids.isEmpty(), ids::toString);
     }
 
     @Test
@@ -691,7 +691,7 @@ class UpsellSuggestionServiceTest {
     }
 
     @Test
-    void openAiValidationDiscardsInvalidDuplicateAndIncompatibleProductIds() {
+    void openAiValidationDiscardsInvalidAndDuplicateProductIdsButKeepsAiSemanticChoices() {
         FakeOpenAiService fakeService = new FakeOpenAiService();
         service = fakeService;
         configureService(service);
@@ -726,12 +726,12 @@ class UpsellSuggestionServiceTest {
                 .toList();
 
         assertEquals("openai", response.source());
-        assertEquals(List.of(2), ids);
+        assertEquals(List.of(40, 2), ids);
         assertTrue(fakeService.openAiCalled);
     }
 
     @Test
-    void openAiUnavailableFallsBackOnlyToStrictQualityGatedCandidates() {
+    void openAiUnavailableReturnsEmptyPlanWithoutServerFallbackSuggestions() {
         FakeOpenAiService fakeService = new FakeOpenAiService();
         service = fakeService;
         configureService(service);
@@ -757,11 +757,11 @@ class UpsellSuggestionServiceTest {
                 .map(suggestion -> suggestion.product().id())
                 .toList();
 
-        assertEquals("fallback", response.source());
+        assertEquals("none", response.source());
         assertTrue(fakeService.openAiCalled);
         assertFalse(ids.contains(23), ids::toString);
         assertFalse(ids.contains(1), ids::toString);
-        assertTrue(ids.isEmpty() || ids.equals(List.of(71)), ids::toString);
+        assertTrue(ids.isEmpty(), ids::toString);
     }
 
     private static final class FakeOpenSearchService extends OpenSearchService {

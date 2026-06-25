@@ -50,8 +50,8 @@ public class UpsellSuggestionService {
 
     private static final Logger LOG = Logger.getLogger(UpsellSuggestionService.class);
     private static final String GENERIC_REASON = "Ergaenzt den gerade erledigten Artikel.";
-    private static final String CACHE_CONTEXT_VERSION = "upsell-v3";
-    private static final String PLAN_CACHE_CONTEXT_VERSION = "upsell-plan-v3";
+    private static final String CACHE_CONTEXT_VERSION = "upsell-v4";
+    private static final String PLAN_CACHE_CONTEXT_VERSION = "upsell-plan-v4";
     private static final int FALLBACK_MIN_SCORE = 90;
 
     @Inject
@@ -684,18 +684,14 @@ public class UpsellSuggestionService {
     ) {
         String storeId = request.storeId() == null ? null : request.storeId().toString();
         String storeCode = normalizeOptional(request.storeCode());
-        Set<String> globallyExcludedClasses = excludedClassKeys(request.currentListProductIds(), request.completedProductIds());
         List<RankedOpportunity> ranked = new ArrayList<>();
         for (UpsellDtos.UpsellOpportunityRequest opportunity : opportunities) {
             OpportunityRankingInput input = rankingInput(opportunity);
             List<ScoredCandidate> scored = candidates.stream()
-                    .map(candidate -> scoreCandidate(input, candidate, storeId, storeCode, globallyExcludedClasses))
-                    .filter(candidate -> candidate.score() >= Math.max(0, minDeterministicScore))
-                    .sorted(scoredCandidateComparator())
+                    .map(candidate -> aiCatalogCandidate(candidate, storeId, storeCode))
                     .toList();
             ranked.add(new RankedOpportunity(opportunity, input, scored));
         }
-        ranked = dedupePlanCandidates(ranked, requestId);
         logRankedCandidateCounts(requestId, candidates.size(), ranked);
         return ranked;
     }
@@ -719,6 +715,20 @@ public class UpsellSuggestionService {
                 .sorted(scoredCandidateComparator())
                 .limit(Math.max(1, maxCandidates))
                 .toList();
+    }
+
+    private ScoredCandidate aiCatalogCandidate(Product candidate, String storeId, String storeCode) {
+        ProductClassification classification = classifyProduct(candidate);
+        int score = storeScore(candidate, storeId, storeCode) + (hasLayoutPosition(candidate) ? 1 : 0);
+        boolean storeMatched = storeScore(candidate, storeId, storeCode) > 0;
+        return new ScoredCandidate(
+                candidate,
+                categoryCode(candidate.getLayoutCode()),
+                classification,
+                score,
+                List.of("ai_catalog"),
+                storeMatched
+        );
     }
 
     OpportunityRankingInput rankingInput(UpsellDtos.UpsellOpportunityRequest opportunity) {
@@ -1517,7 +1527,7 @@ public class UpsellSuggestionService {
 
     Optional<OpenAiPlanResult> rankPlanWithOpenAi(List<RankedOpportunity> rankedOpportunities, String requestId) {
         Optional<String> apiKey = openAiApiKey.filter(key -> !key.isBlank());
-        int candidateCount = rankedOpportunities.stream().mapToInt(opportunity -> opportunity.candidates().size()).sum();
+        int candidateCount = distinctAiCandidates(rankedOpportunities).size();
         if (!openAiEnabled || apiKey.isEmpty() || candidateCount == 0 || rankedOpportunities.isEmpty()) {
             LOG.infof(
                     "Upsell plan OpenAI skipped requestId=%s enabled=%s hasApiKey=%s opportunities=%d candidates=%d",
@@ -1756,7 +1766,8 @@ public class UpsellSuggestionService {
         );
 
         Map<String, Object> payload = Map.of(
-                "opportunities", rankedOpportunities.stream().map(this::toAiOpportunity).toList(),
+                "opportunities", rankedOpportunities.stream().map(RankedOpportunity::opportunity).map(this::toAiOpportunity).toList(),
+                "candidateProducts", distinctAiCandidates(rankedOpportunities).stream().map(this::toAiCandidateSummary).toList(),
                 "maxSuggestionsPerOpportunity", Math.max(1, maxSuggestions)
         );
 
@@ -1765,7 +1776,7 @@ public class UpsellSuggestionService {
         requestBody.put("input", List.of(
                 Map.of(
                         "role", "system",
-                        "content", "Rank supermarket add-on products for each shopping station. Select only productIds from the candidateProducts listed on the same opportunity and only opportunityIds from opportunities. Do not invent products or opportunityIds. Reasons must be concise German customer-facing text."
+                        "content", "You are ranking supermarket add-on products for each shopping station. The server provides a shared candidateProducts catalog for this store. For each opportunity, decide from scratch which candidate productIds are genuinely useful complements for the trigger products. Return an empty suggestions array when nothing clearly fits. Select only productIds from candidateProducts and only opportunityIds from opportunities. Do not invent products or opportunityIds. Reasons must be concise German customer-facing text."
                 ),
                 Map.of(
                         "role", "user",
@@ -1788,6 +1799,19 @@ public class UpsellSuggestionService {
         }
 
         return requestBody;
+    }
+
+    private List<ScoredCandidate> distinctAiCandidates(List<RankedOpportunity> rankedOpportunities) {
+        Map<Integer, ScoredCandidate> unique = new LinkedHashMap<>();
+        for (RankedOpportunity opportunity : rankedOpportunities == null ? List.<RankedOpportunity>of() : rankedOpportunities) {
+            for (ScoredCandidate candidate : opportunity.candidates() == null ? List.<ScoredCandidate>of() : opportunity.candidates()) {
+                if (candidate.product() == null || candidate.product().getId() == null) {
+                    continue;
+                }
+                unique.putIfAbsent(candidate.product().getId(), candidate);
+            }
+        }
+        return new ArrayList<>(unique.values());
     }
 
     private boolean supportsReasoning(String model) {
@@ -1825,9 +1849,6 @@ public class UpsellSuggestionService {
 
     private Map<String, Object> toAiOpportunity(RankedOpportunity rankedOpportunity) {
         Map<String, Object> summary = toAiOpportunity(rankedOpportunity.opportunity());
-        summary.put("candidateProducts", rankedOpportunity.candidates().stream()
-                .map(this::toAiCandidateSummary)
-                .toList());
         return summary;
     }
 
@@ -1836,9 +1857,8 @@ public class UpsellSuggestionService {
         summary.put("id", candidate.product().getId());
         summary.put("name", candidate.product().getName());
         summary.put("categoryCode", candidate.categoryCode());
-        summary.put("family", candidate.classification().family().name().toLowerCase(Locale.ROOT));
-        summary.put("classKey", candidate.classification().classKey());
-        summary.put("score", candidate.score());
+        summary.put("layoutCode", normalizeOptional(candidate.product().getLayoutCode()));
+        summary.put("hasLayoutPosition", hasLayoutPosition(candidate.product()));
         return summary;
     }
 
