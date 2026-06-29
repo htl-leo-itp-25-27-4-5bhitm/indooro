@@ -49,7 +49,7 @@ final class UpsellSuggestionStore: ObservableObject {
 
     private let apiBase = "https://it220209.cloud.htl-leonding.ac.at/api"
     private let minSecondsBetweenPrompts: TimeInterval = 8
-    private let maxPromptsPerSession = 4
+    private let maxPromptsPerSession = 10
     private let maxSuggestionsShown = 3
     private let minConfidence = 0.45
     private let maxPendingOpportunityAge: TimeInterval = 30
@@ -127,7 +127,7 @@ final class UpsellSuggestionStore: ObservableObject {
         source: String
     ) {
         guard shownCountForSession < maxPromptsPerSession else {
-            debugLog("preloadPlan skipped reason=session_limit shownCount=\(shownCountForSession)")
+            debugLog("preloadPlan skipped reason=session_limit shownCount=\(shownCountForSession) limit=\(maxPromptsPerSession)")
             return
         }
         guard let store else {
@@ -690,7 +690,7 @@ final class UpsellSuggestionStore: ObservableObject {
             return "active_prompt=\(activePrompt?.opportunityId ?? "unknown")"
         }
         guard shownCountForSession < maxPromptsPerSession else {
-            return "session_limit shownCount=\(shownCountForSession)"
+            return "session_limit shownCount=\(shownCountForSession) limit=\(maxPromptsPerSession)"
         }
         guard !dismissedProductIDs.contains(checkedProductId) else {
             return "dismissed_product checkedProductId=\(checkedProductId)"

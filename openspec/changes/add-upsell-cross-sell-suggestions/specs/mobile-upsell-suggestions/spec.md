@@ -176,9 +176,14 @@ The mobile app SHALL limit how often upsell prompts are displayed in a shopping 
 - **THEN** the app does not display another upsell prompt
 
 #### Scenario: Session limit reached
-- **GIVEN** the customer has already seen the maximum configured number of upsell prompts in the current session
+- **GIVEN** the customer has already seen 10 upsell prompts in the current session
 - **WHEN** another product is completed
 - **THEN** the app suppresses additional upsell prompts for that session
+
+#### Scenario: More than four opportunities exist
+- **GIVEN** the current shopping session contains more than four eligible opportunities
+- **WHEN** fewer than 10 upsell prompts have actually been shown
+- **THEN** the app continues to allow prepared prompts for later completed opportunities
 
 #### Scenario: Customer repeatedly dismisses
 - **GIVEN** the customer dismisses upsell prompts repeatedly

@@ -273,7 +273,7 @@ The prompt is a compact SwiftUI bottom sheet or overlay:
 Suggested MVP config:
 
 - `minSecondsBetweenUpsellPrompts = 45`
-- `maxSuggestionsPerSession = 4`
+- `maxSuggestionsPerSession = 10`
 - `maxSuggestionsShown = 3`
 - `minConfidence = 0.45`
 - request timeout around 3 to 5 seconds on mobile/backend boundary

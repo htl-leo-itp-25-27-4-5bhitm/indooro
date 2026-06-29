@@ -94,3 +94,10 @@
 - [x] 12.5 Mark products added from upsell suggestions and exclude them from future upsell trigger opportunities.
 - [x] 12.6 Add backend service/resource tests for plan responses, station grouping, exclusion filtering, and cache hits.
 - [x] 12.7 Verify backend tests and the final iOS app build after the plan rewrite.
+
+## 13. Phase 13 Session Prompt Capacity
+
+- [x] 13.1 Increase the iOS maximum from 4 to 10 actually shown upsell prompts per shopping session.
+- [x] 13.2 Keep empty results, cache-only operations, and upsell-origin products from consuming the prompt count.
+- [x] 13.3 Include the configured limit in session-limit debug output.
+- [x] 13.4 Run the final iOS simulator build and strict OpenSpec validation.
