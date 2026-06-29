@@ -13,6 +13,7 @@ The server still keeps the non-negotiable safety contract:
 - Products already open on the shopping list, completed products, and trigger products are excluded before the AI request.
 - Returned product IDs are validated against the server candidate map.
 - Duplicate product IDs in one opportunity are ignored.
+- The OpenAI prompt rejects another brand, package size, flavor, or variant of the trigger product because it is an alternative, not an add-on.
 - If OpenAI is disabled, unavailable, times out, or returns invalid JSON, the backend returns empty suggestions instead of deterministic fallback guesses.
 
 This intentionally prefers no popup over weak server-generated suggestions.
@@ -39,7 +40,7 @@ Backend flow:
 - `openai.upsell.timeout-ms` controls the backend OpenAI request timeout. Default: `12000`.
 - `openai.upsell.enabled`, `openai.api-key`, `openai.upsell.model`, and `openai.upsell.reasoning-effort` keep their existing behavior.
 
-The plan cache version is `upsell-plan-v4`, so old prefiltered responses are not reused.
+The plan cache version is `upsell-plan-v5`, so responses created before the alternative-product prompt rule are not reused.
 
 ## OpenAI Payload Shape
 
@@ -94,6 +95,7 @@ Useful iOS debug lines:
 - `source=cache` means the cached plan was reused.
 - `source=none` with `fallbackReason=openai_unavailable_timeout_or_invalid` means no deterministic server fallback was used.
 - Weak cases such as Gouda, eggs, cola, cleaner, or softener may return no popup if OpenAI finds no clear add-on.
+- Apples should not suggest other apple variants, and cola should not suggest another cola size or brand.
 
 ## Tradeoff
 

@@ -59,7 +59,7 @@ Die App sendet keinen OpenAI-Key. Sie sendet nur die aktuelle Store-/Listen-/Sta
 System:
 
 ```text
-You are ranking supermarket add-on products for each shopping station. The server provides a shared candidateProducts catalog for this store. For each opportunity, decide from scratch which candidate productIds are genuinely useful complements for the trigger products. Return an empty suggestions array when nothing clearly fits. Select only productIds from candidateProducts and only opportunityIds from opportunities. Do not invent products or opportunityIds. Reasons must be concise German customer-facing text.
+You are ranking supermarket add-on products for each shopping station. The server provides a shared candidateProducts catalog for this store. For each opportunity, decide from scratch which candidate productIds are genuinely useful complements for the trigger products. Do not suggest the same product type in another brand, package size, flavor, or variant; suggest complements, not alternatives. Return an empty suggestions array when nothing clearly fits. Select only productIds from candidateProducts and only opportunityIds from opportunities. Do not invent products or opportunityIds. Reasons must be concise German customer-facing text.
 ```
 
 User-Payload:
@@ -189,6 +189,7 @@ Das Backend ersetzt die AI-IDs durch echte Katalogprodukte und filtert ungueltig
 - OpenAI-Key liegt nur im Backend als Secret/Env, nie in Swift.
 - AI bekommt einen breiteren, aber weiterhin begrenzten Store-Katalog, nicht ungefilterte Secrets oder Admin-Daten.
 - AI darf keine Produkte erfinden; unbekannte `productId` werden verworfen.
+- Andere Marken, Packungsgroessen, Sorten oder Varianten desselben Trigger-Produkttyps gelten als Alternativen und sollen nicht vorgeschlagen werden.
 - Bereits offene, erledigte und Trigger-Produkte werden serverseitig ausgeschlossen.
 - Stationen werden ueber `opportunityId` gebunden, dadurch kann keine alte Antwort fuer eine andere Station erscheinen.
 - iOS cached leere Opportunities als `loaded_empty`; spaeteres Abhaken fuehrt dann zu `no_suggestions` statt `cache_miss`.

@@ -64,3 +64,10 @@
 - [x] 7.6 Wait for rollout with `kubectl -n student-it220209 rollout status deployment/indooro-backend`.
 - [x] 7.7 Verify LeoCloud deployment readiness with `kubectl -n student-it220209 get deployment indooro-backend`.
 - [x] 7.8 Record rollback command/state in the final response.
+
+## 8. Equivalent Product Variants
+
+- [x] 8.1 Extend the OpenAI prompts so another brand, package size, flavor, or variant of the trigger product is treated as an alternative rather than an add-on.
+- [x] 8.2 Bump the plan cache context to `upsell-plan-v5` so cached results from the older prompt are not reused.
+- [x] 8.3 Add a regression test that verifies the plan prompt contains the alternative-product exclusion rule.
+- [x] 8.4 Run targeted backend tests and strict OpenSpec validation.

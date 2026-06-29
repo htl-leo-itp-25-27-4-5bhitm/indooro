@@ -389,6 +389,31 @@ class UpsellSuggestionServiceTest {
     }
 
     @Test
+    void planPromptRejectsAlternativeBrandsSizesAndVariants() throws IOException {
+        Product candidate = new Product(43, "Bio Aepfel lose", 3.49, "310/1/1/2");
+        UpsellDtos.UpsellOpportunityRequest opportunity = new UpsellDtos.UpsellOpportunityRequest(
+                "item:apple",
+                List.of(40),
+                List.of("Aepfel 1kg")
+        );
+        UpsellSuggestionService.ScoredCandidate scoredCandidate = new UpsellSuggestionService.ScoredCandidate(
+                candidate,
+                "310",
+                service.classifyProduct(candidate),
+                0,
+                List.of(),
+                true
+        );
+
+        String requestJson = service.objectMapper.writeValueAsString(service.openAiPlanRequestBody(List.of(
+                new UpsellSuggestionService.RankedOpportunity(opportunity, null, List.of(scoredCandidate))
+        )));
+
+        assertTrue(requestJson.contains("same product type in another brand, package size, flavor, or variant"));
+        assertTrue(requestJson.contains("complements, not alternatives"));
+    }
+
+    @Test
     void unavailableAiReturnsNoButterFallbackInsteadOfServerGuessing() {
         UpsellDtos.UpsellPlanResponse response = service.plan(new UpsellDtos.UpsellPlanRequest(
                 null,

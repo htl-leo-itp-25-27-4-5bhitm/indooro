@@ -51,7 +51,9 @@ public class UpsellSuggestionService {
     private static final Logger LOG = Logger.getLogger(UpsellSuggestionService.class);
     private static final String GENERIC_REASON = "Ergaenzt den gerade erledigten Artikel.";
     private static final String CACHE_CONTEXT_VERSION = "upsell-v4";
-    private static final String PLAN_CACHE_CONTEXT_VERSION = "upsell-plan-v4";
+    private static final String PLAN_CACHE_CONTEXT_VERSION = "upsell-plan-v5";
+    private static final String NO_ALTERNATIVE_PRODUCTS_RULE =
+            "Do not suggest the same product type in another brand, package size, flavor, or variant; suggest complements, not alternatives.";
     private static final int FALLBACK_MIN_SCORE = 90;
 
     @Inject
@@ -1704,7 +1706,9 @@ public class UpsellSuggestionService {
         requestBody.put("input", List.of(
                 Map.of(
                         "role", "system",
-                        "content", "Rank supermarket add-on products. Select only productIds from the provided candidates. Do not invent products. Reasons must be concise German customer-facing text."
+                        "content", "Rank supermarket add-on products. Select only productIds from the provided candidates. Do not invent products. "
+                                + NO_ALTERNATIVE_PRODUCTS_RULE
+                                + " Reasons must be concise German customer-facing text."
                 ),
                 Map.of(
                         "role", "user",
@@ -1776,7 +1780,9 @@ public class UpsellSuggestionService {
         requestBody.put("input", List.of(
                 Map.of(
                         "role", "system",
-                        "content", "You are ranking supermarket add-on products for each shopping station. The server provides a shared candidateProducts catalog for this store. For each opportunity, decide from scratch which candidate productIds are genuinely useful complements for the trigger products. Return an empty suggestions array when nothing clearly fits. Select only productIds from candidateProducts and only opportunityIds from opportunities. Do not invent products or opportunityIds. Reasons must be concise German customer-facing text."
+                        "content", "You are ranking supermarket add-on products for each shopping station. The server provides a shared candidateProducts catalog for this store. For each opportunity, decide from scratch which candidate productIds are genuinely useful complements for the trigger products. "
+                                + NO_ALTERNATIVE_PRODUCTS_RULE
+                                + " Return an empty suggestions array when nothing clearly fits. Select only productIds from candidateProducts and only opportunityIds from opportunities. Do not invent products or opportunityIds. Reasons must be concise German customer-facing text."
                 ),
                 Map.of(
                         "role", "user",

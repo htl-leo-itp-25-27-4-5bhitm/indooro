@@ -16,6 +16,11 @@ The backend SHALL let OpenAI choose add-on products for shopping-session upsell 
 - **WHEN** the backend loads products for an AI upsell plan
 - **THEN** the candidate list is capped by the configured `upsell.max-candidates` value
 
+#### Scenario: Catalog contains an equivalent product variant
+- **WHEN** a candidate is the same product type as a trigger in another brand, package size, flavor, or variant
+- **THEN** the OpenAI ranking prompt instructs the model not to select it as an add-on
+- **AND** the model may return an empty suggestions array when no genuine complement exists
+
 ### Requirement: Backend must validate OpenAI product IDs
 The backend SHALL treat OpenAI output as ranking advice and validate every returned identifier against the server-side candidate map.
 
